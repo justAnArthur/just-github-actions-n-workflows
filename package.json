@@ -13,7 +13,9 @@
   },
   "files": [
     "init.ts",
-    "dist/**/*"
+    "workflows/**/*.yml",
+    "workflow.example.yaml",
+    "README.md"
   ],
   "dependencies": {
     "fast-xml-parser": "^5.5.9"
