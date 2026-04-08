@@ -10,7 +10,7 @@ run-name: "publish-npm — ${{ github.ref_name }}"
 
 on:
   push:
-    tags: ["*@*"]
+    tags: [ "*@*" ]
   workflow_dispatch:
     inputs:
       tag:
@@ -28,4 +28,3 @@ jobs:
     secrets:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
-

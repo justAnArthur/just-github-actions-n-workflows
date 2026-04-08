@@ -15,8 +15,8 @@
 // else is needed — the toolkit fetches its own binaries at runtime.
 // ---
 
-import { mkdirSync, writeFileSync, existsSync } from "node:fs";
-import { join } from "node:path";
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
 
 // --- workflow templates ---
 
@@ -67,7 +67,7 @@ jobs:
       bump_manifest_names: \${{ github.event.inputs.bump_manifest_names || '' }}
     secrets:
       GH_TOKEN: \${{ secrets.GH_TOKEN }}
-`,
+`
   },
 
   "publish-docker": {
@@ -104,7 +104,7 @@ jobs:
     secrets:
       GH_TOKEN: \${{ secrets.GH_TOKEN }}
       NPM_TOKEN: \${{ secrets.NPM_TOKEN }}
-`,
+`
   },
 
   "publish-npm": {
@@ -133,20 +133,20 @@ jobs:
     secrets:
       GH_TOKEN: \${{ secrets.GH_TOKEN }}
       NPM_TOKEN: \${{ secrets.NPM_TOKEN }}
-`,
-  },
-};
+`
+  }
+}
 
 // --- cli ---
 
-const args = process.argv.slice(2);
+const args = process.argv.slice(2)
 
 // strip the "init" subcommand if present
-const command = args[0];
-if (command === "init") args.shift();
+const command = args[0]
+if (command === "init") args.shift()
 
-const flags = args.filter((a) => a.startsWith("-"));
-const positional = args.filter((a) => !a.startsWith("-"));
+const flags = args.filter((a) => a.startsWith("-"))
+const positional = args.filter((a) => !a.startsWith("-"))
 
 if (flags.includes("--help") || flags.includes("-h")) {
   console.log(`
@@ -162,62 +162,62 @@ examples:
 
 available workflows:
 ${Object.entries(WORKFLOWS)
-  .map(([name, w]) => `  ${name.padEnd(20)} ${w.description}`)
-  .join("\n")}
-`);
-  process.exit(0);
+    .map(([name, w]) => `  ${name.padEnd(20)} ${w.description}`)
+    .join("\n")}
+`)
+  process.exit(0)
 }
 
 if (flags.includes("--list") || flags.includes("-l")) {
-  console.log("\navailable workflows:\n");
+  console.log("\navailable workflows:\n")
   for (const [name, w] of Object.entries(WORKFLOWS)) {
-    console.log(`  ${name.padEnd(20)} → .github/workflows/${w.file}`);
-    console.log(`  ${"".padEnd(20)}   ${w.description}\n`);
+    console.log(`  ${name.padEnd(20)} → .github/workflows/${w.file}`)
+    console.log(`  ${"".padEnd(20)}   ${w.description}\n`)
   }
-  process.exit(0);
+  process.exit(0)
 }
 
 // determine which workflows to install
 const selected =
   positional.length > 0
     ? positional.map((name) => {
-        const key = name.replace(/\.yml$/, "");
-        if (!WORKFLOWS[key]) {
-          console.error(`unknown workflow: "${name}"`);
-          console.error(`available: ${Object.keys(WORKFLOWS).join(", ")}`);
-          process.exit(1);
-        }
-        return [key, WORKFLOWS[key]] as const;
-      })
-    : Object.entries(WORKFLOWS);
+      const key = name.replace(/\.yml$/, "")
+      if (!WORKFLOWS[key]) {
+        console.error(`unknown workflow: "${name}"`)
+        console.error(`available: ${Object.keys(WORKFLOWS).join(", ")}`)
+        process.exit(1)
+      }
+      return [key, WORKFLOWS[key]] as const
+    })
+    : Object.entries(WORKFLOWS)
 
 // create .github/workflows/ if needed
-const workflowsDir = join(process.cwd(), ".github", "workflows");
-mkdirSync(workflowsDir, { recursive: true });
+const workflowsDir = join(process.cwd(), ".github", "workflows")
+mkdirSync(workflowsDir, { recursive: true })
 
 // write files
-let created = 0;
-let skipped = 0;
+let created = 0
+let skipped = 0
 
 for (const [name, workflow] of selected) {
-  const filePath = join(workflowsDir, workflow.file);
+  const filePath = join(workflowsDir, workflow.file)
 
   if (existsSync(filePath)) {
-    console.log(`  skip  ${workflow.file} (already exists)`);
-    skipped++;
-    continue;
+    console.log(`  skip  ${workflow.file} (already exists)`)
+    skipped++
+    continue
   }
 
-  writeFileSync(filePath, workflow.content, "utf-8");
-  console.log(`  create  .github/workflows/${workflow.file}`);
-  created++;
+  writeFileSync(filePath, workflow.content, "utf-8")
+  console.log(`  create  .github/workflows/${workflow.file}`)
+  created++
 }
 
-console.log(`\ndone — ${created} created, ${skipped} skipped`);
+console.log(`\ndone — ${created} created, ${skipped} skipped`)
 
 if (created > 0) {
-  console.log(`\nnext steps:`);
-  console.log(`  1. set the GH_TOKEN secret in your repo settings`);
-  console.log(`  2. commit and push: git add .github/ && git commit -m "ci: add workflows" && git push`);
+  console.log(`\nnext steps:`)
+  console.log(`  1. set the GH_TOKEN secret in your repo settings`)
+  console.log(`  2. commit and push: git add .github/ && git commit -m "ci: add workflows" && git push`)
 }
 

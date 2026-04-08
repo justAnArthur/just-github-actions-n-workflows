@@ -5,7 +5,7 @@
 // and structured logging that github actions understands.
 // ---
 
-import { appendFileSync } from "node:fs";
+import { appendFileSync } from "node:fs"
 
 // --- step outputs ---
 // writes a key/value pair to `$GITHUB_OUTPUT` so downstream steps
@@ -13,16 +13,16 @@ import { appendFileSync } from "node:fs";
 // multiline values are wrapped with a heredoc-style delimiter.
 
 export function setOutput(key: string, value: string): void {
-  const outputFile = process.env.GITHUB_OUTPUT;
+  const outputFile = process.env.GITHUB_OUTPUT
   if (!outputFile) {
-    console.warn(`GITHUB_OUTPUT is not set — cannot write output "${key}"`);
-    return;
+    console.warn(`GITHUB_OUTPUT is not set — cannot write output "${key}"`)
+    return
   }
 
   if (value.includes("\n")) {
-    appendFileSync(outputFile, `${key}<<EOF\n${value}\nEOF\n`);
+    appendFileSync(outputFile, `${key}<<EOF\n${value}\nEOF\n`)
   } else {
-    appendFileSync(outputFile, `${key}=${value}\n`);
+    appendFileSync(outputFile, `${key}=${value}\n`)
   }
 }
 
@@ -31,15 +31,15 @@ export function setOutput(key: string, value: string): void {
 // giving a clear error message instead of a silent undefined.
 
 export function getRequiredEnv(name: string): string {
-  const value = process.env[name];
+  const value = process.env[name]
   if (value === undefined || value === "") {
-    throw new Error(`required environment variable "${name}" is not set`);
+    throw new Error(`required environment variable "${name}" is not set`)
   }
-  return value;
+  return value
 }
 
 export function getEnv(name: string, fallback: string = ""): string {
-  return process.env[name] ?? fallback;
+  return process.env[name] ?? fallback
 }
 
 // --- logging ---
@@ -52,5 +52,5 @@ export const log = {
   warn: (msg: string) => console.log(`::warning::${msg}`),
   error: (msg: string) => console.log(`::error::${msg}`),
   group: (title: string) => console.log(`::group::${title}`),
-  groupEnd: () => console.log("::endgroup::"),
-};
+  groupEnd: () => console.log("::endgroup::")
+}

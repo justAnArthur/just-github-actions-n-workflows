@@ -6,20 +6,20 @@
 // for looking up and updating individual manifests.
 // ---
 
-import type { Dirent } from "node:fs";
-import fs from "node:fs/promises";
-import path from "node:path";
+import type { Dirent } from "node:fs"
+import fs from "node:fs/promises"
+import path from "node:path"
 
-import { manifestModules } from "./handle";
-import type { Manifest } from "./handle";
+import type { Manifest } from "./handle"
+import { manifestModules } from "./handle"
 
-export type { Manifest };
+export type { Manifest }
 
 // --- constants ---
 
 const TARGET_FILENAMES = new Set(
-  manifestModules.map((m) => m.fileName).filter(Boolean),
-);
+  manifestModules.map((m) => m.fileName).filter(Boolean)
+)
 
 const DEFAULT_EXCLUDE = new Set([
   "node_modules",
@@ -29,8 +29,8 @@ const DEFAULT_EXCLUDE = new Set([
   "build",
   "out",
   "target",
-  ".next",
-]);
+  ".next"
+])
 
 // --- discovery ---
 // walks the file tree starting at `dir`, collecting every manifest
@@ -38,41 +38,41 @@ const DEFAULT_EXCLUDE = new Set([
 
 export async function findManifests<R = Manifest & { path: string }>(
   dir: string,
-  opts: { exclude?: Set<string>; results?: R[] } = {},
+  opts: { exclude?: Set<string>; results?: R[] } = {}
 ): Promise<R[]> {
-  const exclude = opts.exclude || DEFAULT_EXCLUDE;
-  const results = opts.results || [];
+  const exclude = opts.exclude || DEFAULT_EXCLUDE
+  const results = opts.results || []
 
-  let entries: Dirent[];
+  let entries: Dirent[]
   try {
-    entries = await fs.readdir(dir, { withFileTypes: true });
+    entries = await fs.readdir(dir, { withFileTypes: true })
   } catch {
-    return results;
+    return results
   }
 
   for (const entry of entries) {
-    const full = path.join(dir, entry.name);
+    const full = path.join(dir, entry.name)
 
     if (entry.isFile() && TARGET_FILENAMES.has(entry.name)) {
-      results.push({ ...(await parseManifest(full)), path: full } as R);
+      results.push({ ...(await parseManifest(full)), path: full } as R)
     } else if (entry.isDirectory() && !exclude.has(entry.name)) {
-      await findManifests(full, { exclude, results });
+      await findManifests(full, { exclude, results })
     }
   }
 
-  return results;
+  return results
 }
 
 // --- parsing ---
 // delegates to the handler module that matches the file name.
 
 export async function parseManifest(filePath: string): Promise<Manifest> {
-  const fileName = path.basename(filePath);
-  const handler = manifestModules.find((m) => m.fileName === fileName);
-  if (!handler) throw new Error(`no manifest handler for file: ${filePath}`);
+  const fileName = path.basename(filePath)
+  const handler = manifestModules.find((m) => m.fileName === fileName)
+  if (!handler) throw new Error(`no manifest handler for file: ${filePath}`)
 
-  const content = await fs.readFile(filePath, "utf-8");
-  return handler.parseManifest(content);
+  const content = await fs.readFile(filePath, "utf-8")
+  return handler.parseManifest(content)
 }
 
 // --- lookup ---
@@ -80,13 +80,13 @@ export async function parseManifest(filePath: string): Promise<Manifest> {
 
 export function findManifestByName(
   manifests: Manifest[],
-  name: string,
+  name: string
 ): Manifest | undefined {
   return manifests.find(
     (m) =>
       m.name === name ||
-      m.gitCommitScopeRelatedNames?.includes(name),
-  );
+      m.gitCommitScopeRelatedNames?.includes(name)
+  )
 }
 
 // --- update ---
@@ -94,22 +94,22 @@ export function findManifestByName(
 
 export async function updateManifest(
   filePath: string,
-  newVersion: string,
+  newVersion: string
 ): Promise<void> {
-  const fileName = path.basename(filePath);
-  const handler = manifestModules.find((m) => m.fileName === fileName);
-  if (!handler) throw new Error(`no manifest handler for file: ${filePath}`);
+  const fileName = path.basename(filePath)
+  const handler = manifestModules.find((m) => m.fileName === fileName)
+  if (!handler) throw new Error(`no manifest handler for file: ${filePath}`)
 
-  const content = await fs.readFile(filePath, "utf-8");
-  const updated = await handler.setManifestVersion(content, newVersion);
-  await fs.writeFile(filePath, updated, "utf-8");
+  const content = await fs.readFile(filePath, "utf-8")
+  const updated = await handler.setManifestVersion(content, newVersion)
+  await fs.writeFile(filePath, updated, "utf-8")
 }
 
 // --- cli helper ---
 // reads the manifest search directory from argv, defaulting to cwd.
 
 export function getManifestSearchDir(): string {
-  const argv = process.argv.slice(2);
-  const dirArgIndex = argv.findIndex((a) => !a.startsWith("-"));
-  return dirArgIndex >= 0 ? path.resolve(argv[dirArgIndex]) : process.cwd();
+  const argv = process.argv.slice(2)
+  const dirArgIndex = argv.findIndex((a) => !a.startsWith("-"))
+  return dirArgIndex >= 0 ? path.resolve(argv[dirArgIndex]) : process.cwd()
 }

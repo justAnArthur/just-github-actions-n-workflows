@@ -18,7 +18,7 @@ run-name: >-
 
 on:
   push:
-    branches: ["canary", "versions/**"]
+    branches: [ "canary", "versions/**" ]
   workflow_dispatch:
     inputs:
       bump_type:

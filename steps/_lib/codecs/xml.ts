@@ -6,7 +6,7 @@
 // element order and comments intact.
 // ---
 
-import { XMLBuilder, XMLParser } from "fast-xml-parser";
+import { XMLBuilder, XMLParser } from "fast-xml-parser"
 
 // --- parser ---
 // order-preserving parser that keeps comments and avoids
@@ -18,8 +18,8 @@ const parser = new XMLParser({
   commentPropName: "#comment",
   trimValues: true,
   parseTagValue: false,
-  parseAttributeValue: false,
-});
+  parseAttributeValue: false
+})
 
 // --- builder ---
 // reconstructs xml from the parsed json structure.
@@ -33,15 +33,15 @@ const builder = new XMLBuilder({
   format: true,
   indentBy: "  ",
   processEntities: false,
-  suppressBooleanAttributes: false,
-});
+  suppressBooleanAttributes: false
+})
 
 // --- public api ---
 
 export function pomXmlToJson(xml: string) {
-  return parser.parse(xml);
+  return parser.parse(xml)
 }
 
 export function jsonToPomXml(json: any) {
-  return builder.build(json);
+  return builder.build(json)
 }

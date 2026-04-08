@@ -9,30 +9,30 @@
 //   ENV_FILE_VARIABLES — newline-separated key=value pairs (required)
 // ---
 
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
-import { getEnv, getRequiredEnv, log } from "./_lib/github";
+import { mkdirSync, writeFileSync } from "node:fs"
+import { join } from "node:path"
+import { getEnv, getRequiredEnv, log } from "./_lib/github"
 
-const fileName = getEnv("ENV_FILE_NAME", ".env");
-const variables = getRequiredEnv("ENV_FILE_VARIABLES");
+const fileName = getEnv("ENV_FILE_NAME", ".env")
+const variables = getRequiredEnv("ENV_FILE_VARIABLES")
 
 // normalise the path — strip trailing slash for consistent `join()`
-let filePath = getEnv("ENV_FILE_PATH", "./");
-if (filePath.endsWith("/")) filePath = filePath.slice(0, -1);
+let filePath = getEnv("ENV_FILE_PATH", "./")
+if (filePath.endsWith("/")) filePath = filePath.slice(0, -1)
 
-const envFile = join(filePath, fileName);
+const envFile = join(filePath, fileName)
 
 // ensure the target directory exists
-mkdirSync(filePath, { recursive: true });
+mkdirSync(filePath, { recursive: true })
 
 // filter out empty lines and comments, then write
 const lines = variables
   .split("\n")
-  .filter((line) => line.trim().length > 0 && !line.trim().startsWith("#"));
+  .filter((line) => line.trim().length > 0 && !line.trim().startsWith("#"))
 
-writeFileSync(envFile, lines.join("\n") + "\n", "utf-8");
+writeFileSync(envFile, lines.join("\n") + "\n", "utf-8")
 
-log.info(`created ${envFile} with ${lines.length} variable(s):`);
+log.info(`created ${envFile} with ${lines.length} variable(s):`)
 for (const line of lines) {
-  log.info(`  ${line}`);
+  log.info(`  ${line}`)
 }

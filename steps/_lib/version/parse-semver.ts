@@ -22,9 +22,9 @@ export interface ParsedVersion {
 export function parseSemver(input: string): ParsedVersion | null {
   const match = input.match(
     /^(v)?(\d+)\.(\d+)\.(\d+)(?:-([0-9A-Za-z.-]+))?(?:\+([0-9A-Za-z.-]+))?$/
-  );
+  )
 
-  if (!match) return null;
+  if (!match) return null
 
   return {
     prefixV: !!match[1],
@@ -32,16 +32,16 @@ export function parseSemver(input: string): ParsedVersion | null {
     minor: parseInt(match[3], 10),
     patch: parseInt(match[4], 10),
     prerelease: match[5] || null,
-    build: match[6] || null,
-  };
+    build: match[6] || null
+  }
 }
 
 // --- format ---
 // reconstructs the version string from its parsed components.
 
 export function formatSemver(parsed: ParsedVersion): string {
-  const core = `${parsed.major}.${parsed.minor}.${parsed.patch}`;
-  const pre = parsed.prerelease ? `-${parsed.prerelease}` : "";
-  const build = parsed.build ? `+${parsed.build}` : "";
-  return (parsed.prefixV ? "v" : "") + core + pre + build;
+  const core = `${parsed.major}.${parsed.minor}.${parsed.patch}`
+  const pre = parsed.prerelease ? `-${parsed.prerelease}` : ""
+  const build = parsed.build ? `+${parsed.build}` : ""
+  return (parsed.prefixV ? "v" : "") + core + pre + build
 }

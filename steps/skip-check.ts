@@ -16,25 +16,25 @@
 //   78 — skip (neutral exit; github actions treats it as success)
 // ---
 
-import { $ } from "bun";
-import { log, setOutput } from "./_lib/github";
+import { $ } from "bun"
+import { log, setOutput } from "./_lib/github"
 
-const message = (await $`git log -1 --pretty=%B`.text()).trim();
-const committer = (await $`git log -1 --pretty=%ce`.text()).trim();
+const message = (await $`git log -1 --pretty=%B`.text()).trim()
+const committer = (await $`git log -1 --pretty=%ce`.text()).trim()
 
-const skipByMessage = message.includes("[skip bump]");
+const skipByMessage = message.includes("[skip bump]")
 const skipByBot =
-  committer.includes("github-actions") || committer.includes("[bot]");
+  committer.includes("github-actions") || committer.includes("[bot]")
 
 if (skipByMessage || skipByBot) {
   const reason = skipByMessage
     ? "commit message contains [skip bump]"
-    : `committer is bot (${committer})`;
+    : `committer is bot (${committer})`
 
-  log.info(`skipping workflow: ${reason}`);
-  setOutput("skip", "true");
-  process.exit(78);
+  log.info(`skipping workflow: ${reason}`)
+  setOutput("skip", "true")
+  process.exit(78)
 } else {
-  log.info(`last commit: "${message}" by ${committer} — no skip marker found`);
-  setOutput("skip", "false");
+  log.info(`last commit: "${message}" by ${committer} — no skip marker found`)
+  setOutput("skip", "false")
 }

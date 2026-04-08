@@ -22,10 +22,10 @@ export type ManifestModule = {
 // --- registry ---
 // order matters: the first module whose `fileName` matches wins.
 
-import packageJsonModule from "./handle.package-json";
-import pomXmlModule from "./handle.pom-xml";
+import packageJsonModule from "./handle.package-json"
+import pomXmlModule from "./handle.pom-xml"
 
 export const manifestModules: ManifestModule[] = [
   packageJsonModule,
-  pomXmlModule,
-];
+  pomXmlModule
+]

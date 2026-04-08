@@ -12,17 +12,17 @@
 //   SSH_EXEC_ALIVE_COUNT    — max unanswered keepalives (default: "5")
 // ---
 
-import { getEnv, getRequiredEnv, log } from "./_lib/github";
-import { exec } from "./_lib/exec";
+import { getEnv, getRequiredEnv, log } from "./_lib/github"
+import { exec } from "./_lib/exec"
 
-const host = getRequiredEnv("SSH_EXEC_HOST");
-const username = getRequiredEnv("SSH_EXEC_USERNAME");
-const script = getRequiredEnv("SSH_EXEC_SCRIPT");
-const aliveInterval = getEnv("SSH_EXEC_ALIVE_INTERVAL", "60");
-const aliveCountMax = getEnv("SSH_EXEC_ALIVE_COUNT", "5");
+const host = getRequiredEnv("SSH_EXEC_HOST")
+const username = getRequiredEnv("SSH_EXEC_USERNAME")
+const script = getRequiredEnv("SSH_EXEC_SCRIPT")
+const aliveInterval = getEnv("SSH_EXEC_ALIVE_INTERVAL", "60")
+const aliveCountMax = getEnv("SSH_EXEC_ALIVE_COUNT", "5")
 
-log.info(`executing remote commands on ${username}@${host}`);
-log.info(`keepalive: interval=${aliveInterval}s, max=${aliveCountMax}`);
+log.info(`executing remote commands on ${username}@${host}`)
+log.info(`keepalive: interval=${aliveInterval}s, max=${aliveCountMax}`)
 
 // build the ssh command with keepalive options
 const sshCommand = [
@@ -31,12 +31,12 @@ const sshCommand = [
   "-o", `ServerAliveInterval=${aliveInterval}`,
   "-o", `ServerAliveCountMax=${aliveCountMax}`,
   `${username}@${host}`,
-  "bash -s",
-].join(" ");
+  "bash -s"
+].join(" ")
 
 // pipe the script via stdin using a heredoc
-const fullCommand = `${sshCommand} << 'ENDSSH'\n${script}\nENDSSH`;
+const fullCommand = `${sshCommand} << 'ENDSSH'\n${script}\nENDSSH`
 
-await exec(fullCommand);
+await exec(fullCommand)
 
-log.info(`remote execution on ${host} complete`);
+log.info(`remote execution on ${host} complete`)

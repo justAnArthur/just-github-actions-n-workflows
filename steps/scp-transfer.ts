@@ -10,23 +10,23 @@
 //   SCP_TARGET   — remote destination path (required)
 // ---
 
-import { $ } from "bun";
-import { getRequiredEnv, log } from "./_lib/github";
+import { $ } from "bun"
+import { getRequiredEnv, log } from "./_lib/github"
 
-const host = getRequiredEnv("SCP_HOST");
-const username = getRequiredEnv("SCP_USERNAME");
-const source = getRequiredEnv("SCP_SOURCE");
-const target = getRequiredEnv("SCP_TARGET");
+const host = getRequiredEnv("SCP_HOST")
+const username = getRequiredEnv("SCP_USERNAME")
+const source = getRequiredEnv("SCP_SOURCE")
+const target = getRequiredEnv("SCP_TARGET")
 
-log.info(`transferring files to ${username}@${host}:${target}`);
-log.info(`source: ${source}`);
+log.info(`transferring files to ${username}@${host}:${target}`)
+log.info(`source: ${source}`)
 
 // split in case multiple files are space-separated
-const sourceFiles = source.split(/\s+/).filter(Boolean);
+const sourceFiles = source.split(/\s+/).filter(Boolean)
 
 for (const file of sourceFiles) {
-  log.info(`  copying ${file}...`);
-  await $`scp -v -o StrictHostKeyChecking=no ${file} ${username}@${host}:${target}`;
+  log.info(`  copying ${file}...`)
+  await $`scp -v -o StrictHostKeyChecking=no ${file} ${username}@${host}:${target}`
 }
 
-log.info("scp transfer complete");
+log.info("scp transfer complete")

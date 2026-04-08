@@ -5,7 +5,7 @@
 // gitCommitScopeRelatedNames) from the `properties` field.
 // ---
 
-import type { Manifest, ManifestModule } from "./index";
+import type { Manifest, ManifestModule } from "./index"
 
 export default {
   fileName: "package.json",
@@ -14,8 +14,8 @@ export default {
   // extracts manifest metadata from a raw package.json string.
 
   async parseManifest(fileContent: string): Promise<Manifest> {
-    const pkg = JSON.parse(fileContent);
-    const props = pkg.properties ?? {};
+    const pkg = JSON.parse(fileContent)
+    const props = pkg.properties ?? {}
 
     return {
       name: pkg.name,
@@ -24,17 +24,17 @@ export default {
       DockerfilePath: props.DockerfilePath,
       gitCommitScopeRelatedNames: props.gitCommitScopeRelatedNames
         ? props.gitCommitScopeRelatedNames.split(",").map((s: string) => s.trim())
-        : undefined,
-    };
+        : undefined
+    }
   },
 
   // --- update version ---
   // replaces the `version` field and re-serialises with 2-space indent.
 
   async setManifestVersion(fileContent: string, version: string): Promise<string> {
-    const pkg = JSON.parse(fileContent);
-    pkg.version = version;
-    return JSON.stringify(pkg, null, 2);
-  },
-} as ManifestModule;
+    const pkg = JSON.parse(fileContent)
+    pkg.version = version
+    return JSON.stringify(pkg, null, 2)
+  }
+} as ManifestModule
 
