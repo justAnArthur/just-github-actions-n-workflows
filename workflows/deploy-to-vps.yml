@@ -106,6 +106,7 @@ jobs:
               ;;
             "78.47.109.42")
               COMPOSE_PROFILES="@camasys/backend_gps"
+              PROFILES=""
               APP_TZ="UTC"
               ;;
             *)
@@ -115,6 +116,7 @@ jobs:
           esac
           echo "COMPOSE_PROFILES=${COMPOSE_PROFILES}" >> $GITHUB_ENV
           echo "PROFILES=${PROFILES}" >> $GITHUB_ENV
+          echo "APP_TZ=${APP_TZ}" >> $GITHUB_ENV
 
       - name: Resolve image tags
         id: resolve-tags

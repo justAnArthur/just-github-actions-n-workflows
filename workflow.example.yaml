@@ -8,9 +8,10 @@
 # available reusable workflows:
 #   .github/workflows/bump-version.yml
 #   .github/workflows/publish-docker-on-tag.yml
+#   .github/workflows/publish-npm-on-tag.yml
 #
 # for custom workflows (e.g. deploy), you can also use the binaries
-# directly — see example 3 below.
+# directly — see example 4 below.
 # ---
 
 # ╔══════════════════════════════════════════════════════════════════════╗
@@ -20,45 +21,49 @@
 # ║  auto-bumps manifests on push to canary, or via manual dispatch    ║
 # ╚══════════════════════════════════════════════════════════════════════╝
 
-name: bump-version
-run-name: >-
-  ${{
-    github.event_name == 'workflow_dispatch'
-      && format('bump-version (manual) — type={0}, stable={1}, manifests={2}',
-           github.event.inputs.bump_type || '',
-           github.event.inputs.bump_to_stable || '',
-           github.event.inputs.bump_manifest_names || '')
-      || format('bump-version (auto) — {0}',
-           github.event.head_commit.message || '')
-  }}
-
-on:
-  push:
-    branches: ["canary", "versions/**"]
-  workflow_dispatch:
-    inputs:
-      bump_type:
-        description: 'bump type (e.g. "minor:canary", "patch:stable")'
-        required: false
-        default: ""
-      bump_to_stable:
-        description: "promote canary to stable based on history"
-        required: false
-        default: "false"
-      bump_manifest_names:
-        description: "comma-separated manifest names to bump (empty = all)"
-        required: false
-        default: ""
-
-jobs:
-  bump:
-    uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
-    with:
-      bump_type: ${{ github.event.inputs.bump_type || '' }}
-      bump_to_calculated_stable: ${{ github.event.inputs.bump_to_stable || 'false' }}
-      bump_manifest_names: ${{ github.event.inputs.bump_manifest_names || '' }}
-    secrets:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+# name: bump-version
+# run-name: >-
+#   ${{
+#     github.event_name == 'workflow_dispatch'
+#       && format('bump-version (manual) — type={0}, stable={1}, manifests={2}',
+#            github.event.inputs.bump_type || '',
+#            github.event.inputs.bump_to_stable || '',
+#            github.event.inputs.bump_manifest_names || '')
+#       || format('bump-version (auto) — {0}',
+#            github.event.head_commit.message || '')
+#   }}
+#
+# on:
+#   push:
+#     branches: ["canary", "versions/**"]
+#   workflow_dispatch:
+#     inputs:
+#       bump_type:
+#         description: 'bump type (e.g. "minor:canary", "patch:stable")'
+#         required: false
+#         default: ""
+#       bump_to_stable:
+#         description: "promote canary to stable based on history"
+#         required: false
+#         default: "false"
+#       bump_manifest_names:
+#         description: "comma-separated manifest names to bump (empty = all)"
+#         required: false
+#         default: ""
+#
+# permissions:
+#   contents: write
+#   packages: write
+#
+# jobs:
+#   bump:
+#     uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
+#     with:
+#       bump_type: ${{ github.event.inputs.bump_type || '' }}
+#       bump_to_calculated_stable: ${{ github.event.inputs.bump_to_stable || 'false' }}
+#       bump_manifest_names: ${{ github.event.inputs.bump_manifest_names || '' }}
+#     secrets:
+#       GH_TOKEN: ${{ secrets.GH_TOKEN }}
 
 # ╔══════════════════════════════════════════════════════════════════════╗
 # ║  example 2 — publish docker image on tag                           ║
@@ -78,6 +83,10 @@ jobs:
 #         description: 'tag to build (e.g. "@scope/pkg@1.2.3")'
 #         required: false
 #
+# permissions:
+#   contents: write
+#   packages: write
+#
 # jobs:
 #   publish:
 #     uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/publish-docker-on-tag.yml@main
@@ -88,7 +97,38 @@ jobs:
 #       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
 # ╔══════════════════════════════════════════════════════════════════════╗
-# ║  example 3 — deploy to vps (custom workflow using binaries)        ║
+# ║  example 3 — publish npm package on tag                            ║
+# ║                                                                    ║
+# ║  paste this into:  .github/workflows/publish-npm.yml               ║
+# ║  publishes to npm registry, creates a github release with notes    ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+# name: publish-npm
+# run-name: "publish-npm — ${{ github.ref_name }}"
+#
+# on:
+#   push:
+#     tags: ["*@*"]
+#   workflow_dispatch:
+#     inputs:
+#       tag:
+#         description: 'tag to publish (e.g. "my-package@1.2.3")'
+#         required: true
+#
+# permissions:
+#   contents: write
+#
+# jobs:
+#   publish:
+#     uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/publish-npm-on-tag.yml@main
+#     with:
+#       tag: ${{ github.event.inputs.tag || github.ref_name }}
+#     secrets:
+#       GH_TOKEN: ${{ secrets.GH_TOKEN }}
+#       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  example 4 — deploy to vps (custom workflow using binaries)        ║
 # ║                                                                    ║
 # ║  for project-specific workflows that don't fit a reusable template ║
 # ║  you can fetch the binaries directly and call them in your steps.  ║

@@ -19,8 +19,9 @@ $ bunx just-github-actions-n-workflows init
 
   create  .github/workflows/bump-version.yml
   create  .github/workflows/publish-docker-on-tag.yml
+  create  .github/workflows/publish-npm-on-tag.yml
 
-done — 2 created, 0 skipped
+done — 3 created, 0 skipped
 
 next steps:
   1. set the GH_TOKEN secret in your repo settings
@@ -32,6 +33,7 @@ you can also install a specific workflow:
 ```bash
 bunx just-github-actions-n-workflows init bump-version
 bunx just-github-actions-n-workflows init publish-docker
+bunx just-github-actions-n-workflows init publish-npm
 bunx just-github-actions-n-workflows init --list
 ```
 
@@ -102,7 +104,10 @@ steps:
 │
 ├── .github/workflows/            # reusable workflows (workflow_call)
 │   ├── bump-version.yml
-│   └── publish-docker-on-tag.yml
+│   ├── publish-docker-on-tag.yml
+│   ├── publish-npm-on-tag.yml
+│   ├── ci-bump-version.yml       # self-use: bumps this repo's version
+│   └── ci-publish-npm.yml        # self-use: publishes this package to npm
 │
 ├── steps/                        # step entry points (one binary each)
 │   ├── bump-version.ts
@@ -127,6 +132,7 @@ steps:
 ├── workflows/                    # caller examples you can copy
 │   ├── bump-version.yml
 │   ├── publish-docker-on-tag.yml
+│   ├── publish-npm-on-tag.yml
 │   └── deploy-to-vps.yml
 │
 └── dist/                         # compiled linux-x64 binaries (committed)
@@ -153,11 +159,11 @@ steps:
 | secret | used by |
 |--------|---------|
 | `GH_TOKEN` | all workflows (github api + push access) |
+| `NPM_TOKEN` | publish-docker-on-tag (npm registry in docker build), publish-npm-on-tag (npm publish) |
 | `SSH_PRIVATE_KEY` | deploy-to-vps (ssh authentication) |
 | `SERVER_USERNAME` | deploy-to-vps (ssh/scp username) |
 | `DOCKER_USERNAME` | deploy-to-vps (ghcr login) |
 | `DOCKER_PASSWORD` | deploy-to-vps (ghcr login) |
-| `NPM_TOKEN` | publish-docker-on-tag (npm registry in docker build) |
 
 ## development
 

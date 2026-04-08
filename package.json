@@ -25,6 +25,9 @@
     "type": "git",
     "url": "https://github.com/justAnArthur/just-github-actions-n-workflows"
   },
+  "publishConfig": {
+    "access": "public"
+  },
   "license": "MIT",
   "properties": {
     "gitCommitScopeRelatedNames": "toolkit,actions,workflows"

@@ -199,7 +199,7 @@ mkdirSync(workflowsDir, { recursive: true })
 let created = 0
 let skipped = 0
 
-for (const [name, workflow] of selected) {
+for (const [_name, workflow] of selected) {
   const filePath = join(workflowsDir, workflow.file)
 
   if (existsSync(filePath)) {

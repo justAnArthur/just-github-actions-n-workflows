@@ -30,8 +30,8 @@
 
 import { parseCommitMessage, type ParsedCommit } from "./_lib/git/conventional-commit-parser"
 import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "./_lib/version/calculate-semver"
+import type { Manifest } from "./_lib/manifests"
 import { findManifestByName, findManifests, getManifestSearchDir, updateManifest } from "./_lib/manifests"
-import type { Manifest } from "./_lib/manifests/handle"
 import { commitAndPush } from "./_lib/git/commit-n-push"
 import { tagAndPush } from "./_lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "./_lib/git/get-commits-from-the-last-stable"
