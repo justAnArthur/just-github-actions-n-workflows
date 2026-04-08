@@ -7,23 +7,30 @@
 
 import { appendFileSync } from "node:fs"
 
-// --- step outputs ---
-// writes a key/value pair to `$GITHUB_OUTPUT` so downstream steps
-// can read it via `steps.<id>.outputs.<key>`.
-// multiline values are wrapped with a heredoc-style delimiter.
+// --- file-append helper ---
+// shared logic for writing key/value pairs to github actions files
+// ($GITHUB_OUTPUT, $GITHUB_ENV). multiline values use heredoc delimiters.
 
-export function setOutput(key: string, value: string): void {
-  const outputFile = process.env.GITHUB_OUTPUT
-  if (!outputFile) {
-    console.warn(`GITHUB_OUTPUT is not set — cannot write output "${key}"`)
+function appendToGithubFile(envVar: string, label: string, key: string, value: string): void {
+  const filePath = process.env[envVar]
+  if (!filePath) {
+    console.warn(`${envVar} is not set — cannot write ${label} "${key}"`)
     return
   }
 
   if (value.includes("\n")) {
-    appendFileSync(outputFile, `${key}<<EOF\n${value}\nEOF\n`)
+    appendFileSync(filePath, `${key}<<EOF\n${value}\nEOF\n`)
   } else {
-    appendFileSync(outputFile, `${key}=${value}\n`)
+    appendFileSync(filePath, `${key}=${value}\n`)
   }
+}
+
+// --- step outputs ---
+// writes a key/value pair to `$GITHUB_OUTPUT` so downstream steps
+// can read it via `steps.<id>.outputs.<key>`.
+
+export function setOutput(key: string, value: string): void {
+  appendToGithubFile("GITHUB_OUTPUT", "output", key, value)
 }
 
 // --- env export ---
@@ -31,17 +38,7 @@ export function setOutput(key: string, value: string): void {
 // can read it as an environment variable.
 
 export function setEnv(key: string, value: string): void {
-  const envFile = process.env.GITHUB_ENV
-  if (!envFile) {
-    console.warn(`GITHUB_ENV is not set — cannot write env "${key}"`)
-    return
-  }
-
-  if (value.includes("\n")) {
-    appendFileSync(envFile, `${key}<<EOF\n${value}\nEOF\n`)
-  } else {
-    appendFileSync(envFile, `${key}=${value}\n`)
-  }
+  appendToGithubFile("GITHUB_ENV", "env", key, value)
 }
 
 // --- env var helpers ---

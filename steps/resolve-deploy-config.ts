@@ -63,7 +63,8 @@ const DEFAULTS: Record<string, DeployConfig> = {
 const environment = getRequiredEnv("DEPLOY_ENVIRONMENT")
 const customConfigRaw = getEnv("DEPLOY_CONFIG", "")
 
-log.info(`resolving deploy config for: ${environment}`)
+log.group("resolve-deploy-config")
+log.info(`target environment: ${environment}`)
 
 let config: DeployConfig | undefined
 
@@ -83,6 +84,7 @@ if (customConfigRaw) {
 // fall back to built-in defaults
 if (!config) {
   config = DEFAULTS[environment]
+  if (config) log.info("using built-in default config")
 }
 
 if (!config) {
@@ -100,4 +102,6 @@ setEnv("APP_TZ", config.app_tz)
 log.info(`COMPOSE_PROFILES=${config.compose_profiles}`)
 log.info(`PROFILES=${config.profiles}`)
 log.info(`APP_TZ=${config.app_tz}`)
+
+log.groupEnd()
 

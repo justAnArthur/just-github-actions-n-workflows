@@ -18,7 +18,9 @@ const host = getRequiredEnv("SSH_HOST")
 
 const sshDir = `${process.env.HOME}/.ssh`
 
-log.info(`setting up ssh key for host: ${host}`)
+log.group("setup-ssh")
+log.info(`host: ${host}`)
+log.info(`ssh dir: ${sshDir}`)
 
 // create ~/.ssh if it doesn't exist
 mkdirSync(sshDir, { recursive: true })
@@ -38,3 +40,4 @@ log.info("installing sshpass...")
 await $`sudo apt-get install -y sshpass`.quiet()
 
 log.info(`ssh setup complete for ${host}`)
+log.groupEnd()

@@ -18,6 +18,7 @@
 
 import { getEnv, getRequiredEnv, log, setEnv } from "./_lib/github"
 import { execWithTimeout } from "./_lib/exec"
+import { versionFromTag } from "./_lib/git/tag-utils"
 
 // --- types ---
 
@@ -138,19 +139,14 @@ function resolveLatestTag(
   return parsed[0]?.raw ?? ""
 }
 
-function extractVersion(tag: string): string {
-  const cleaned = tag.replace(/^refs\/tags\//, "")
-  if (cleaned.includes("@")) {
-    return cleaned.split("@").pop() ?? cleaned
-  }
-  return cleaned
-}
 
 // --- entry point ---
 
 const repoUrl = getRequiredEnv("RESOLVE_REPO_URL")
 const componentsRaw = getRequiredEnv("RESOLVE_COMPONENTS")
 const token = getEnv("GH_TOKEN", "")
+
+log.group("resolve-image-tags")
 
 let components: Component[]
 try {
@@ -160,6 +156,7 @@ try {
   process.exit(1)
 }
 
+log.info(`components to resolve: ${components.map((c) => c.name).join(", ")}`)
 log.info(`fetching tags from ${repoUrl}...`)
 const allTags = await fetchRemoteTags(repoUrl, token)
 log.info(`found ${allTags.length} remote tag(s)`)
@@ -187,7 +184,7 @@ for (const comp of components) {
       break
   }
 
-  const version = extractVersion(resolvedTag)
+  const version = versionFromTag(resolvedTag)
 
   if (!version) {
     log.error(`could not resolve version for ${comp.name} (package: ${comp.package}, input: ${comp.version})`)
@@ -199,4 +196,5 @@ for (const comp of components) {
 }
 
 log.info("all image tags resolved")
+log.groupEnd()
 

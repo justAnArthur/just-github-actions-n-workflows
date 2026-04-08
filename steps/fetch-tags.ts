@@ -9,6 +9,8 @@
 import { $ } from "bun"
 import { log } from "./_lib/github"
 
+log.group("fetch-tags")
+
 log.info("fetching all tags...")
 await $`git fetch --tags --force`
 
@@ -19,6 +21,9 @@ const isShallow = (await $`test -f .git/shallow && echo "yes" || echo "no"`.text
 if (isShallow === "yes") {
   log.info("repository is shallow — unshallowing...")
   await $`git fetch --unshallow`
+} else {
+  log.info("repository is already full-depth")
 }
 
 log.info("tags and full history fetched")
+log.groupEnd()

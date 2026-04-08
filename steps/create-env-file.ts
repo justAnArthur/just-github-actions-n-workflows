@@ -13,6 +13,8 @@ import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 import { getEnv, getRequiredEnv, log } from "./_lib/github"
 
+log.group("create-env-file")
+
 const fileName = getEnv("ENV_FILE_NAME", ".env")
 const variables = getRequiredEnv("ENV_FILE_VARIABLES")
 
@@ -21,6 +23,8 @@ let filePath = getEnv("ENV_FILE_PATH", "./")
 if (filePath.endsWith("/")) filePath = filePath.slice(0, -1)
 
 const envFile = join(filePath, fileName)
+
+log.info(`target: ${envFile}`)
 
 // ensure the target directory exists
 mkdirSync(filePath, { recursive: true })
@@ -36,3 +40,6 @@ log.info(`created ${envFile} with ${lines.length} variable(s):`)
 for (const line of lines) {
   log.info(`  ${line}`)
 }
+
+log.groupEnd()
+

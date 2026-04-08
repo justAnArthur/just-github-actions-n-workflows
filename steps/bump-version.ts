@@ -40,6 +40,7 @@ import { log } from "./_lib/github"
 
 // --- discover manifests ---
 
+log.group("bump-version")
 log.info("starting version bump process...")
 
 const dir = getManifestSearchDir()
@@ -272,3 +273,7 @@ if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
     log.info("GITHUB_TOKEN or GITHUB_REPOSITORY not set, skipping canary image cleanup")
   }
 }
+
+log.info("bump-version complete")
+log.groupEnd()
+

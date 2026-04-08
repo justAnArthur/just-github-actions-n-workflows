@@ -19,8 +19,13 @@
 import { $ } from "bun"
 import { log, setOutput } from "./_lib/github"
 
+log.group("skip-check")
+
 const message = (await $`git log -1 --pretty=%B`.text()).trim()
 const committer = (await $`git log -1 --pretty=%ce`.text()).trim()
+
+log.info(`last commit message: "${message}"`)
+log.info(`committer: ${committer}`)
 
 const skipByMessage = message.includes("[skip bump]")
 const skipByBot =
@@ -33,8 +38,10 @@ if (skipByMessage || skipByBot) {
 
   log.info(`skipping workflow: ${reason}`)
   setOutput("skip", "true")
+  log.groupEnd()
   process.exit(78)
 } else {
-  log.info(`last commit: "${message}" by ${committer} — no skip marker found`)
+  log.info("no skip marker found — proceeding")
   setOutput("skip", "false")
+  log.groupEnd()
 }

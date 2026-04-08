@@ -15,54 +15,12 @@
 import { getEnv, getRequiredEnv, log, setOutput } from "./_lib/github"
 import { execWithTimeout } from "./_lib/exec"
 import { parseCommitMessage } from "./_lib/git/conventional-commit-parser"
+import { versionFromTag, moduleFromTag, isPrerelease } from "./_lib/git/tag-utils"
+import { compareSemver } from "./_lib/version/compare-semver"
 import { findManifests } from "./_lib/manifests"
 import type { ParsedVersion } from "./_lib/version/parse-semver"
 import { parseSemver } from "./_lib/version/parse-semver"
 
-// --- semver comparison ---
-// compares two parsed versions for sorting.
-// within the same base version, canary > stable in this project's flow.
-
-function compareSemver(a: ParsedVersion, b: ParsedVersion): number {
-  if (a.major !== b.major) return a.major - b.major
-  if (a.minor !== b.minor) return a.minor - b.minor
-  if (a.patch !== b.patch) return a.patch - b.patch
-
-  if (!a.prerelease && !b.prerelease) return 0
-  if (a.prerelease && !b.prerelease) return 1
-  if (!a.prerelease && b.prerelease) return -1
-
-  const aParts = a.prerelease!.split(".")
-  const bParts = b.prerelease!.split(".")
-  const len = Math.max(aParts.length, bParts.length)
-
-  for (let i = 0; i < len; i++) {
-    const ap = aParts[i]
-    const bp = bParts[i]
-    if (ap === undefined) return -1
-    if (bp === undefined) return 1
-
-    const aNum = /^\d+$/.test(ap) ? parseInt(ap, 10) : NaN
-    const bNum = /^\d+$/.test(bp) ? parseInt(bp, 10) : NaN
-
-    if (!isNaN(aNum) && !isNaN(bNum)) {
-      if (aNum !== bNum) return aNum - bNum
-    } else {
-      const cmp = ap.localeCompare(bp)
-      if (cmp !== 0) return cmp
-    }
-  }
-
-  return 0
-}
-
-// --- helpers ---
-
-// extracts the version portion from a tag: `@scope/pkg@1.2.3` → `1.2.3`
-function versionFromTag(tag: string): string {
-  const lastAt = tag.lastIndexOf("@")
-  return lastAt > 0 ? tag.slice(lastAt + 1) : tag
-}
 
 // --- core ---
 
@@ -70,9 +28,9 @@ async function generateReleaseNotes(
   tagName: string,
   rootDir: string
 ): Promise<string> {
-  const moduleName = tagName.slice(0, tagName.lastIndexOf("@"))
+  const moduleName = moduleFromTag(tagName)
   const version = versionFromTag(tagName)
-  const isCanary = /-(canary|rc|alpha|beta)/.test(version)
+  const isCanary = isPrerelease(version)
 
   log.info(`module: ${moduleName}, version: ${version} (${isCanary ? "canary" : "stable"})`)
 
@@ -222,12 +180,20 @@ async function generateReleaseNotes(
 const tagName = getRequiredEnv("TAG_NAME")
 const rootDir = getEnv("ROOT_DIR", process.cwd())
 
+log.group("generate-release-notes")
+log.info(`tag: ${tagName}`)
+log.info(`root: ${rootDir}`)
+
 const notes = await generateReleaseNotes(tagName, rootDir)
 setOutput("release_notes", notes)
 
 log.info("release notes generated")
 if (notes) {
-  log.group("release notes")
+  log.group("release notes preview")
   log.info(notes)
   log.groupEnd()
+} else {
+  log.info("(empty — no notes to output)")
 }
+
+log.groupEnd()
