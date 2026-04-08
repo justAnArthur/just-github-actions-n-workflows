@@ -1,6 +1,6 @@
 {
   "name": "just-github-actions-n-workflows",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "description": "Release automation toolkit — version bumping, Docker publishing, VPS deployment. All steps compile to standalone Linux binaries via Bun.",
   "type": "module",
   "bin": {
