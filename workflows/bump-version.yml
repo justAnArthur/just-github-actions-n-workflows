@@ -1,0 +1,49 @@
+# bump-version.yml
+# ---
+# caller example: paste this into your repo's `.github/workflows/`.
+# calls the reusable workflow from the toolkit — no binaries to copy.
+# ---
+
+name: bump-version
+run-name: >-
+  ${{
+    github.event_name == 'workflow_dispatch'
+      && format('bump-version (manual) — type={0}, stable={1}, manifests={2}',
+           github.event.inputs.bump_type || '',
+           github.event.inputs.bump_to_stable || '',
+           github.event.inputs.bump_manifest_names || '')
+      || format('bump-version (auto) — {0}',
+           github.event.head_commit.message || '')
+  }}
+
+on:
+  push:
+    branches: ["canary", "versions/**"]
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'bump type (e.g. "minor:canary", "patch:stable")'
+        required: false
+        default: ""
+      bump_to_stable:
+        description: "promote canary to stable based on history"
+        required: false
+        default: "false"
+      bump_manifest_names:
+        description: "comma-separated manifest names to bump (empty = all)"
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  bump:
+    uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
+    with:
+      bump_type: ${{ github.event.inputs.bump_type || '' }}
+      bump_to_calculated_stable: ${{ github.event.inputs.bump_to_stable || 'false' }}
+      bump_manifest_names: ${{ github.event.inputs.bump_manifest_names || '' }}
+    secrets:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}

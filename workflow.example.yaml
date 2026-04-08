@@ -1,0 +1,157 @@
+# workflow.example.yaml
+# ---
+# examples: how to use the reusable workflows from this toolkit.
+# paste any example into your repo's `.github/workflows/` — no files
+# to copy, no binaries to commit.  the toolkit fetches its own
+# binaries automatically at runtime.
+#
+# available reusable workflows:
+#   .github/workflows/bump-version.yml
+#   .github/workflows/publish-docker-on-tag.yml
+#
+# for custom workflows (e.g. deploy), you can also use the binaries
+# directly — see example 3 below.
+# ---
+
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  example 1 — bump version                                         ║
+# ║                                                                    ║
+# ║  paste this into:  .github/workflows/bump-version.yml              ║
+# ║  auto-bumps manifests on push to canary, or via manual dispatch    ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+name: bump-version
+run-name: >-
+  ${{
+    github.event_name == 'workflow_dispatch'
+      && format('bump-version (manual) — type={0}, stable={1}, manifests={2}',
+           github.event.inputs.bump_type || '',
+           github.event.inputs.bump_to_stable || '',
+           github.event.inputs.bump_manifest_names || '')
+      || format('bump-version (auto) — {0}',
+           github.event.head_commit.message || '')
+  }}
+
+on:
+  push:
+    branches: ["canary", "versions/**"]
+  workflow_dispatch:
+    inputs:
+      bump_type:
+        description: 'bump type (e.g. "minor:canary", "patch:stable")'
+        required: false
+        default: ""
+      bump_to_stable:
+        description: "promote canary to stable based on history"
+        required: false
+        default: "false"
+      bump_manifest_names:
+        description: "comma-separated manifest names to bump (empty = all)"
+        required: false
+        default: ""
+
+jobs:
+  bump:
+    uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
+    with:
+      bump_type: ${{ github.event.inputs.bump_type || '' }}
+      bump_to_calculated_stable: ${{ github.event.inputs.bump_to_stable || 'false' }}
+      bump_manifest_names: ${{ github.event.inputs.bump_manifest_names || '' }}
+    secrets:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  example 2 — publish docker image on tag                           ║
+# ║                                                                    ║
+# ║  paste this into:  .github/workflows/publish-docker.yml            ║
+# ║  builds + pushes to ghcr, creates a github release with notes      ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+# name: publish-docker
+#
+# on:
+#   push:
+#     tags: ["*@*"]
+#   workflow_dispatch:
+#     inputs:
+#       tag:
+#         description: 'tag to build (e.g. "@scope/pkg@1.2.3")'
+#         required: false
+#
+# jobs:
+#   publish:
+#     uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/publish-docker-on-tag.yml@main
+#     with:
+#       tag: ${{ github.event.inputs.tag || github.ref_name }}
+#     secrets:
+#       GH_TOKEN: ${{ secrets.GH_TOKEN }}
+#       NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+# ╔══════════════════════════════════════════════════════════════════════╗
+# ║  example 3 — deploy to vps (custom workflow using binaries)        ║
+# ║                                                                    ║
+# ║  for project-specific workflows that don't fit a reusable template ║
+# ║  you can fetch the binaries directly and call them in your steps.  ║
+# ║                                                                    ║
+# ║  paste this into:  .github/workflows/deploy.yml                    ║
+# ╚══════════════════════════════════════════════════════════════════════╝
+
+# name: deploy-to-vps
+#
+# on:
+#   workflow_dispatch:
+#     inputs:
+#       environment:
+#         type: choice
+#         options: [staging, production]
+#
+# jobs:
+#   deploy:
+#     runs-on: ubuntu-latest
+#     steps:
+#       - uses: actions/checkout@v4
+#         with: { token: "${{ secrets.GH_TOKEN }}", lfs: true }
+#
+#       # --- fetch toolkit binaries (no need to commit dist/ yourself) ---
+#       - uses: actions/checkout@v4
+#         with:
+#           repository: justAnArthur/just-github-actions-n-workflows
+#           path: .toolkit
+#           sparse-checkout: dist
+#       - run: cp -r .toolkit/dist ./dist && chmod +x dist/* && rm -rf .toolkit
+#
+#       # --- setup ssh ---
+#       - name: Setup SSH
+#         env:
+#           SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
+#           SSH_HOST: ${{ github.event.inputs.environment }}
+#         run: ./dist/setup-ssh
+#
+#       # --- create .env file ---
+#       - name: Create .env
+#         env:
+#           ENV_FILE_VARIABLES: |
+#             APP_ENV=${{ github.event.inputs.environment }}
+#             IMAGE_TAG=${{ github.sha }}
+#         run: ./dist/create-env-file
+#
+#       # --- transfer files ---
+#       - name: Transfer files
+#         env:
+#           SCP_HOST: ${{ github.event.inputs.environment }}
+#           SCP_USERNAME: ${{ secrets.SERVER_USERNAME }}
+#           SCP_SOURCE: "./docker-compose.yml ./.env"
+#           SCP_TARGET: "~/app"
+#         run: ./dist/scp-transfer
+#
+#       # --- run remote commands ---
+#       - name: Deploy remotely
+#         env:
+#           SSH_EXEC_HOST: ${{ github.event.inputs.environment }}
+#           SSH_EXEC_USERNAME: ${{ secrets.SERVER_USERNAME }}
+#           SSH_EXEC_SCRIPT: |
+#             cd ~/app
+#             docker compose pull
+#             docker compose up -d --force-recreate
+#         run: ./dist/ssh-exec
+

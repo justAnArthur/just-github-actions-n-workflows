@@ -1,0 +1,32 @@
+{
+  "name": "just-github-actions-n-workflows",
+  "version": "0.0.0",
+  "description": "Release automation toolkit — version bumping, Docker publishing, VPS deployment. All steps compile to standalone Linux binaries via Bun.",
+  "type": "module",
+  "bin": {
+    "just-github-actions-n-workflows": "./init.ts"
+  },
+  "scripts": {
+    "build": "bun run build.ts",
+    "test": "bun test",
+    "init": "bun run init.ts init"
+  },
+  "files": [
+    "init.ts",
+    "dist/**/*"
+  ],
+  "dependencies": {
+    "fast-xml-parser": "^5.5.9"
+  },
+  "devDependencies": {
+    "@types/bun": "latest"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/justAnArthur/just-github-actions-n-workflows"
+  },
+  "license": "MIT",
+  "properties": {
+    "gitCommitScopeRelatedNames": "toolkit,actions,workflows"
+  }
+}

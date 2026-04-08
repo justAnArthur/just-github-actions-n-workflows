@@ -1,0 +1,31 @@
+# publish-npm-on-tag.yml
+# ---
+# caller example: paste this into your repo's `.github/workflows/`.
+# publishes the package to npm when a version tag is pushed.
+# triggered by tags created by the bump-version workflow.
+# ---
+
+name: publish-npm
+run-name: "publish-npm — ${{ github.ref_name }}"
+
+on:
+  push:
+    tags: ["*@*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to publish (e.g. "my-package@1.2.3")'
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  publish:
+    uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/publish-npm-on-tag.yml@main
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
+    secrets:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+

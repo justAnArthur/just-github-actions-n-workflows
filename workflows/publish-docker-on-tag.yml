@@ -1,0 +1,37 @@
+# publish-docker-on-tag.yml
+# ---
+# caller example: paste this into your repo's `.github/workflows/`.
+# calls the reusable workflow from the toolkit — no binaries to copy.
+# ---
+
+name: publish-docker
+run-name: >-
+  publish-docker
+  ${{
+    github.event_name == 'workflow_dispatch'
+      && format('(manual) tag={0}', github.event.inputs.tag || github.ref_name)
+      || format('(auto) tag={0}', github.ref_name || '')
+  }}
+
+on:
+  push:
+    tags: ["*@*", "*"]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to build (e.g. "@scope/pkg@1.2.3")'
+        required: false
+        default: ""
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  publish:
+    uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/publish-docker-on-tag.yml@main
+    with:
+      tag: ${{ github.event.inputs.tag || github.ref_name }}
+    secrets:
+      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+      NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

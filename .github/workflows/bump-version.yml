@@ -1,0 +1,117 @@
+# bump-version.yml
+# ---
+# reusable workflow: auto-bumps manifest versions using conventional commits.
+#
+# callers invoke this with `workflow_call` — no need to copy files.
+# the workflow fetches its own binaries from this toolkit repo automatically.
+#
+# usage (in your repo's `.github/workflows/bump-version.yml`):
+#
+#   name: bump-version
+#   on:
+#     push:
+#       branches: [canary, "versions/**"]
+#     workflow_dispatch:
+#       inputs:
+#         bump_type:           { required: false, default: "" }
+#         bump_to_stable:      { required: false, default: "false" }
+#         bump_manifest_names: { required: false, default: "" }
+#
+#   jobs:
+#     bump:
+#       uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
+#       with:
+#         bump_type: ${{ github.event.inputs.bump_type || '' }}
+#         bump_to_calculated_stable: ${{ github.event.inputs.bump_to_stable || 'false' }}
+#         bump_manifest_names: ${{ github.event.inputs.bump_manifest_names || '' }}
+#       secrets:
+#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
+# ---
+
+name: bump-version
+
+on:
+  workflow_call:
+    inputs:
+      bump_type:
+        description: >
+          version bump type.
+          append `:canary` or `:stable` to force a channel
+          (e.g. "minor:canary", "patch:stable").
+        type: string
+        required: false
+        default: ""
+      bump_to_calculated_stable:
+        description: "promote current canary to stable based on commit history"
+        type: string
+        required: false
+        default: "false"
+      bump_manifest_names:
+        description: "comma-separated manifest names to bump (empty = all)"
+        type: string
+        required: false
+        default: ""
+    secrets:
+      GH_TOKEN:
+        description: "github token with contents:write and packages:write"
+        required: true
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  bump-version:
+    runs-on: ubuntu-latest
+    # skip when the push commit itself was a bump (avoids infinite loop)
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      !contains(github.event.head_commit.message, '[skip bump]')
+
+    steps:
+      # --- checkout the caller's repo (the one being bumped) ---
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: "true"
+          token: ${{ secrets.GH_TOKEN }}
+          lfs: true
+
+      # --- fetch toolkit binaries from this repo ---
+      - name: Fetch toolkit binaries
+        uses: actions/checkout@v4
+        with:
+          repository: justAnArthur/just-github-actions-n-workflows
+          path: .toolkit
+          sparse-checkout: dist
+
+      - name: Install binaries
+        run: |
+          cp -r .toolkit/dist ./dist
+          chmod +x dist/*
+          rm -rf .toolkit
+
+      # --- run steps ---
+      - name: Fetch all tags and history
+        run: ./dist/fetch-tags
+
+      - name: Configure git user
+        env:
+          MODE: ${{ github.event_name == 'push' && 'push' || 'dispatch' }}
+          GITHUB_ACTOR: ${{ github.actor }}
+        run: ./dist/configure-git-user
+
+      - name: Bump version
+        env:
+          GITHUB_EVENT: ${{ toJson(github.event) }}
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_REPOSITORY: ${{ github.repository }}
+          BRANCH_NAME: ${{ github.ref_name }}
+          GITHUB_RUN_URL: https://github.com/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          BUMP_TYPE_N_STABLE_OR_CANARY: ${{ inputs.bump_type }}
+          BUMP_TO_CALCULATED_STABLE_VERSION: ${{ inputs.bump_to_calculated_stable }}
+          BUMP_MANIFEST_NAMES: ${{ inputs.bump_manifest_names }}
+          BUMP_TYPE: ${{ inputs.bump_type }}
+        run: ./dist/bump-version
+
