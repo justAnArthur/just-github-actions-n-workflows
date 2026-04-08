@@ -7,7 +7,8 @@
 # paste this into your repo's `.github/workflows/` and customise the
 # environment list and compose profiles for your project.
 #
-# binaries used: setup-ssh, create-env-file, scp-transfer, ssh-exec
+# binaries used: setup-ssh, resolve-deploy-config, resolve-image-tags,
+#                create-env-file, scp-transfer, ssh-exec
 # ---
 
 name: "deploy-to-vps"
@@ -74,167 +75,29 @@ jobs:
           SSH_HOST: ${{ github.event.inputs.environment }}
         run: ./dist/setup-ssh
 
-      - name: Determine manifests and compose profiles
-        id: set-manifests
+      - name: Determine compose profiles and timezone
+        env:
+          DEPLOY_ENVIRONMENT: ${{ github.event.inputs.environment }}
+        run: ./dist/resolve-deploy-config
+
+      - name: Validate version inputs
         run: |
-          echo "Determining compose profiles for ${{ github.event.inputs.environment }}"
-          case "${{ github.event.inputs.environment }}" in
-            "test.camasys.com")
-              COMPOSE_PROFILES="@camasys/frontend_core,@camasys/backend_core,@camasys/backend_gps,camasys-external-signature-app"
-              PROFILES="test"
-              APP_TZ="Europe/Bratislava"
-              ;;
-            "app.camasys.com")
-              COMPOSE_PROFILES="@camasys/frontend_core,@camasys/backend_core,camasys-external-signature-app"
-              PROFILES="avis-sk"
-              APP_TZ="Europe/Bratislava"
-              ;;
-            "camasys.autoin.cz")
-              COMPOSE_PROFILES="@camasys/frontend_core,@camasys/backend_core,camasys-external-signature-app"
-              PROFILES="auto-in"
-              APP_TZ="Europe/Bratislava"
-              ;;
-            "camasys.avis.fo")
-              COMPOSE_PROFILES="@camasys/frontend_core,@camasys/backend_core,camasys-external-signature-app"
-              PROFILES="avis-fo"
-              APP_TZ="Europe/Bratislava"
-              ;;
-            "camasys.net")
-              COMPOSE_PROFILES="@camasys/frontend_core,@camasys/backend_core"
-              PROFILES="single-instance-test"
-              APP_TZ="UTC"
-              ;;
-            "78.47.109.42")
-              COMPOSE_PROFILES="@camasys/backend_gps"
-              PROFILES=""
-              APP_TZ="UTC"
-              ;;
-            *)
-              echo "Unknown environment: ${{ github.event.inputs.environment }}"
-              exit 1
-              ;;
-          esac
-          echo "COMPOSE_PROFILES=${COMPOSE_PROFILES}" >> $GITHUB_ENV
-          echo "PROFILES=${PROFILES}" >> $GITHUB_ENV
-          echo "APP_TZ=${APP_TZ}" >> $GITHUB_ENV
-
-      - name: Resolve image tags
-        id: resolve-tags
-        run: |
-          BACKEND_INPUT="${{ github.event.inputs.backend_version }}"
-          FRONTEND_INPUT="${{ github.event.inputs.frontend_version }}"
-          GPS_INPUT="${{ github.event.inputs.gps_version }}"
-
-          echo "Requested versions:"
-          echo "  Backend: ${BACKEND_INPUT:-'(empty - will use fallback)'}"
-          echo "  Frontend: ${FRONTEND_INPUT:-'(empty - will use fallback)'}"
-          echo "  GPS: ${GPS_INPUT:-'(empty - will use fallback)'}"
-
-          if [ -z "$BACKEND_INPUT" ] && [ -z "$FRONTEND_INPUT" ]; then
-            echo "Error: At least one of backend_version or frontend_version must be specified"
+          if [ -z "${{ github.event.inputs.backend_version }}" ] && [ -z "${{ github.event.inputs.frontend_version }}" ]; then
+            echo "::error::At least one of backend_version or frontend_version must be specified"
             exit 1
           fi
 
-          if [ -z "$BACKEND_INPUT" ]; then
-            BACKEND_INPUT="$FRONTEND_INPUT"
-          fi
-          if [ -z "$FRONTEND_INPUT" ]; then
-            FRONTEND_INPUT="$BACKEND_INPUT"
-          fi
-          if [ -z "$GPS_INPUT" ]; then
-            GPS_INPUT="$BACKEND_INPUT"
-          fi
-
-          resolve_tag() {
-            PKG="$1"
-            MODE="$2"
-
-            REPO_URL="https://github.com/utegsk/camasys.git"
-            TAGS_RAW=""
-            if [ -n "${{ secrets.GH_TOKEN }}" ]; then
-              TAGS_RAW=$(git ls-remote --tags --refs "https://x-access-token:${{ secrets.GH_TOKEN }}@github.com/utegsk/camasys.git" 2>/dev/null || true)
-            fi
-            if [ -z "$TAGS_RAW" ]; then
-              TAGS_RAW=$(git ls-remote --tags --refs "$REPO_URL" 2>/dev/null || true)
-            fi
-            if [ -z "$TAGS_RAW" ]; then return 1; fi
-
-            TAGS=$(printf "%s\n" "$TAGS_RAW" | awk '{print $2}' | sed 's|refs/tags/||' | sed 's/\^{}$//' | sort -u)
-
-            raw_no_at=$(printf '%s' "$PKG" | sed 's/^@//')
-            raw_dash=$(printf '%s' "$raw_no_at" | sed 's|/|-|g')
-
-            candidates=$(printf '%s\n' "$TAGS" | grep -i -- "${raw_no_at}" || true)
-            if [ -z "$candidates" ]; then
-              candidates=$(printf '%s\n' "$TAGS" | grep -i -- "${raw_dash}" || true)
-            fi
-            if [ -z "$candidates" ]; then candidates="$TAGS"; fi
-
-            if [ "$MODE" = "stable" ]; then
-              FILTERED=$(printf "%s\n" "$candidates" | grep -i -v canary || true)
-            else
-              FILTERED=$(printf "%s\n" "$candidates" | grep -i canary || true)
-            fi
-            if [ -z "$FILTERED" ]; then FILTERED="$candidates"; fi
-
-            selected=$(printf '%s' "$FILTERED" | awk '
-              function trim(s){ sub(/^[ \t\r\n]+/, "", s); sub(/[ \t\r\n]+$/, "", s); return s }
-              BEGIN{ max_key=""; max_line="" }
-              {
-                line=$0; if (line=="") next
-                ver=line; n=split(line,a,"@"); if(n>1) ver=a[n]; else { n=split(line,b,":"); if(n>1) ver=b[n] }
-                ver=trim(ver); sub(/^[vV]/, "", ver)
-                split(ver,c,"-"); core=c[1]; pre=(length(c)>1?c[2]:"")
-                split(core,cv,"\\."); maj=(cv[1]+0); min=(cv[2]+0); pat=(cv[3]+0)
-                pre_label="zzzz"; pre_num=0
-                if (pre!="") { m=split(pre,pp,"\\."); pre_label=pp[1]; if(m>1) pre_num=(pp[2]+0) }
-                key=sprintf("%05d.%05d.%05d.%s.%05d", maj,min,pat,pre_label,pre_num)
-                if (key>max_key) { max_key=key; max_line=line }
-              }
-              END{ if (max_line!="") print max_line }
-            ')
-            printf "%s" "$selected"
-          }
-
-          resolve_component_version() {
-            local COMPONENT_NAME="$1"
-            local COMPONENT_PKG="$2"
-            local VERSION_INPUT="$3"
-
-            case "${VERSION_INPUT}" in
-              stable) TAG=$(resolve_tag "$COMPONENT_PKG" "stable") ;;
-              canary) TAG=$(resolve_tag "$COMPONENT_PKG" "canary") ;;
-              *) TAG="${VERSION_INPUT}" ;;
-            esac
-            printf "%s" "$TAG"
-          }
-
-          DOCKER_BACKEND_IMAGE_TAG=$(resolve_component_version "Backend" "@camasys/backend_core" "$BACKEND_INPUT")
-          DOCKER_FRONTEND_IMAGE_TAG=$(resolve_component_version "Frontend" "@camasys/frontend_core" "$FRONTEND_INPUT")
-          DOCKER_GPS_IMAGE_TAG=$(resolve_component_version "GPS" "@camasys/backend_gps" "$GPS_INPUT")
-
-          # Normalize tags: extract version portion only
-          extract_version() {
-            in="$1"
-            in=$(printf '%s' "$in" | sed -E 's|refs/tags/||g')
-            if printf '%s' "$in" | grep -q '@'; then
-              out=$(printf '%s' "$in" | awk -F'@' '{print $NF}')
-            else out="$in"; fi
-            printf '%s' "$out" | tr -d '\r\n' | sed -E 's/^\s+|\s+$//g'
-          }
-
-          DOCKER_BACKEND_IMAGE_TAG=$(extract_version "$DOCKER_BACKEND_IMAGE_TAG")
-          DOCKER_FRONTEND_IMAGE_TAG=$(extract_version "$DOCKER_FRONTEND_IMAGE_TAG")
-          DOCKER_GPS_IMAGE_TAG=$(extract_version "$DOCKER_GPS_IMAGE_TAG")
-
-          echo "DOCKER_BACKEND_IMAGE_TAG=${DOCKER_BACKEND_IMAGE_TAG}" >> $GITHUB_ENV
-          echo "DOCKER_FRONTEND_IMAGE_TAG=${DOCKER_FRONTEND_IMAGE_TAG}" >> $GITHUB_ENV
-          echo "DOCKER_GPS_IMAGE_TAG=${DOCKER_GPS_IMAGE_TAG}" >> $GITHUB_ENV
-
-          echo "Resolved tags:"
-          echo "  Backend: $DOCKER_BACKEND_IMAGE_TAG"
-          echo "  Frontend: $DOCKER_FRONTEND_IMAGE_TAG"
-          echo "  GPS: $DOCKER_GPS_IMAGE_TAG"
+      - name: Resolve image tags
+        env:
+          RESOLVE_REPO_URL: https://github.com/utegsk/camasys.git
+          GH_TOKEN: ${{ secrets.GH_TOKEN }}
+          RESOLVE_COMPONENTS: |
+            [
+              { "name": "BACKEND", "package": "@camasys/backend_core", "version": "${{ github.event.inputs.backend_version || github.event.inputs.frontend_version }}" },
+              { "name": "FRONTEND", "package": "@camasys/frontend_core", "version": "${{ github.event.inputs.frontend_version || github.event.inputs.backend_version }}" },
+              { "name": "GPS", "package": "@camasys/backend_gps", "version": "${{ github.event.inputs.gps_version || github.event.inputs.backend_version || github.event.inputs.frontend_version }}" }
+            ]
+        run: ./dist/resolve-image-tags
 
       - name: Create .env file for Docker Compose
         env:

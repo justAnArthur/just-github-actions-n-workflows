@@ -26,6 +26,24 @@ export function setOutput(key: string, value: string): void {
   }
 }
 
+// --- env export ---
+// writes a key/value pair to `$GITHUB_ENV` so subsequent steps
+// can read it as an environment variable.
+
+export function setEnv(key: string, value: string): void {
+  const envFile = process.env.GITHUB_ENV
+  if (!envFile) {
+    console.warn(`GITHUB_ENV is not set — cannot write env "${key}"`)
+    return
+  }
+
+  if (value.includes("\n")) {
+    appendFileSync(envFile, `${key}<<EOF\n${value}\nEOF\n`)
+  } else {
+    appendFileSync(envFile, `${key}=${value}\n`)
+  }
+}
+
 // --- env var helpers ---
 // `getRequiredEnv` throws immediately when a variable is missing,
 // giving a clear error message instead of a silent undefined.

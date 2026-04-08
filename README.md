@@ -89,6 +89,8 @@ steps:
 | `dist/fetch-tags` | fetch all tags + unshallow if needed | _(none)_ |
 | `dist/generate-release-notes` | markdown release notes between tags | `TAG_NAME`, `ROOT_DIR` |
 | `dist/get-dockerfile-path` | resolve dockerfile from manifest metadata | `TAG_NAME` |
+| `dist/resolve-deploy-config` | determine compose profiles and timezone for a deploy target | `DEPLOY_ENVIRONMENT`, `DEPLOY_CONFIG` |
+| `dist/resolve-image-tags` | resolve docker image tags from git remote tags | `RESOLVE_REPO_URL`, `RESOLVE_COMPONENTS`, `GH_TOKEN` |
 | `dist/scp-transfer` | copy files to remote server via scp | `SCP_HOST`, `SCP_USERNAME`, `SCP_SOURCE`, `SCP_TARGET` |
 | `dist/setup-ssh` | provision ssh key + known_hosts | `SSH_PRIVATE_KEY`, `SSH_HOST` |
 | `dist/skip-check` | detect `[skip bump]` loops (defence-in-depth) | _(none)_ |
@@ -116,6 +118,8 @@ steps:
 │   ├── fetch-tags.ts
 │   ├── generate-release-notes.ts
 │   ├── get-dockerfile-path.ts
+│   ├── resolve-deploy-config.ts
+│   ├── resolve-image-tags.ts
 │   ├── scp-transfer.ts
 │   ├── setup-ssh.ts
 │   ├── skip-check.ts
