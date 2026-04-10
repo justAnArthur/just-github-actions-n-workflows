@@ -1,30 +1,45 @@
 #!/usr/bin/env bash
 # -----------------------------------------------------------
 # pre-commit hook
-# Copies selected workflow templates from  workflows/  into
-# .github/workflows/  so GitHub Actions always sees the latest
-# version without manual duplication.
+# Syncs workflow templates from  workflows/  into
+# .github/workflows/  based on the list in
+# .github/workflows/sync-from-root-workflows
 #
-# Which files to sync is controlled by the SYNC_WORKFLOWS array
-# below.  Add or remove entries as needed.
+# Workflows listed in that file are copied from workflows/.
+# Synced workflows that are no longer listed get deleted.
 # -----------------------------------------------------------
 
 set -euo pipefail
 
 REPO_ROOT="$(git rev-parse --show-toplevel)"
 
-# ── workflows to sync ──────────────────────────────────────
-SYNC_WORKFLOWS=(
-  "bump-version.yml"
-  "publish-npm-on-tag.yml"
-  "release-on-tag.yml"
-)
-# ────────────────────────────────────────────────────────────
-
 SRC_DIR="$REPO_ROOT/workflows"
 DST_DIR="$REPO_ROOT/.github/workflows"
+SYNC_FILE="$DST_DIR/sync-from-root-workflows"
+
+if [[ ! -f "$SYNC_FILE" ]]; then
+  echo "⚠  pre-commit: $SYNC_FILE not found — skipping workflow sync"
+  exit 0
+fi
+
+# ── read sync list (skip blank lines and comments) ─────────
+SYNC_WORKFLOWS=()
+while IFS= read -r line; do
+  line="${line%%#*}"       # strip inline comments
+  line="${line// /}"       # trim whitespace
+  [[ -z "$line" ]] && continue
+  SYNC_WORKFLOWS+=("$line")
+done < "$SYNC_FILE"
+
+if [[ ${#SYNC_WORKFLOWS[@]} -eq 0 ]]; then
+  echo "⚠  pre-commit: sync list is empty — skipping"
+  exit 0
+fi
 
 dirty=0
+
+# ── sync listed workflows ─────────────────────────────────
+mkdir -p "$DST_DIR"
 
 for wf in "${SYNC_WORKFLOWS[@]}"; do
   src="$SRC_DIR/$wf"
@@ -35,10 +50,6 @@ for wf in "${SYNC_WORKFLOWS[@]}"; do
     continue
   fi
 
-  # create destination dir if missing
-  mkdir -p "$DST_DIR"
-
-  # copy only when content differs (or destination is missing)
   if [[ ! -f "$dst" ]] || ! diff -q "$src" "$dst" > /dev/null 2>&1; then
     cp "$src" "$dst"
     git add "$dst"
@@ -47,8 +58,32 @@ for wf in "${SYNC_WORKFLOWS[@]}"; do
   fi
 done
 
+# ── delete workflows no longer in sync list ────────────────
+for dst in "$DST_DIR"/*.yml; do
+  [[ ! -f "$dst" ]] && continue
+  wf="$(basename "$dst")"
+
+  # check if this file has a matching source in workflows/
+  [[ ! -f "$SRC_DIR/$wf" ]] && continue
+
+  # if it came from workflows/ but is no longer in the sync list, delete it
+  in_list=0
+  for listed in "${SYNC_WORKFLOWS[@]}"; do
+    if [[ "$listed" == "$wf" ]]; then
+      in_list=1
+      break
+    fi
+  done
+
+  if [[ "$in_list" -eq 0 ]]; then
+    git rm -f "$dst" 2>/dev/null || rm -f "$dst"
+    dirty=1
+    echo "✗  pre-commit: removed $wf (no longer in sync list)"
+  fi
+done
+
 if [[ "$dirty" -eq 1 ]]; then
-  echo "✓  pre-commit: staged synced workflows into this commit"
+  echo "✓  pre-commit: staged workflow changes into this commit"
 fi
 
 exit 0
