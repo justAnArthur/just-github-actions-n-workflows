@@ -36,34 +36,44 @@ feat!(api): redesign authentication flow
 ## Scope
 
 The scope **must** match one of:
-- A package name from a `package.json` `name` field (e.g. `toolkit`, `actions`)
+- A package name from a `package.json` `name` field
 - A value from the `gitCommitScopeRelatedNames` property in a manifest's `properties` field
 
 When a scope is provided, only the matching package gets a version bump.
 When no scope is provided, **all** packages in the repo are bumped.
 
-For this repository, use these scopes:
-- `toolkit` / `actions` / `workflows` — for the CLI package (`@justanarthur/just-github-actions-n-workflows`)
-- The action's directory name for action-specific changes (e.g. `bump-version`, `fetch-tags`, `setup-ssh`)
-- `lib` — for shared library changes
-- Omit scope for repo-wide changes
+This monorepo has the following versioned packages:
+
+| Scope | Package | Location | Published |
+|-------|---------|----------|-----------|
+| `toolkit` / `workflows` | `@justanarthur/just-github-actions-n-workflows` | root | private |
+| `cli` | `@justanarthur/just-github-actions-n-workflows-cli` | `cli/` | npm |
+| `lib` | `@justanarthur/just-github-actions-n-workflows-lib` | `lib/` | private |
+| _(omit scope)_ | all of the above | | |
+
+Each action in `actions/` also has its own `package.json` (e.g. `@justanarthur/step-bump-manifest-versions`)
+but they are private workspace packages without scope aliases — they get bumped when no scope is specified.
 
 ## Multi-item commits
 
 Multiple conventional commit lines in one message are supported:
 ```
-feat(toolkit): add --ref flag to init command
+feat(cli): add --ref flag to init command
 fix(lib): handle empty tag list gracefully
 ```
 
 ## Examples
 
 ```
-feat(toolkit): add interactive workflow selector to init CLI
+feat(cli): add interactive workflow selector to init CLI
 ```
 
 ```
-fix(bump-version): handle scoped packages with special characters
+fix(lib): handle scoped packages with special characters
+```
+
+```
+feat(toolkit): add new resolve-package-dir action
 ```
 
 ```
@@ -74,18 +84,18 @@ chore: update dependencies
 feat!(lib): redesign manifest discovery API
 
 The findManifests function now returns a typed result including the file path.
-This is a breaking change for consumers importing from @justanarthur/actions-lib/manifests.
+This is a breaking change for consumers importing from the lib.
 
 BREAKING CHANGE: findManifests return type changed
 ```
 
 ```
-docs: update README with new workflow table
+ci(workflows): add release-on-tag workflow
 ```
 
 ```
-feat(toolkit): add --force flag
-fix(toolkit): handle existing files gracefully
+feat(cli): add --force flag
+fix(cli): handle existing files gracefully
 ```
 
 ## Rules

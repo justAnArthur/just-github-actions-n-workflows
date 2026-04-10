@@ -12,7 +12,7 @@
     "./codecs/*": "./src/codecs/*.ts"
   },
   "dependencies": {
-    "@justanarthur/actions-lib": "workspace:*",
+    "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
     "fast-xml-parser": "^5.5.9"
   },
   "scripts": {

@@ -1,5 +1,5 @@
 {
-  "name": "@justanarthur/actions-lib",
+  "name": "@justanarthur/just-github-actions-n-workflows-lib",
   "version": "0.0.0-beta.1",
   "private": true,
   "type": "module",
@@ -9,5 +9,8 @@
     "./ghcr/*": "./src/ghcr/*.ts",
     "./git/*": "./src/git/*.ts",
     "./version/*": "./src/version/*.ts"
+  },
+  "properties": {
+    "gitCommitScopeRelatedNames": "lib"
   }
 }

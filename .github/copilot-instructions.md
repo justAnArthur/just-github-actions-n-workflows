@@ -43,9 +43,10 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 { "workspaces": ["lib", "actions/*", "cli"] }
 ```
 
-- **`lib/`** → `@justanarthur/actions-lib` (private, workspace-only)
+- **root** → `@justanarthur/just-github-actions-n-workflows` (private, workspace root)
+- **`lib/`** → `@justanarthur/just-github-actions-n-workflows-lib` (private, workspace-only)
 - **`actions/*`** → `@justanarthur/step-*` (private, workspace-only)
-- **`cli/`** → `@justanarthur/just-github-actions-n-workflows` (public, published to npm)
+- **`cli/`** → `@justanarthur/just-github-actions-n-workflows-cli` (public, published to npm)
 
 ## Strict rules
 
@@ -72,7 +73,7 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 ### Actions (`actions/`)
 - Every action **must** have: `action.yml`, `package.json`, `tsconfig.json`, `src/index.ts`.
 - `action.yml` uses `runs.using: composite` and runs the TypeScript directly via `bun run`.
-- `package.json` must be `"private": true` and depend on `"@justanarthur/actions-lib": "workspace:*"`.
+- `package.json` must be `"private": true` and depend on `"@justanarthur/just-github-actions-n-workflows-lib": "workspace:*"`.
 - `tsconfig.json` must extend `../../tsconfig.base.json`.
 - Actions read inputs via environment variables (`process.env`) and write outputs via `setOutput()` from the lib.
 - Actions install dependencies from the workspace root: `bun install --frozen-lockfile` with `working-directory: ${{ github.action_path }}/../..`.

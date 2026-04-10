@@ -4,7 +4,7 @@
   "private": true,
   "type": "module",
   "dependencies": {
-    "@justanarthur/actions-lib": "workspace:*",
+    "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
     "@justanarthur/step-bump-manifest-versions": "workspace:*"
 
   },
