@@ -4,16 +4,17 @@
 // there is nothing to compile — actions run via `bun run` in composite actions.
 //
 import { existsSync } from "node:fs"
+import { join } from "node:path"
 import { Glob } from "bun"
 
 const ACTIONS_DIR = "./actions"
-const REQUIRED_FILES = ["action.yml", "package.json", "tsconfig.json", "src/index.ts"]
+const REQUIRED_FILES = ["action.yml", "package.json", "tsconfig.json", join("src", "index.ts")]
 
 const glob = new Glob("*/action.yml")
 const actions: string[] = []
 
 for await (const file of glob.scan(ACTIONS_DIR)) {
-  actions.push(file.split("/")[0])
+  actions.push(file.split(/[/\\]/)[0])
 }
 
 if (actions.length === 0) {
@@ -27,7 +28,7 @@ let errors = 0
 
 for (const name of actions.sort()) {
   const missing = REQUIRED_FILES.filter(
-    (f) => !existsSync(`${ACTIONS_DIR}/${name}/${f}`)
+    (f) => !existsSync(join(ACTIONS_DIR, name, f))
   )
 
   if (missing.length > 0) {
