@@ -1,6 +1,6 @@
 {
   "name": "@justanarthur/just-github-actions-n-workflows",
-  "version": "0.0.0-beta.2",
+  "version": "0.0.0-canary.0",
   "description": "Release automation toolkit — version bumping, Docker publishing, VPS deployment. All steps compile to standalone Linux binaries via Bun.",
   "type": "module",
   "bin": {
