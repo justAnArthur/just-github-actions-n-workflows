@@ -1,6 +1,6 @@
 {
   "name": "@justanarthur/step-resolve-tag-meta",
-  "version": "0.0.0-beta.1",
+  "version": "0.0.0-beta.2",
   "private": true,
   "type": "module",
   "dependencies": {
@@ -13,4 +13,3 @@
     "gitCommitScopeRelatedNames": "resolve-tag-meta"
   }
 }
-
