@@ -9,7 +9,8 @@
   "scripts": {
     "build": "bun run build.ts",
     "test": "bun test",
-    "init": "bun run init.ts init"
+    "init": "bun run init.ts init",
+    "publish": "bun publish --access public"
   },
   "files": [
     "init.ts",
