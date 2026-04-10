@@ -37,6 +37,7 @@ import { tagAndPush } from "./_lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "./_lib/git/get-commits-from-the-last-stable"
 import { deleteCanaryImages, manifestNameToImageName } from "./_lib/ghcr/delete-canary-images"
 import { log } from "./_lib/github"
+import { GITHUB_ACTIONS_BOT, withCoAuthors } from "./_lib/git/co-authors"
 
 // --- discover manifests ---
 
@@ -207,8 +208,11 @@ if (manifestNextVersions.length !== 0) {
   // commit message includes [skip bump] so the push won't re-trigger this workflow
   await commitAndPush(
     dir,
-    "chore[skip bump]: bumping stable release versions for " +
-    manifestNextVersions.map(([m]) => m.name).join(", ")
+    withCoAuthors(
+      "chore[skip bump]: bumping stable release versions for " +
+      manifestNextVersions.map(([m]) => m.name).join(", "),
+      [GITHUB_ACTIONS_BOT]
+    )
   )
   log.info("committed and pushed version bump")
 }
@@ -238,8 +242,11 @@ if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
 
   await commitAndPush(
     dir,
-    "chore[skip bump]: bumping canary versions after stable release for " +
-    canaryNextVersions.map(([m]) => m.name).join(", ")
+    withCoAuthors(
+      "chore[skip bump]: bumping canary versions after stable release for " +
+      canaryNextVersions.map(([m]) => m.name).join(", "),
+      [GITHUB_ACTIONS_BOT]
+    )
   )
 
   log.info("committed canary version bump (no tags created)")
