@@ -108,11 +108,38 @@ ready-to-copy workflow files in `workflows/`:
 | `publish-docker-on-tag.yml` | build docker + push to ghcr + release  | tag push, dispatch, call |
 | `deploy-to-vps.yml`         | deploy docker compose to VPS (example) | dispatch                 |
 
+### workflow sync (pre-push hook)
+
+`workflows/` is the **single source of truth** for workflow templates. a git
+pre-push hook automatically copies the workflows this repo uses into
+`.github/workflows/` so GitHub Actions always sees the latest version.
+
+which files get synced is controlled by the `SYNC_WORKFLOWS` array in
+`.githooks/pre-push`:
+
+```bash
+SYNC_WORKFLOWS=(
+  "bump-version.yml"
+  "publish-npm-on-tag.yml"
+  "publish-docker-on-tag.yml"
+)
+```
+
+this means `deploy-to-vps.yml` (and any other template-only workflows) stay
+in `workflows/` without being copied — `.github/workflows/` only contains
+the workflows this repo actually runs.
+
+the hook is installed automatically via the `prepare` script when you run
+`bun install`. to set it up manually:
+
+```bash
+git config core.hooksPath .githooks
+```
+
 ## project structure
 
 ```
 ├── build.ts                      # validates action packages
-├── init.ts                       # cli entry point
 ├── package.json                  # workspace root
 ├── tsconfig.base.json            # shared typescript config
 │
@@ -141,13 +168,16 @@ ready-to-copy workflow files in `workflows/`:
 ├── cli/                          # npm-published cli package
 │   └── src/init.ts
 │
-├── workflows/                    # copy-paste ready workflow files
+├── workflows/                    # workflow templates (source of truth)
 │   ├── bump-version.yml
 │   ├── publish-npm-on-tag.yml
 │   ├── publish-docker-on-tag.yml
 │   └── deploy-to-vps.yml
 │
-└── .github/workflows/            # this repo's active workflows
+├── .githooks/                    # git hooks
+│   └── pre-push                  # syncs workflows/ → .github/workflows/
+│
+└── .github/workflows/            # auto-synced by pre-push hook
 ```
 
 ## how it works
@@ -164,6 +194,9 @@ ready-to-copy workflow files in `workflows/`:
 3. **`init` cli** scaffolds the workflow files into any repo so you don't
    have to copy yaml by hand.
 
+4. **pre-push hook** keeps `.github/workflows/` in sync with `workflows/`
+   automatically — edit the template once, the hook copies it on push.
+
 ## secrets required
 
 | secret            | used by                                    |
@@ -178,7 +211,7 @@ ready-to-copy workflow files in `workflows/`:
 ## development
 
 ```bash
-bun install          # install deps
+bun install          # install deps + configure git hooks
 bun run build        # validate all action packages
 bun test             # run tests
 ```
