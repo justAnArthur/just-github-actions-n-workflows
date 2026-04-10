@@ -81,8 +81,11 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
           lfs: true
 
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+      - name: Resolve package directory
+        id: pkg
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-package-dir@main
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
@@ -96,6 +99,7 @@ jobs:
           fi
 
       - name: Publish to npm
+        working-directory: ${{ steps.pkg.outputs.dir }}
         run: bun publish --access public --tag ${{ steps.meta.outputs.npm_tag }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}

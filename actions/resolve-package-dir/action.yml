@@ -1,0 +1,40 @@
+name: Resolve Package Directory
+description: >
+  Resolves the directory containing the package.json that matches
+  the module name extracted from a git tag (e.g. '@scope/pkg@1.2.3').
+  Useful in monorepos to find which workspace directory to publish from.
+
+inputs:
+  tag_name:
+    description: "Git tag to resolve the package for (e.g. '@scope/pkg@1.2.3')"
+    required: true
+
+outputs:
+  dir:
+    description: "Relative path to the directory containing the matched package.json"
+    value: ${{ steps.run.outputs.dir }}
+  name:
+    description: "Resolved package name"
+    value: ${{ steps.run.outputs.name }}
+  version:
+    description: "Version extracted from the tag"
+    value: ${{ steps.run.outputs.version }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run resolve-package-dir
+      id: run
+      shell: bash
+      env:
+        TAG_NAME: ${{ inputs.tag_name }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+
