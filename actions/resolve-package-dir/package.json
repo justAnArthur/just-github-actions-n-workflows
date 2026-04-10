@@ -1,13 +1,15 @@
 {
-  "name": "@justanarthur/step-resolve-dockerfile-path",
+  "name": "@justanarthur/step-resolve-package-dir",
   "version": "0.0.0-beta.1",
   "private": true,
   "type": "module",
   "dependencies": {
     "@justanarthur/actions-lib": "workspace:*",
     "@justanarthur/step-bump-manifest-versions": "workspace:*"
+
   },
   "scripts": {
     "test": "bun test"
   }
 }
+
