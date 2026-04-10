@@ -108,34 +108,6 @@ ready-to-copy workflow files in `workflows/`:
 | `publish-docker-on-tag.yml` | build docker + push to ghcr + release  | tag push, dispatch, call |
 | `deploy-to-vps.yml`         | deploy docker compose to VPS (example) | dispatch                 |
 
-### workflow sync (pre-push hook)
-
-`workflows/` is the **single source of truth** for workflow templates. a git
-pre-push hook automatically copies the workflows this repo uses into
-`.github/workflows/` so GitHub Actions always sees the latest version.
-
-which files get synced is controlled by the `SYNC_WORKFLOWS` array in
-`.githooks/pre-push`:
-
-```bash
-SYNC_WORKFLOWS=(
-  "bump-version.yml"
-  "publish-npm-on-tag.yml"
-  "publish-docker-on-tag.yml"
-)
-```
-
-this means `deploy-to-vps.yml` (and any other template-only workflows) stay
-in `workflows/` without being copied — `.github/workflows/` only contains
-the workflows this repo actually runs.
-
-the hook is installed automatically via the `prepare` script when you run
-`bun install`. to set it up manually:
-
-```bash
-git config core.hooksPath .githooks
-```
-
 ## project structure
 
 ```
@@ -211,7 +183,7 @@ git config core.hooksPath .githooks
 ## development
 
 ```bash
-bun install          # install deps + configure git hooks
+bun install          # install deps
 bun run build        # validate all action packages
 bun test             # run tests
 ```
