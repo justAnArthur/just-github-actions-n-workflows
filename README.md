@@ -152,7 +152,7 @@ ready-to-copy workflow files in `workflows/`:
 └── .github/workflows/            # auto-synced by pre-commit hook
 ```
 
-## how it works
+## how it  
 
 1. **composite actions** in `actions/` are standalone typescript programs that
    read inputs from environment variables and write outputs to `$GITHUB_OUTPUT`.
@@ -166,8 +166,8 @@ ready-to-copy workflow files in `workflows/`:
 3. **`init` cli** scaffolds the workflow files into any repo so you don't
    have to copy YAML by hand.
 
-4. **pre-push hook** keeps `.github/workflows/` in sync with `workflows/`
-   automatically — edit the template once, the hook copies it on push.
+4. **pre-commit hook** keeps `.github/workflows/` in sync with `workflows/`
+   automatically — edit the template once, the hook copies it on commit.
 
 ## secrets required
 
@@ -177,8 +177,8 @@ ready-to-copy workflow files in `workflows/`:
 | `NPM_TOKEN`       | publish-npm, publish-docker (npm registry) |
 | `SSH_PRIVATE_KEY` | deploy-to-vps (ssh authentication)         |
 | `SERVER_USERNAME` | deploy-to-vps (ssh/scp username)           |
-4. **pre-commit hook** keeps `.github/workflows/` in sync with `workflows/`
-   automatically — edit the template once, the hook copies it on commit.
+| `DOCKER_USERNAME` | deploy-to-vps (ghcr login)                 |
+| `DOCKER_PASSWORD` | deploy-to-vps (ghcr login)                 |
 
 ## development
 

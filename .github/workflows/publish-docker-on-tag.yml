@@ -1,0 +1,193 @@
+# publish-docker-on-tag.yml
+# ---
+# builds and publishes a docker image to ghcr, then creates a github
+# release with auto-generated release notes when a version tag is pushed.
+#
+# copy this file into your repo's `.github/workflows/` and adjust
+# the `push.tags` pattern to match your package naming convention.
+#
+# can also be called as a reusable workflow:
+#
+#   jobs:
+#     publish:
+#       uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/publish-docker-on-tag.yml@main
+#       with:
+#         tag: ${{ github.ref_name }}
+#       secrets:
+#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
+#         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
+#
+# required secrets:
+#   GH_TOKEN  — github token with contents:write and packages:write
+#   NPM_TOKEN — npm registry token (optional, passed as docker build arg)
+# ---
+
+name: publish-docker-on-tag
+run-name: "publish-docker — ${{ inputs.tag || github.ref_name }}"
+
+on:
+  push:
+    tags: [ "*@*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to build (e.g. "@scope/pkg@1.2.3-canary.4")'
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      tag:
+        description: 'tag to build (e.g. "@scope/pkg@1.2.3-canary.4")'
+        type: string
+        required: true
+    secrets:
+      GH_TOKEN:
+        description: "github token with contents:write and packages:write"
+        required: true
+      NPM_TOKEN:
+        description: "npm registry token (passed as docker build arg)"
+        required: false
+
+permissions:
+  contents: write
+  packages: write
+
+jobs:
+  build-and-publish-docker:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+          ref: ${{ inputs.tag || github.ref_name }}
+          lfs: true
+
+      - name: Fetch all tags
+        uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
+
+      - name: Resolve dockerfile path
+        id: dockerfile
+        uses: justAnArthur/just-github-actions-n-workflows/actions/get-dockerfile-path@main
+        with:
+          tag_name: ${{ inputs.tag || github.ref_name }}
+
+      - id: prepare
+        name: Prepare image metadata
+        env:
+          TAG_NAME: ${{ inputs.tag || github.ref_name }}
+          DOCKERFILE: ${{ steps.dockerfile.outputs.dockerfile }}
+          CONTEXT: ${{ steps.dockerfile.outputs.context }}
+        run: |
+          set -euo pipefail
+
+          dockerfile="$DOCKERFILE"
+
+          raw_tag=$(printf '%s' "${TAG_NAME}" | tr -d '\r')
+          tag=$(printf '%s' "$raw_tag" \
+            | sed -E 's/^refs\/tags\///; s/^refs\/heads\///' \
+            | sed -e 's/^\s*//' -e 's/\s*$//')
+
+          if [ -z "$tag" ]; then
+            echo "no tag available; aborting"
+            exit 2
+          fi
+
+          version_raw=$(printf '%s' "$tag" | awk -F'@' '{print $NF}')
+          if [ -z "$version_raw" ]; then version_raw="$tag"; fi
+
+          sanitized_tag=$(printf '%s' "$version_raw" \
+            | sed -E 's/[^A-Za-z0-9_.-]+/-/g' \
+            | sed -E 's/^-+|-+$//g')
+          if [ -z "$sanitized_tag" ]; then sanitized_tag="untagged-${RANDOM}"; fi
+
+          package_raw=$(printf '%s' "$tag" | sed -E 's/@[^@]+$//')
+          if [ -z "$package_raw" ]; then package_raw="unknown-package"; fi
+
+          package_image_name=$(printf '%s' "$package_raw" \
+            | sed -e 's/^@//' -e 's|/|-|g' \
+            | sed -E 's/[^A-Za-z0-9_.-]+/-/g' \
+            | sed -E 's/^-+|-+$//g' \
+            | tr '[:upper:]' '[:lower:]')
+          if [ -z "$package_image_name" ]; then package_image_name="package-unknown"; fi
+
+          repository=$(printf '%s' "${GITHUB_REPOSITORY}" | tr '[:upper:]' '[:lower:]')
+          repo_name=$(printf '%s' "$repository" | cut -d'/' -f2)
+
+          dockerfile_dir=$(dirname "$dockerfile" | sed -e 's|/*$||')
+          context_file_path="$dockerfile_dir/Dockerfile.context"
+          if [ -f "$context_file_path" ]; then
+            candidate=$(sed -n '1p' "$context_file_path" | tr -d '\r' | sed -e 's/^\s*//' -e 's/\s*$//')
+            if [ -n "$candidate" ] && [ -d "$candidate" ]; then
+              dockerfile_dir="$candidate"
+              echo "using build context from Dockerfile.context: $dockerfile_dir"
+            fi
+          fi
+
+          if printf '%s' "$version_raw" | grep -qiE '(canary|alpha|beta|rc)'; then
+            is_prerelease="true"
+          else
+            is_prerelease="false"
+          fi
+
+          echo "dockerfile=$dockerfile"                     >> $GITHUB_OUTPUT
+          echo "context=$dockerfile_dir"                     >> $GITHUB_OUTPUT
+          echo "image_tag=$sanitized_tag"                    >> $GITHUB_OUTPUT
+          echo "repository=$repository"                      >> $GITHUB_OUTPUT
+          echo "repo_name=$repo_name"                        >> $GITHUB_OUTPUT
+          echo "package_raw=$package_raw"                    >> $GITHUB_OUTPUT
+          echo "package_image_name=$package_image_name"      >> $GITHUB_OUTPUT
+          echo "is_prerelease=$is_prerelease"                >> $GITHUB_OUTPUT
+          echo "original_tag=$tag"                           >> $GITHUB_OUTPUT
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GH_TOKEN }}
+
+      - name: Build and push docker image to ghcr
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.prepare.outputs.context }}
+          file: ${{ steps.prepare.outputs.dockerfile }}
+          push: true
+          tags: ghcr.io/${{ steps.prepare.outputs.repository }}/${{ steps.prepare.outputs.package_image_name }}:${{ steps.prepare.outputs.image_tag }}
+          platforms: linux/amd64
+          build-args: |
+            USERNAME_GITHUB=${{ github.actor }}
+            TOKEN_GITHUB=${{ secrets.GH_TOKEN }}
+            TAG_NAME=${{ steps.prepare.outputs.original_tag }}
+            SANITIZED_IMAGE_TAG=${{ steps.prepare.outputs.image_tag }}
+            NPM_TOKEN=${{ secrets.NPM_TOKEN }}
+          labels: |
+            org.opencontainers.image.version=${{ steps.prepare.outputs.original_tag }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Docker image for ${{ steps.prepare.outputs.package_raw }} built from tag ${{ steps.prepare.outputs.original_tag }}
+
+      - name: Generate release notes
+        id: generate_release_notes
+        uses: justAnArthur/just-github-actions-n-workflows/actions/generate-release-notes@main
+        with:
+          tag_name: ${{ steps.prepare.outputs.original_tag }}
+          root_dir: ${{ github.workspace }}
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.prepare.outputs.original_tag }}
+          name: ${{ steps.prepare.outputs.original_tag }}
+          prerelease: ${{ steps.prepare.outputs.is_prerelease == 'true' }}
+          body: |
+            ## release notes
+
+            ${{ steps.generate_release_notes.outputs.release_notes }}
+
+            ## docker image
+
+            published to [github container registry](https://github.com/${{ github.repository }}/pkgs/container/${{ steps.prepare.outputs.repo_name }}%2F${{ steps.prepare.outputs.package_image_name }}?tag=${{ steps.prepare.outputs.image_tag }})
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
