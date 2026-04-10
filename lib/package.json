@@ -1,6 +1,6 @@
 {
   "name": "@justanarthur/actions-lib",
-  "version": "0.0.0-beta.0",
+  "version": "0.0.0-beta.1",
   "private": true,
   "type": "module",
   "exports": {
@@ -11,4 +11,3 @@
     "./version/*": "./src/version/*.ts"
   }
 }
-
