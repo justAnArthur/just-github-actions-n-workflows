@@ -4,15 +4,138 @@
   "workspaces": {
     "": {
       "name": "just-github-actions-n-workflows",
-      "dependencies": {
-        "fast-xml-parser": "^5.5.9",
-      },
       "devDependencies": {
         "@types/bun": "latest",
       },
     },
+    "actions/bump-version": {
+      "name": "@justanarthur/step-bump-manifest-versions",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+        "fast-xml-parser": "^5.5.9",
+      },
+    },
+    "actions/configure-git-user": {
+      "name": "@justanarthur/step-setup-git-author",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "actions/create-env-file": {
+      "name": "@justanarthur/step-create-dotenv",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "actions/fetch-tags": {
+      "name": "@justanarthur/step-git-fetch-and-unshallow",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "actions/generate-release-notes": {
+      "name": "@justanarthur/step-generate-release-notes",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+        "@justanarthur/step-bump-manifest-versions": "workspace:*",
+      },
+    },
+    "actions/get-dockerfile-path": {
+      "name": "@justanarthur/step-resolve-dockerfile-path",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+        "@justanarthur/step-bump-manifest-versions": "workspace:*",
+      },
+    },
+    "actions/resolve-deploy-config": {
+      "name": "@justanarthur/step-resolve-deploy-config",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "actions/resolve-image-tags": {
+      "name": "@justanarthur/step-resolve-docker-image-tags",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "actions/scp-transfer": {
+      "name": "@justanarthur/step-scp-upload",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "actions/setup-ssh": {
+      "name": "@justanarthur/step-setup-ssh-keys",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "actions/skip-check": {
+      "name": "@justanarthur/step-check-ci-skip",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "actions/ssh-exec": {
+      "name": "@justanarthur/step-ssh-remote-exec",
+      "version": "0.0.0",
+      "dependencies": {
+        "@justanarthur/actions-lib": "workspace:*",
+      },
+    },
+    "cli": {
+      "name": "@justanarthur/just-github-actions-n-workflows",
+      "version": "0.0.0-canary.0",
+      "bin": {
+        "just-github-actions-n-workflows": "./src/init.ts",
+      },
+    },
+    "lib": {
+      "name": "@justanarthur/actions-lib",
+      "version": "0.0.0",
+    },
   },
   "packages": {
+    "@justanarthur/actions-lib": ["@justanarthur/actions-lib@workspace:lib"],
+
+    "@justanarthur/just-github-actions-n-workflows": ["@justanarthur/just-github-actions-n-workflows@workspace:cli"],
+
+    "@justanarthur/step-bump-manifest-versions": ["@justanarthur/step-bump-manifest-versions@workspace:actions/bump-version"],
+
+    "@justanarthur/step-check-ci-skip": ["@justanarthur/step-check-ci-skip@workspace:actions/skip-check"],
+
+    "@justanarthur/step-create-dotenv": ["@justanarthur/step-create-dotenv@workspace:actions/create-env-file"],
+
+    "@justanarthur/step-generate-release-notes": ["@justanarthur/step-generate-release-notes@workspace:actions/generate-release-notes"],
+
+    "@justanarthur/step-git-fetch-and-unshallow": ["@justanarthur/step-git-fetch-and-unshallow@workspace:actions/fetch-tags"],
+
+    "@justanarthur/step-resolve-deploy-config": ["@justanarthur/step-resolve-deploy-config@workspace:actions/resolve-deploy-config"],
+
+    "@justanarthur/step-resolve-docker-image-tags": ["@justanarthur/step-resolve-docker-image-tags@workspace:actions/resolve-image-tags"],
+
+    "@justanarthur/step-resolve-dockerfile-path": ["@justanarthur/step-resolve-dockerfile-path@workspace:actions/get-dockerfile-path"],
+
+    "@justanarthur/step-scp-upload": ["@justanarthur/step-scp-upload@workspace:actions/scp-transfer"],
+
+    "@justanarthur/step-setup-git-author": ["@justanarthur/step-setup-git-author@workspace:actions/configure-git-user"],
+
+    "@justanarthur/step-setup-ssh-keys": ["@justanarthur/step-setup-ssh-keys@workspace:actions/setup-ssh"],
+
+    "@justanarthur/step-ssh-remote-exec": ["@justanarthur/step-ssh-remote-exec@workspace:actions/ssh-exec"],
+
     "@types/bun": ["@types/bun@1.3.11", "", { "dependencies": { "bun-types": "1.3.11" } }, "sha512-5vPne5QvtpjGpsGYXiFyycfpDF2ECyPcTSsFBMa0fraoxiQyMJ3SmuQIGhzPg2WJuWxVBoxWJ2kClYTcw/4fAg=="],
 
     "@types/node": ["@types/node@25.5.2", "", { "dependencies": { "undici-types": "~7.18.0" } }, "sha512-tO4ZIRKNC+MDWV4qKVZe3Ql/woTnmHDr5JD8UI5hn2pwBrHEwOEMZK7WlNb5RKB6EoJ02gwmQS9OrjuFnZYdpg=="],

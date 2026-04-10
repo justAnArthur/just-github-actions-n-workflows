@@ -1,0 +1,37 @@
+name: Resolve Dockerfile Path
+description: >
+  Resolves the Dockerfile path and build context directory for a module
+  by looking up the DockerfilePath property in the project manifest
+  (package.json or pom.xml) that matches the given tag.
+
+inputs:
+  tag_name:
+    description: "Git tag to resolve the Dockerfile for (e.g. '@scope/pkg@1.2.3')"
+    required: true
+
+outputs:
+  dockerfile:
+    description: "Absolute path to the resolved Dockerfile"
+    value: ${{ steps.run.outputs.dockerfile }}
+  context:
+    description: "Absolute path to the Docker build context directory"
+    value: ${{ steps.run.outputs.context }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run resolve-dockerfile-path
+      id: run
+      shell: bash
+      env:
+        TAG_NAME: ${{ inputs.tag_name }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

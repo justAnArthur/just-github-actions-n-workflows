@@ -1,0 +1,45 @@
+name: SSH Remote Exec
+description: >
+  Executes a shell script on a remote host via SSH.
+  Pipes the script through stdin using a heredoc, with configurable keepalive settings.
+
+inputs:
+  host:
+    description: "Remote host to connect to"
+    required: true
+  username:
+    description: "SSH username"
+    required: true
+  script:
+    description: "Shell script to execute on the remote host (multi-line supported)"
+    required: true
+  alive_interval:
+    description: "SSH ServerAliveInterval in seconds"
+    required: false
+    default: "60"
+  alive_count_max:
+    description: "SSH ServerAliveCountMax"
+    required: false
+    default: "5"
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run ssh-remote-exec
+      shell: bash
+      env:
+        SSH_EXEC_HOST: ${{ inputs.host }}
+        SSH_EXEC_USERNAME: ${{ inputs.username }}
+        SSH_EXEC_SCRIPT: ${{ inputs.script }}
+        SSH_EXEC_ALIVE_INTERVAL: ${{ inputs.alive_interval }}
+        SSH_EXEC_ALIVE_COUNT: ${{ inputs.alive_count_max }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

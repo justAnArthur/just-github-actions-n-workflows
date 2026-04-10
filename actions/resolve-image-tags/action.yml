@@ -1,0 +1,37 @@
+name: Resolve Docker Image Tags
+description: >
+  Resolves Docker image tags from remote git tags for a list of components.
+  For each component, looks up the latest stable or canary tag and exports
+  the resolved version as a DOCKER_<NAME>_IMAGE_TAG environment variable.
+
+inputs:
+  repo_url:
+    description: "Git repository URL to fetch tags from"
+    required: true
+  components:
+    description: 'JSON array of components to resolve, each with "name", "package", and "version" fields'
+    required: true
+  gh_token:
+    description: "GitHub token for authenticated tag fetching (optional, falls back to public)"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run resolve-docker-image-tags
+      shell: bash
+      env:
+        RESOLVE_REPO_URL: ${{ inputs.repo_url }}
+        RESOLVE_COMPONENTS: ${{ inputs.components }}
+        GH_TOKEN: ${{ inputs.gh_token }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

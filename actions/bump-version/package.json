@@ -1,0 +1,21 @@
+{
+  "name": "@justanarthur/step-bump-manifest-versions",
+  "version": "0.0.0-beta.0",
+  "private": true,
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./manifests": "./src/manifests/index.ts",
+    "./manifests/*": "./src/manifests/*.ts",
+    "./manifests/handle": "./src/manifests/handle/index.ts",
+    "./manifests/handle/*": "./src/manifests/handle/*.ts",
+    "./codecs/*": "./src/codecs/*.ts"
+  },
+  "dependencies": {
+    "@justanarthur/actions-lib": "workspace:*",
+    "fast-xml-parser": "^5.5.9"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}

@@ -1,0 +1,20 @@
+name: Git Fetch and Unshallow
+description: >
+  Fetches all git tags with --force and unshallows the repository
+  if it was cloned with a limited depth (e.g. actions/checkout with fetch-depth: 1).
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run git-fetch-and-unshallow
+      shell: bash
+      run: bun run ${{ github.action_path }}/src/index.ts
+

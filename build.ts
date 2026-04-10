@@ -1,44 +1,45 @@
 // build.ts
 // ---
-// compiles every step script into a standalone linux binary.
-// only top-level `.ts` files in `steps/` are compiled (not `_lib/`).
+// validates that every action package has the required files.
+// there is nothing to compile — actions run via `bun run` in composite actions.
 //
-import { $, Glob } from "bun"
-import { mkdirSync } from "node:fs"
-import { basename } from "node:path"
+import { existsSync } from "node:fs"
+import { Glob } from "bun"
 
-const STEPS_DIR = "./steps"
-const OUT_DIR = "./dist"
+const ACTIONS_DIR = "./actions"
+const REQUIRED_FILES = ["action.yml", "package.json", "tsconfig.json", "src/index.ts"]
 
-// --- collect step entry points ---
+const glob = new Glob("*/action.yml")
+const actions: string[] = []
 
-mkdirSync(OUT_DIR, { recursive: true })
-
-const glob = new Glob("*.ts")
-const entries: string[] = []
-for await (const file of glob.scan(STEPS_DIR)) {
-  entries.push(file)
+for await (const file of glob.scan(ACTIONS_DIR)) {
+  actions.push(file.split("/")[0])
 }
 
-if (entries.length === 0) {
-  console.error("no step scripts found in steps/")
+if (actions.length === 0) {
+  console.error("no actions found in actions/")
   process.exit(1)
 }
 
-console.log(`found ${entries.length} step(s) to compile:\n`)
+console.log(`found ${actions.length} action(s) to validate:\n`)
 
-// --- compile each step to a standalone binary ---
+let errors = 0
 
-for (const file of entries) {
-  const name = basename(file, ".ts")
-  const src = `${STEPS_DIR}/${file}`
-  const out = `${OUT_DIR}/${name}`
+for (const name of actions.sort()) {
+  const missing = REQUIRED_FILES.filter(
+    (f) => !existsSync(`${ACTIONS_DIR}/${name}/${f}`)
+  )
 
-  console.log(`  ${src}  →  ${out}`)
-  await $`bun build --compile --target=bun-linux-x64 ${src} --outfile ${out}`
+  if (missing.length > 0) {
+    console.log(`  ✗ ${name}  — missing: ${missing.join(", ")}`)
+    errors++
+  } else {
+    console.log(`  ✓ ${name}`)
+  }
 }
 
-// --- summary ---
+console.log(`\n${actions.length} action(s), ${errors} with errors`)
 
-console.log(`\ndone — ${entries.length} binaries compiled to ${OUT_DIR}/`)
-console.log(`  ${entries.map((f) => basename(f, ".ts")).join(", ")}`)
+if (errors > 0) {
+  process.exit(1)
+}

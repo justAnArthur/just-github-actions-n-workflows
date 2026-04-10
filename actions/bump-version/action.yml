@@ -1,0 +1,55 @@
+name: Bump Manifest Versions
+description: >
+  Automated version bumping for mono-repo manifests (package.json, pom.xml).
+  Supports push-triggered, manual dispatch, and calculated stable promotion strategies.
+  Commits version changes, creates git tags, and optionally cleans up prerelease Docker images.
+
+inputs:
+  bump_to_calculated_stable:
+    description: 'Promote prerelease to stable based on commit history ("true"/"false")'
+    required: false
+    default: "false"
+  bump_type_and_channel:
+    description: 'Manual bump type and channel, colon-separated (e.g. "minor:canary", "patch:stable")'
+    required: false
+    default: ""
+  bump_manifest_names:
+    description: "Comma-separated manifest names to bump (empty = all discovered manifests)"
+    required: false
+    default: ""
+  prerelease_channel:
+    description: 'Prerelease channel label (e.g. "canary", "beta", "alpha", "rc")'
+    required: false
+    default: "canary"
+  github_token:
+    description: "GitHub token for cleaning up prerelease Docker images from GHCR"
+    required: false
+    default: ""
+  github_event:
+    description: "JSON-encoded GitHub push event (auto-provided in push workflows via toJSON(github.event))"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run bump-manifest-versions
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        BUMP_TO_CALCULATED_STABLE_VERSION: ${{ inputs.bump_to_calculated_stable }}
+        BUMP_TYPE_N_STABLE_OR_CANARY: ${{ inputs.bump_type_and_channel }}
+        BUMP_MANIFEST_NAMES: ${{ inputs.bump_manifest_names }}
+        BUMP_PRERELEASE_CHANNEL: ${{ inputs.prerelease_channel }}
+        GITHUB_TOKEN: ${{ inputs.github_token }}
+        GITHUB_EVENT: ${{ inputs.github_event }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

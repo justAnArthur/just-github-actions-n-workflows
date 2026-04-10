@@ -1,14 +1,14 @@
 # deploy-to-vps.yml
 # ---
 # project-specific example: deploys docker compose services to a vps.
-# this one is too specific for a reusable workflow, so it fetches the
-# toolkit binaries directly and calls them in its steps.
+# this one is too specific for a reusable workflow, so it uses
+# composite actions directly in its steps.
 #
 # paste this into your repo's `.github/workflows/` and customise the
 # environment list and compose profiles for your project.
 #
-# binaries used: setup-ssh, resolve-deploy-config, resolve-image-tags,
-#                create-env-file, scp-transfer, ssh-exec
+# actions used: setup-ssh, resolve-deploy-config, resolve-image-tags,
+#               create-env-file, scp-transfer, ssh-exec
 # ---
 
 name: "deploy-to-vps"
@@ -55,30 +55,16 @@ jobs:
           token: ${{ secrets.GH_TOKEN }}
           lfs: true
 
-      # --- fetch toolkit binaries ---
-      - name: Fetch toolkit binaries
-        uses: actions/checkout@v4
-        with:
-          repository: justAnArthur/just-github-actions-n-workflows
-          path: .toolkit
-          sparse-checkout: dist
-
-      - name: Install binaries
-        run: |
-          cp -r .toolkit/dist ./dist
-          chmod +x dist/*
-          rm -rf .toolkit
-
       - name: Set up SSH key
-        env:
-          SSH_PRIVATE_KEY: ${{ secrets.SSH_PRIVATE_KEY }}
-          SSH_HOST: ${{ github.event.inputs.environment }}
-        run: ./dist/setup-ssh
+        uses: justAnArthur/just-github-actions-n-workflows/actions/setup-ssh@main
+        with:
+          private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ github.event.inputs.environment }}
 
       - name: Determine compose profiles and timezone
-        env:
-          DEPLOY_ENVIRONMENT: ${{ github.event.inputs.environment }}
-        run: ./dist/resolve-deploy-config
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-deploy-config@main
+        with:
+          environment: ${{ github.event.inputs.environment }}
 
       - name: Validate version inputs
         run: |
@@ -88,20 +74,21 @@ jobs:
           fi
 
       - name: Resolve image tags
-        env:
-          RESOLVE_REPO_URL: https://github.com/utegsk/camasys.git
-          GH_TOKEN: ${{ secrets.GH_TOKEN }}
-          RESOLVE_COMPONENTS: |
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-image-tags@main
+        with:
+          repo_url: https://github.com/utegsk/camasys.git
+          gh_token: ${{ secrets.GH_TOKEN }}
+          components: |
             [
               { "name": "BACKEND", "package": "@camasys/backend_core", "version": "${{ github.event.inputs.backend_version || github.event.inputs.frontend_version }}" },
               { "name": "FRONTEND", "package": "@camasys/frontend_core", "version": "${{ github.event.inputs.frontend_version || github.event.inputs.backend_version }}" },
               { "name": "GPS", "package": "@camasys/backend_gps", "version": "${{ github.event.inputs.gps_version || github.event.inputs.backend_version || github.event.inputs.frontend_version }}" }
             ]
-        run: ./dist/resolve-image-tags
 
       - name: Create .env file for Docker Compose
-        env:
-          ENV_FILE_VARIABLES: |
+        uses: justAnArthur/just-github-actions-n-workflows/actions/create-env-file@main
+        with:
+          variables: |
             DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
             DOCKER_BACKEND_IMAGE_TAG=${{ env.DOCKER_BACKEND_IMAGE_TAG }}
             DOCKER_FRONTEND_IMAGE_TAG=${{ env.DOCKER_FRONTEND_IMAGE_TAG }}
@@ -109,21 +96,21 @@ jobs:
             COMPOSE_PROFILES=${{ env.COMPOSE_PROFILES }}
             PROFILES=${{ env.PROFILES }}
             APP_TZ=${{ env.APP_TZ }}
-        run: ./dist/create-env-file
 
       - name: Transfer docker-compose.yml and .env files to server
-        env:
-          SCP_HOST: ${{ github.event.inputs.environment }}
-          SCP_USERNAME: ${{ secrets.SERVER_USERNAME }}
-          SCP_SOURCE: './docker-compose.yml ./.env'
-          SCP_TARGET: ${{ env.SSH_TARGET_PATH }}
-        run: ./dist/scp-transfer
+        uses: justAnArthur/just-github-actions-n-workflows/actions/scp-transfer@main
+        with:
+          host: ${{ github.event.inputs.environment }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          source: './docker-compose.yml ./.env'
+          target: ${{ env.SSH_TARGET_PATH }}
 
       - name: Rebuild Docker Compose and restart containers
-        env:
-          SSH_EXEC_HOST: ${{ github.event.inputs.environment }}
-          SSH_EXEC_USERNAME: ${{ secrets.SERVER_USERNAME }}
-          SSH_EXEC_SCRIPT: |
+        uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main
+        with:
+          host: ${{ github.event.inputs.environment }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          script: |
             set -euo pipefail
             TARGET=${{ env.SSH_TARGET_PATH }}
             echo "Changing to target directory: $TARGET"
@@ -155,4 +142,3 @@ jobs:
             docker system prune -f --volumes
 
             echo "Deployment finished."
-        run: ./dist/ssh-exec

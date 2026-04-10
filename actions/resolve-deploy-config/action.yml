@@ -1,0 +1,33 @@
+name: Resolve Deploy Config
+description: >
+  Resolves deployment configuration (compose profiles, Spring profiles, timezone)
+  for a target environment. Uses built-in defaults or a custom JSON override.
+  Exports resolved values as environment variables for subsequent steps.
+
+inputs:
+  environment:
+    description: "Target deployment environment (hostname or identifier)"
+    required: true
+  config:
+    description: "Optional JSON override for deployment configuration (keyed by environment)"
+    required: false
+    default: ""
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run resolve-deploy-config
+      shell: bash
+      env:
+        DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
+        DEPLOY_CONFIG: ${{ inputs.config }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

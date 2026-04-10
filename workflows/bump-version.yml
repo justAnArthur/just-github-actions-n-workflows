@@ -1,54 +1,123 @@
 # bump-version.yml
 # ---
-# caller example: paste this into your repo's `.github/workflows/`.
-# calls the reusable workflow from the toolkit — no binaries to copy.
+# auto-bumps manifest versions using conventional commits.
+#
+# copy this file into your repo's `.github/workflows/` and adjust
+# the `push.branches` trigger to match your default branch.
+#
+# can also be called as a reusable workflow from another workflow:
+#
+#   jobs:
+#     bump:
+#       uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
+#       with:
+#         bump_type: "minor:canary"
+#       secrets:
+#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
+#
+# required secrets:
+#   GH_TOKEN — github token with contents:write
 # ---
 
 name: bump-version
 run-name: >-
   ${{
     github.event_name == 'workflow_dispatch'
-      && format('bump-version (manual) — type={0}, stable={1}, manifests={2}',
-           github.event.inputs.bump_type || '',
-           github.event.inputs.bump_to_stable || '',
-           github.event.inputs.bump_manifest_names || '')
+      && format('bump-version (manual) — type={0}, stable={1}',
+           inputs.bump_type || 'auto',
+           inputs.bump_to_calculated_stable || 'false')
       || format('bump-version (auto) — {0}',
-           github.event.head_commit.message || '')
+           github.event.head_commit.message || github.ref_name)
   }}
 
 on:
   push:
-    branches: [ "canary", "versions/**" ]
+    branches: [ main ]
   workflow_dispatch:
     inputs:
       bump_type:
-        description: 'bump type (e.g. "minor:canary", "patch:stable", "minor:beta")'
+        description: >
+          version bump type.
+          append `:<channel>` for prerelease
+          (e.g. "minor:canary", "patch:stable", "minor:beta").
+        type: string
         required: false
         default: ""
-      bump_to_stable:
-        description: "promote canary to stable based on history"
+      bump_to_calculated_stable:
+        description: "promote current prerelease to stable based on commit history"
+        type: string
         required: false
         default: "false"
       bump_manifest_names:
         description: "comma-separated manifest names to bump (empty = all)"
+        type: string
         required: false
         default: ""
       bump_prerelease_channel:
-        description: 'prerelease channel label (e.g. "canary", "beta", "alpha", "rc")'
+        description: >
+          prerelease channel label (e.g. "canary", "beta", "alpha", "rc").
+          defaults to "canary" when omitted.
+        type: string
         required: false
         default: "canary"
+  workflow_call:
+    inputs:
+      bump_type:
+        type: string
+        required: false
+        default: ""
+      bump_to_calculated_stable:
+        type: string
+        required: false
+        default: "false"
+      bump_manifest_names:
+        type: string
+        required: false
+        default: ""
+      bump_prerelease_channel:
+        type: string
+        required: false
+        default: "canary"
+    secrets:
+      GH_TOKEN:
+        description: "github token with contents:write and packages:write"
+        required: true
 
 permissions:
   contents: write
   packages: write
 
 jobs:
-  bump:
-    uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
-    with:
-      bump_type: ${{ github.event.inputs.bump_type || '' }}
-      bump_to_calculated_stable: ${{ github.event.inputs.bump_to_stable || 'false' }}
-      bump_manifest_names: ${{ github.event.inputs.bump_manifest_names || '' }}
-      bump_prerelease_channel: ${{ github.event.inputs.bump_prerelease_channel || 'canary' }}
-    secrets:
-      GH_TOKEN: ${{ secrets.GH_TOKEN }}
+  bump-version:
+    runs-on: ubuntu-latest
+    if: >-
+      github.event_name == 'workflow_dispatch' ||
+      github.event_name == 'workflow_call' ||
+      !contains(github.event.head_commit.message, '[skip bump]')
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          persist-credentials: "true"
+          token: ${{ secrets.GH_TOKEN }}
+          lfs: true
+
+      - name: Fetch all tags and history
+        uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
+
+      - name: Configure git user
+        uses: justAnArthur/just-github-actions-n-workflows/actions/configure-git-user@main
+        with:
+          mode: ${{ github.event_name == 'push' && 'push' || 'dispatch' }}
+
+      - name: Bump version
+        uses: justAnArthur/just-github-actions-n-workflows/actions/bump-version@main
+        with:
+          bump_to_calculated_stable: ${{ inputs.bump_to_calculated_stable || 'false' }}
+          bump_type_and_channel: ${{ inputs.bump_type || '' }}
+          bump_manifest_names: ${{ inputs.bump_manifest_names || '' }}
+          prerelease_channel: ${{ inputs.bump_prerelease_channel || 'canary' }}
+          github_token: ${{ secrets.GH_TOKEN }}
+          github_event: ${{ toJson(github.event) }}

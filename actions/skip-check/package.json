@@ -1,0 +1,12 @@
+{
+  "name": "@justanarthur/step-check-ci-skip",
+"version":"0.0.0-beta.0",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@justanarthur/actions-lib": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  }
+}

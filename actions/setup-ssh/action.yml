@@ -1,0 +1,32 @@
+name: Setup SSH Keys
+description: >
+  Sets up SSH for remote server access.
+  Writes the private key to ~/.ssh/id_rsa, scans the host keys,
+  and installs sshpass for subsequent SCP/SSH steps.
+
+inputs:
+  private_key:
+    description: "SSH private key content"
+    required: true
+  host:
+    description: "Remote host to scan and add to known_hosts"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run setup-ssh-keys
+      shell: bash
+      env:
+        SSH_PRIVATE_KEY: ${{ inputs.private_key }}
+        SSH_HOST: ${{ inputs.host }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

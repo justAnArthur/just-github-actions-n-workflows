@@ -1,0 +1,28 @@
+name: Check CI Skip
+description: >
+  Checks whether the current workflow should be skipped.
+  Detects "[skip bump]" markers in the last commit message
+  and bot committers (github-actions, [bot]).
+  Exits with code 78 (neutral) when skip is detected.
+
+outputs:
+  skip:
+    description: '"true" if the workflow should be skipped, "false" otherwise'
+    value: ${{ steps.run.outputs.skip }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run check-ci-skip
+      id: run
+      shell: bash
+      run: bun run ${{ github.action_path }}/src/index.ts
+

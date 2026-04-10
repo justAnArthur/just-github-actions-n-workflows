@@ -1,0 +1,39 @@
+name: Generate Release Notes
+description: >
+  Generates markdown release notes from conventional commit messages
+  between the given tag and the previous tag for the same module.
+  Groups changes by scope and highlights breaking changes.
+
+inputs:
+  tag_name:
+    description: "Git tag to generate notes for (e.g. '@scope/pkg@1.2.3')"
+    required: true
+  root_dir:
+    description: "Root directory for manifest discovery"
+    required: false
+    default: ${{ github.workspace }}
+
+outputs:
+  release_notes:
+    description: "Generated markdown release notes"
+    value: ${{ steps.run.outputs.release_notes }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run generate-release-notes
+      id: run
+      shell: bash
+      env:
+        TAG_NAME: ${{ inputs.tag_name }}
+        ROOT_DIR: ${{ inputs.root_dir }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

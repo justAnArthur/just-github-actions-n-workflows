@@ -1,49 +1,66 @@
 # just-github-actions-n-workflows
 
-release automation toolkit — version bumping, docker publishing, vps deployment.  
-all steps compile to **standalone linux binaries** via [bun](https://bun.sh).
+release automation toolkit — version bumping, npm publishing, docker publishing, VPS deployment.  
+built as **composite GitHub Actions** powered by [Bun](https://bun.sh).
 
-## install
+## quick start
 
-from any repo, run one command:
+from any repo, scaffold the workflow files:
 
 ```bash
 bunx just-github-actions-n-workflows init
 ```
 
-this creates the workflow caller files in `.github/workflows/` automatically.
-no binaries to copy — the toolkit fetches its own at runtime.
-
 ```
 $ bunx just-github-actions-n-workflows init
 
   create  .github/workflows/bump-version.yml
-  create  .github/workflows/publish-docker-on-tag.yml
   create  .github/workflows/publish-npm-on-tag.yml
+  create  .github/workflows/publish-docker-on-tag.yml
 
 done — 3 created, 0 skipped
 
 next steps:
   1. set the GH_TOKEN secret in your repo settings
-  2. commit and push: git add .github/ && git commit -m "ci: add workflows" && git push
+  2. adjust push.branches / push.tags triggers for your repo
+  3. commit and push: git add .github/ && git commit -m "ci: add workflows" && git push
 ```
 
-you can also install a specific workflow:
+install a specific workflow:
 
 ```bash
 bunx just-github-actions-n-workflows init bump-version
-bunx just-github-actions-n-workflows init publish-docker
 bunx just-github-actions-n-workflows init publish-npm
+bunx just-github-actions-n-workflows init publish-docker
 bunx just-github-actions-n-workflows init --list
 ```
 
 ### what gets created
 
-the `init` command writes minimal caller files (~30 lines each) that reference
-the reusable workflows from this repo. example:
+each workflow is **self-contained** — it has all triggers (`push`, `workflow_dispatch`, `workflow_call`) built in. copy
+it into `.github/workflows/`, adjust the triggers for your repo, done.
 
 ```yaml
-# .github/workflows/bump-version.yml (auto-generated)
+# .github/workflows/bump-version.yml (scaffolded)
+name: bump-version
+on:
+  push:
+    branches: [ main ]          # ← adjust to your default branch
+  workflow_dispatch: { ... }
+  workflow_call: { ... }      # also callable as a reusable workflow
+
+jobs:
+  bump-version:
+    steps:
+      - uses: actions/checkout@v4
+      - uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
+      - uses: justAnArthur/just-github-actions-n-workflows/actions/configure-git-user@main
+      - uses: justAnArthur/just-github-actions-n-workflows/actions/bump-version@main
+```
+
+you can also reference workflows directly from other repos without copying:
+
+```yaml
 jobs:
   bump:
     uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
@@ -51,142 +68,117 @@ jobs:
       GH_TOKEN: ${{ secrets.GH_TOKEN }}
 ```
 
-the reusable workflow handles everything — checking out your repo, fetching
-the compiled binaries, running the steps. you never touch binaries or yaml again.
+## available actions
 
-### using binaries directly (custom workflows)
+each action is a composite GitHub Action in `actions/` with its own `action.yml`.
 
-for project-specific workflows that don't fit a reusable template,
-fetch the binaries in 3 lines:
+| action                           | description                               | key inputs                                                    |
+|----------------------------------|-------------------------------------------|---------------------------------------------------------------|
+| `actions/bump-version`           | version bump with conventional commits    | `bump_type_and_channel`, `prerelease_channel`, `github_token` |
+| `actions/configure-git-user`     | set git user from push author or actor    | `mode`                                                        |
+| `actions/create-env-file`        | write a `.env` file from key=value pairs  | `variables`, `filename`, `path`                               |
+| `actions/fetch-tags`             | fetch all tags + unshallow if needed      | —                                                             |
+| `actions/generate-release-notes` | markdown release notes between tags       | `tag_name`, `root_dir`                                        |
+| `actions/get-dockerfile-path`    | resolve dockerfile from manifest metadata | `tag_name`                                                    |
+| `actions/resolve-deploy-config`  | determine compose profiles and timezone   | `environment`                                                 |
+| `actions/resolve-image-tags`     | resolve docker image tags from git tags   | `repo_url`, `components`, `gh_token`                          |
+| `actions/scp-transfer`           | copy files to remote server via scp       | `host`, `username`, `source`, `target`                        |
+| `actions/setup-ssh`              | provision ssh key + known_hosts           | `private_key`, `host`                                         |
+| `actions/skip-check`             | detect `[skip bump]` loops                | —                                                             |
+| `actions/ssh-exec`               | run a script on remote server via ssh     | `host`, `username`, `script`                                  |
+
+use any action directly in your workflow steps:
 
 ```yaml
 steps:
-  - uses: actions/checkout@v4
-
-  # fetch toolkit binaries — no need to commit dist/
-  - uses: actions/checkout@v4
+  - uses: justAnArthur/just-github-actions-n-workflows/actions/setup-ssh@main
     with:
-      repository: justAnArthur/just-github-actions-n-workflows
-      path: .toolkit
-      sparse-checkout: dist
-  - run: cp -r .toolkit/dist ./dist && chmod +x dist/* && rm -rf .toolkit
-
-  # now use any binary directly
-  - run: ./dist/setup-ssh
-  - run: ./dist/scp-transfer
-  - run: ./dist/ssh-exec
+      private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+      host: my-server.com
 ```
 
-> see `workflow.example.yaml` for complete examples.
+## available workflows
 
-## available binaries
+ready-to-copy workflow files in `workflows/`:
 
-| binary | description | key env vars |
-|--------|-------------|-------------|
-| `dist/bump-version` | version bump with conventional commits | `GITHUB_EVENT`, `BUMP_TYPE_N_STABLE_OR_CANARY`, `BUMP_MANIFEST_NAMES` |
-| `dist/configure-git-user` | set git user from push author or actor | `MODE`, `GITHUB_ACTOR` |
-| `dist/create-env-file` | write a `.env` file from key=value pairs | `ENV_FILE_VARIABLES`, `ENV_FILE_NAME`, `ENV_FILE_PATH` |
-| `dist/fetch-tags` | fetch all tags + unshallow if needed | _(none)_ |
-| `dist/generate-release-notes` | markdown release notes between tags | `TAG_NAME`, `ROOT_DIR` |
-| `dist/get-dockerfile-path` | resolve dockerfile from manifest metadata | `TAG_NAME` |
-| `dist/resolve-deploy-config` | determine compose profiles and timezone for a deploy target | `DEPLOY_ENVIRONMENT`, `DEPLOY_CONFIG` |
-| `dist/resolve-image-tags` | resolve docker image tags from git remote tags | `RESOLVE_REPO_URL`, `RESOLVE_COMPONENTS`, `GH_TOKEN` |
-| `dist/scp-transfer` | copy files to remote server via scp | `SCP_HOST`, `SCP_USERNAME`, `SCP_SOURCE`, `SCP_TARGET` |
-| `dist/setup-ssh` | provision ssh key + known_hosts | `SSH_PRIVATE_KEY`, `SSH_HOST` |
-| `dist/skip-check` | detect `[skip bump]` loops (defence-in-depth) | _(none)_ |
-| `dist/ssh-exec` | run a script on a remote server via ssh | `SSH_EXEC_HOST`, `SSH_EXEC_USERNAME`, `SSH_EXEC_SCRIPT` |
+| workflow                    | description                            | triggers                 |
+|-----------------------------|----------------------------------------|--------------------------|
+| `bump-version.yml`          | auto-bump manifest versions on push    | push, dispatch, call     |
+| `publish-npm-on-tag.yml`    | publish to npm + github release        | tag push, dispatch, call |
+| `publish-docker-on-tag.yml` | build docker + push to ghcr + release  | tag push, dispatch, call |
+| `deploy-to-vps.yml`         | deploy docker compose to VPS (example) | dispatch                 |
 
 ## project structure
 
 ```
-├── build.ts                      # compiles steps/ → dist/ binaries
-├── init.ts                       # cli: `bunx ... init` scaffolding
-├── package.json
-├── workflow.example.yaml         # annotated reference
+├── build.ts                      # validates action packages
+├── init.ts                       # cli entry point
+├── package.json                  # workspace root
+├── tsconfig.base.json            # shared typescript config
 │
-├── .github/workflows/            # reusable workflows (workflow_call)
-│   ├── bump-version.yml
-│   ├── publish-docker-on-tag.yml
-│   ├── publish-npm-on-tag.yml
-│   ├── ci-bump-version.yml       # self-use: bumps this repo's version
-│   └── ci-publish-npm.yml        # self-use: publishes this package to npm
+├── actions/                      # composite GitHub Actions
+│   ├── bump-version/             # each has action.yml + src/index.ts
+│   ├── configure-git-user/
+│   ├── create-env-file/
+│   ├── fetch-tags/
+│   ├── generate-release-notes/
+│   ├── get-dockerfile-path/
+│   ├── resolve-deploy-config/
+│   ├── resolve-image-tags/
+│   ├── scp-transfer/
+│   ├── setup-ssh/
+│   ├── skip-check/
+│   └── ssh-exec/
 │
-├── steps/                        # step entry points (one binary each)
-│   ├── bump-version.ts
-│   ├── configure-git-user.ts
-│   ├── create-env-file.ts
-│   ├── fetch-tags.ts
-│   ├── generate-release-notes.ts
-│   ├── get-dockerfile-path.ts
-│   ├── resolve-deploy-config.ts
-│   ├── resolve-image-tags.ts
-│   ├── scp-transfer.ts
-│   ├── setup-ssh.ts
-│   ├── skip-check.ts
-│   ├── ssh-exec.ts
-│   └── _lib/                     # shared library (bundled into each binary)
+├── lib/                          # shared library (@justanarthur/actions-lib)
+│   └── src/
 │       ├── exec.ts
 │       ├── github.ts
-│       ├── codecs/xml.ts
-│       ├── ghcr/
-│       ├── git/
-│       ├── manifests/
-│       └── version/
+│       ├── git/                  # git utilities
+│       ├── ghcr/                 # container registry utilities
+│       └── version/              # semver utilities
 │
-├── workflows/                    # caller examples you can copy
+├── cli/                          # npm-published cli package
+│   └── src/init.ts
+│
+├── workflows/                    # copy-paste ready workflow files
 │   ├── bump-version.yml
-│   ├── publish-docker-on-tag.yml
 │   ├── publish-npm-on-tag.yml
+│   ├── publish-docker-on-tag.yml
 │   └── deploy-to-vps.yml
 │
-└── dist/                         # compiled linux-x64 binaries (committed)
+└── .github/workflows/            # this repo's active workflows
 ```
 
 ## how it works
 
-1. **step scripts** in `steps/` are standalone typescript programs that read
-   configuration from environment variables and write outputs to `$GITHUB_OUTPUT`.
+1. **composite actions** in `actions/` are standalone typescript programs that
+   read inputs from environment variables and write outputs to `$GITHUB_OUTPUT`.
+   each has an `action.yml` that sets up Bun, installs dependencies, and runs
+   the action via `bun run`.
 
-2. **`bun run build`** compiles each step into a single self-contained linux binary
-   using `bun build --compile --target=bun-linux-x64`. no node, bun, or npm needed
-   on the runner at execution time.
+2. **workflows** in `workflows/` orchestrate multiple actions into complete
+   CI/CD pipelines. each is self-contained with `push`, `workflow_dispatch`,
+   and `workflow_call` triggers — copy into your repo or call as reusable.
 
-3. **reusable workflows** in `.github/workflows/` are `workflow_call` workflows.
-   they checkout the caller's repo, fetch the toolkit's `dist/` binaries, and
-   run the steps. other repos call them with a single `uses:` line.
-
-4. **`init` cli** creates the minimal caller files in any repo so you never
-   write yaml by hand.
+3. **`init` cli** scaffolds the workflow files into any repo so you don't
+   have to copy yaml by hand.
 
 ## secrets required
 
-| secret | used by |
-|--------|---------|
-| `GH_TOKEN` | all workflows (github api + push access) |
-| `NPM_TOKEN` | publish-docker-on-tag (npm registry in docker build), publish-npm-on-tag (npm publish) |
-| `SSH_PRIVATE_KEY` | deploy-to-vps (ssh authentication) |
-| `SERVER_USERNAME` | deploy-to-vps (ssh/scp username) |
-| `DOCKER_USERNAME` | deploy-to-vps (ghcr login) |
-| `DOCKER_PASSWORD` | deploy-to-vps (ghcr login) |
+| secret            | used by                                    |
+|-------------------|--------------------------------------------|
+| `GH_TOKEN`        | all workflows (github api + push access)   |
+| `NPM_TOKEN`       | publish-npm, publish-docker (npm registry) |
+| `SSH_PRIVATE_KEY` | deploy-to-vps (ssh authentication)         |
+| `SERVER_USERNAME` | deploy-to-vps (ssh/scp username)           |
+| `DOCKER_USERNAME` | deploy-to-vps (ghcr login)                 |
+| `DOCKER_PASSWORD` | deploy-to-vps (ghcr login)                 |
 
 ## development
 
 ```bash
 bun install          # install deps
-bun run build        # compile steps/ → dist/ binaries
+bun run build        # validate all action packages
 bun test             # run tests
-```
-
-after editing `steps/`, rebuild and commit:
-
-```bash
-bun run build
-git add dist/
-git commit -m "chore: rebuild step binaries"
-```
-
-to publish the cli to npm:
-
-```bash
-npm publish
 ```

@@ -1,0 +1,39 @@
+name: SCP Upload
+description: >
+  Uploads files to a remote host via SCP.
+  Transfers one or more space-separated source files to a target directory on the remote server.
+
+inputs:
+  host:
+    description: "Remote host to upload to"
+    required: true
+  username:
+    description: "SSH username for the remote host"
+    required: true
+  source:
+    description: "Space-separated list of local file paths to upload"
+    required: true
+  target:
+    description: "Remote directory path to upload files to"
+    required: true
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run scp-upload
+      shell: bash
+      env:
+        SCP_HOST: ${{ inputs.host }}
+        SCP_USERNAME: ${{ inputs.username }}
+        SCP_SOURCE: ${{ inputs.source }}
+        SCP_TARGET: ${{ inputs.target }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+
