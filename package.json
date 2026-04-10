@@ -9,6 +9,7 @@
     "cli"
   ],
   "scripts": {
+    "prepare": "git config core.hooksPath .githooks",
     "build": "bun run build.ts",
     "test": "bun test --recursive actions/ lib/ cli/"
   },

@@ -1,3 +1,2 @@
-# Track compiled step binaries with Git LFS (they embed the Bun runtime)
-dist/* filter=lfs diff=lfs merge=lfs -text
-
+# Keep git hooks executable
+.githooks/* text eol=lf
