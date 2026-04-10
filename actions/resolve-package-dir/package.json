@@ -1,12 +1,11 @@
 {
   "name": "@justanarthur/step-resolve-package-dir",
-  "version": "0.0.0-beta.1",
+  "version": "0.0.0-beta.2",
   "private": true,
   "type": "module",
   "dependencies": {
     "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
     "@justanarthur/step-bump-manifest-versions": "workspace:*"
-
   },
   "scripts": {
     "test": "bun test"
@@ -15,4 +14,3 @@
     "gitCommitScopeRelatedNames": "resolve-package-dir"
   }
 }
-
