@@ -2,7 +2,8 @@
 // ---
 // semver bump logic.
 // given a current version string, a bump level (patch/minor/major),
-// and a release channel (stable/canary), produces the next version.
+// and a release channel (stable or any prerelease label like canary,
+// beta, alpha, rc …), produces the next version.
 //
 // conventional commit types are mapped to semver levels via
 // `CONVENTIONAL_TO_SEMVER` so callers don't need to handle the mapping.
@@ -23,6 +24,16 @@ export const SEMVER = {
 
 export type SEMVER = (typeof SEMVER)[keyof typeof SEMVER] | number;
 
+// --- well-known prerelease channels (in precedence order) ---
+// used to detect the channel from an existing prerelease identifier.
+
+export const PRERELEASE_CHANNELS = [
+  "alpha",
+  "beta",
+  "rc",
+  "canary"
+] as const
+
 // --- conventional commit → semver mapping ---
 // maps each conventional commit type to its default bump level.
 // breaking changes always produce a major bump.
@@ -42,15 +53,20 @@ export const CONVENTIONAL_TO_SEMVER: Record<string, SEMVER> = {
   "BREAKING-CHANGE": SEMVER.MAJOR
 }
 
-// --- canary prerelease increment ---
-// bumps the numeric suffix: `canary.3` → `canary.4`.
-// resets to `canary.0` when the prerelease label is missing or unexpected.
+// --- prerelease increment ---
+// bumps the numeric suffix of a prerelease identifier for the given
+// channel.  e.g. `beta.3` → `beta.4`,  `null` → `<channel>.0`.
+// when the existing label doesn't match the requested channel the
+// counter resets to 0.
 
-function incrementPrerelease(prerelease: string | null): string {
-  if (!prerelease) return "canary.0"
+function incrementPrerelease(
+  prerelease: string | null,
+  channel: string = "canary"
+): string {
+  if (!prerelease) return `${channel}.0`
 
   const parts = prerelease.split(".")
-  if (parts[0] !== "canary") return "canary.0"
+  if (parts[0] !== channel) return `${channel}.0`
 
   const lastNumIndex =
     parts
@@ -67,10 +83,24 @@ function incrementPrerelease(prerelease: string | null): string {
   return parts.join(".")
 }
 
+// --- detect channel from prerelease ---
+// inspects the prerelease string and returns the channel label if it
+// matches a well-known channel or any leading alphabetic identifier.
+
+export function detectChannel(prerelease: string | null): string | null {
+  if (!prerelease) return null
+  const label = prerelease.split(".")[0]
+  return label && /^[a-zA-Z]+$/.test(label) ? label : null
+}
+
 // --- bump strategies ---
 
-function bumpCanary(version: ParsedVersion, _semver: SEMVER | undefined) {
-  version.prerelease = incrementPrerelease(version.prerelease)
+function bumpPrerelease(
+  version: ParsedVersion,
+  _semver: SEMVER | undefined,
+  channel: string = "canary"
+) {
+  version.prerelease = incrementPrerelease(version.prerelease, channel)
 }
 
 function bumpStable(version: ParsedVersion, semver: SEMVER | undefined) {
@@ -95,31 +125,34 @@ function bumpStable(version: ParsedVersion, semver: SEMVER | undefined) {
 
 // --- public api ---
 // calculates the next version from a version string.
-// when `stableOrCanary` is omitted, the channel is inferred from
-// whether the current version already has a prerelease identifier.
+//
+// `channel` accepts:
+//   - `"stable"` — strip prerelease, bump core version
+//   - any other string (`"canary"`, `"beta"`, `"alpha"`, `"rc"`, …)
+//       — bump the prerelease counter for that channel
+//   - `undefined` — auto-detect from the current version's prerelease
+//       identifier; falls back to a stable bump when there is none.
 
 export function calculateNextSemver(
   currentVersion: string,
   semver: SEMVER | undefined,
-  stableOrCanary?: string
+  channel?: string
 ): string {
   const parsed = parseSemver(currentVersion)
   if (!parsed) throw new Error(`invalid semver version: ${currentVersion}`)
 
-  switch (stableOrCanary) {
-    case "stable":
+  if (channel === "stable") {
+    bumpStable(parsed, semver)
+  } else if (channel) {
+    bumpPrerelease(parsed, semver, channel)
+  } else {
+    // auto-detect channel from the current version
+    if (parsed.prerelease) {
+      const detected = detectChannel(parsed.prerelease) ?? "canary"
+      bumpPrerelease(parsed, semver, detected)
+    } else {
       bumpStable(parsed, semver)
-      break
-    case "canary":
-      bumpCanary(parsed, semver)
-      break
-    case undefined:
-      // auto-detect channel from the current version
-      if (parsed.prerelease) bumpCanary(parsed, semver)
-      else bumpStable(parsed, semver)
-      break
-    default:
-      throw new Error(`invalid stableOrCanary value: ${stableOrCanary}`)
+    }
   }
 
   return formatSemver(parsed)

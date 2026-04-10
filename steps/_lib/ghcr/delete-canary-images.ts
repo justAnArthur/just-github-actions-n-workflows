@@ -1,8 +1,8 @@
 // delete-canary-images.ts
 // ---
-// cleans up old canary container images from github container registry (ghcr).
-// after a stable release is published, canary pre-release images are no longer
-// needed and can be deleted to free storage.
+// cleans up old prerelease container images from github container registry (ghcr).
+// after a stable release is published, prerelease images (canary, beta,
+// alpha, rc, …) are no longer needed and can be deleted to free storage.
 //
 // uses the github packages api:
 //   GET    /orgs/{org}/packages/container/{name}/versions
@@ -43,9 +43,12 @@ export function manifestNameToImageName(input: string): string {
     .toLowerCase()
 }
 
-function isCanaryTag(tag: string): boolean {
-  return /canary/i.test(tag)
+function isPrereleaseTag(tag: string): boolean {
+  return /(canary|beta|alpha|rc)/i.test(tag)
 }
+
+/** @deprecated use isPrereleaseTag */
+export const isCanaryTag = isPrereleaseTag
 
 // --- api ---
 
@@ -118,10 +121,10 @@ async function deleteVersion(
 
 // --- public api ---
 
-// deletes all canary image versions for a package.
-// only digests where *every* tag is a canary tag are removed —
+// deletes all prerelease image versions for a package.
+// only digests where *every* tag is a prerelease tag are removed —
 // shared layers and untagged manifests are left untouched.
-export async function deleteCanaryImages(
+export async function deletePrereleaseImages(
   owner: string,
   packageName: string,
   token: string
@@ -138,13 +141,17 @@ export async function deleteCanaryImages(
     // keep untagged manifests (shared layers)
     if (tags.length === 0) continue
 
-    // only delete when every tag on this digest is a canary tag
-    if (!tags.every(isCanaryTag)) continue
+    // only delete when every tag on this digest is a prerelease tag
+    if (!tags.every(isPrereleaseTag)) continue
 
     log.info(`deleting version id=${v.id} tags=[${tags.join(", ")}]`)
     if (await deleteVersion(owner, packageName, v.id, token)) deleted++
   }
 
-  log.info(`deleted ${deleted} canary version(s) for ${packageName}`)
+  log.info(`deleted ${deleted} prerelease version(s) for ${packageName}`)
   return deleted
 }
+
+/** @deprecated use deletePrereleaseImages */
+export const deleteCanaryImages = deletePrereleaseImages
+

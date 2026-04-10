@@ -36,8 +36,8 @@ on:
       bump_type:
         description: >
           version bump type.
-          append `:canary` or `:stable` to force a channel
-          (e.g. "minor:canary", "patch:stable").
+          append `:<channel>` to force a prerelease channel
+          (e.g. "minor:canary", "patch:stable", "minor:beta", "patch:alpha").
         type: string
         required: false
         default: ""
@@ -51,6 +51,13 @@ on:
         type: string
         required: false
         default: ""
+      bump_prerelease_channel:
+        description: >
+          prerelease channel label (e.g. "canary", "beta", "alpha", "rc").
+          defaults to "canary" when omitted.
+        type: string
+        required: false
+        default: "canary"
     secrets:
       GH_TOKEN:
         description: "github token with contents:write and packages:write"
@@ -112,6 +119,7 @@ jobs:
           BUMP_TYPE_N_STABLE_OR_CANARY: ${{ inputs.bump_type }}
           BUMP_TO_CALCULATED_STABLE_VERSION: ${{ inputs.bump_to_calculated_stable }}
           BUMP_MANIFEST_NAMES: ${{ inputs.bump_manifest_names }}
+          BUMP_PRERELEASE_CHANNEL: ${{ inputs.bump_prerelease_channel }}
           BUMP_TYPE: ${{ inputs.bump_type }}
         run: ./dist/bump-version
 

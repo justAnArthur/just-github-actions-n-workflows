@@ -16,13 +16,17 @@
 //   - writes updated manifest files
 //   - commits and pushes (with `[skip bump]` to avoid loops)
 //   - creates git tags
-//   - (stable only) advances manifests to the next canary prerelease
-//   - (stable only) cleans up old canary docker images from ghcr
+//   - (stable only) advances manifests to the next prerelease
+//   - (stable only) cleans up old prerelease docker images from ghcr
+//
+// the prerelease channel defaults to "canary" but can be set to any
+// label (beta, alpha, rc, …) via `BUMP_PRERELEASE_CHANNEL`.
 //
 // env:
 //   BUMP_TO_CALCULATED_STABLE_VERSION — "true" to use strategy 1
-//   BUMP_TYPE_N_STABLE_OR_CANARY      — "minor:canary" style override
+//   BUMP_TYPE_N_STABLE_OR_CANARY      — "minor:beta" style override
 //   BUMP_MANIFEST_NAMES               — comma-separated manifest names
+//   BUMP_PRERELEASE_CHANNEL           — prerelease label (default "canary")
 //   GITHUB_EVENT                      — json payload from push event
 //   GITHUB_TOKEN                      — token for ghcr cleanup
 //   GITHUB_REPOSITORY                 — owner/repo for ghcr cleanup
@@ -35,7 +39,7 @@ import { findManifestByName, findManifests, getManifestSearchDir, updateManifest
 import { commitAndPush } from "./_lib/git/commit-n-push"
 import { tagAndPush } from "./_lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "./_lib/git/get-commits-from-the-last-stable"
-import { deleteCanaryImages, manifestNameToImageName } from "./_lib/ghcr/delete-canary-images"
+import { deletePrereleaseImages, manifestNameToImageName } from "./_lib/ghcr/delete-canary-images"
 import { log } from "./_lib/github"
 import { GITHUB_ACTIONS_BOT, withCoAuthors } from "./_lib/git/co-authors"
 
@@ -66,6 +70,10 @@ const handleBumpManifestNamesEnv = process.env.BUMP_MANIFEST_NAMES
 log.debug(`bump-to-stable: ${bumpToCalculatedStableEnv}`)
 log.debug(`bump-type: ${bumpTypeEnv}, channel: ${bumpStableOrCanary}`)
 log.debug(`manifest filter: ${handleBumpManifestNamesEnv}`)
+
+// prerelease channel label — defaults to "canary", can be "beta", "alpha", "rc", …
+const prereleaseChannel = process.env.BUMP_PRERELEASE_CHANNEL?.trim() || "canary"
+log.debug(`prerelease channel: ${prereleaseChannel}`)
 
 // only bump the manifests the user asked for, or all of them
 const bumpManifests =
@@ -222,38 +230,38 @@ for (const [manifest, newVersion] of manifestNextVersions) {
   log.info(`tagged ${manifest.name}@${newVersion}`)
 }
 
-// --- post-stable: advance to next canary prerelease ---
-// e.g. 1.3.0 → 1.3.0-canary.0
+// --- post-stable: advance to next prerelease ---
+// e.g. 1.3.0 → 1.3.0-canary.0  (or -beta.0, -alpha.0, …)
 
 if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
-  log.group("creating next canary versions after stable release...")
+  log.group(`creating next ${prereleaseChannel} versions after stable release...`)
 
-  const canaryNextVersions: [Manifest, string][] = []
+  const prereleaseNextVersions: [Manifest, string][] = []
 
   for (const [manifest, stableVersion] of manifestNextVersions) {
-    const nextCanary = calculateNextSemver(stableVersion, undefined, "canary")
-    log.info(`${manifest.name}: ${stableVersion} → ${nextCanary} (canary)`)
-    canaryNextVersions.push([manifest, nextCanary])
+    const nextPrerelease = calculateNextSemver(stableVersion, undefined, prereleaseChannel)
+    log.info(`${manifest.name}: ${stableVersion} → ${nextPrerelease} (${prereleaseChannel})`)
+    prereleaseNextVersions.push([manifest, nextPrerelease])
   }
 
-  for (const [manifest, newVersion] of canaryNextVersions) {
+  for (const [manifest, newVersion] of prereleaseNextVersions) {
     await updateManifest((manifest as any).path, newVersion)
   }
 
   await commitAndPush(
     dir,
     withCoAuthors(
-      "chore[skip bump]: bumping canary versions after stable release for " +
-      canaryNextVersions.map(([m]) => m.name).join(", "),
+      `chore[skip bump]: bumping ${prereleaseChannel} versions after stable release for ` +
+      prereleaseNextVersions.map(([m]) => m.name).join(", "),
       [GITHUB_ACTIONS_BOT]
     )
   )
 
-  log.info("committed canary version bump (no tags created)")
+  log.info(`committed ${prereleaseChannel} version bump (no tags created)`)
   log.groupEnd()
 }
 
-// --- cleanup: delete old canary docker images from ghcr ---
+// --- cleanup: delete old prerelease docker images from ghcr ---
 
 if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
   const token = process.env.GITHUB_TOKEN
@@ -265,19 +273,19 @@ if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
     for (const [manifest] of manifestNextVersions) {
       const imageSuffix = manifestNameToImageName(manifest.name)
       if (!imageSuffix) {
-        log.info(`skipping canary cleanup for "${manifest.name}" — could not derive image name`)
+        log.info(`skipping prerelease cleanup for "${manifest.name}" — could not derive image name`)
         continue
       }
 
       const imageName = `${repositoryName}/${imageSuffix}`
       try {
-        await deleteCanaryImages(owner, imageName, token)
+        await deletePrereleaseImages(owner, imageName, token)
       } catch (err) {
-        log.error(`failed to clean canary images for ${manifest.name}: ${err}`)
+        log.error(`failed to clean prerelease images for ${manifest.name}: ${err}`)
       }
     }
   } else {
-    log.info("GITHUB_TOKEN or GITHUB_REPOSITORY not set, skipping canary image cleanup")
+    log.info("GITHUB_TOKEN or GITHUB_REPOSITORY not set, skipping prerelease image cleanup")
   }
 }
 

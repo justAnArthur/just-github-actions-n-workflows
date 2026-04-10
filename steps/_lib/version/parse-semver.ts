@@ -1,8 +1,8 @@
 // parse-semver.ts
 // ---
 // minimal semver parser and formatter.
-// handles the `v` prefix, pre-release identifiers (e.g. `-canary.3`),
-// and build metadata (e.g. `+20240101`).
+// handles the `v` prefix, pre-release identifiers (e.g. `-canary.3`,
+// `-beta.1`, `-alpha.0`, `-rc.2`), and build metadata (e.g. `+20240101`).
 /// ---
 
 // --- types ---
