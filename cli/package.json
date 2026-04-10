@@ -4,13 +4,13 @@
   "description": "Release automation toolkit — version bumping, npm publishing, docker publishing, VPS deployment via GitHub Actions composite actions.",
   "type": "module",
   "bin": {
-    "just-github-actions-n-workflows": "./src/init.ts"
+    "just-github-actions-n-workflows": "./src/index.ts"
   },
   "scripts": {
     "publish": "bun publish --access public"
   },
   "files": [
-    "src/init.ts",
+    "src/**/*.ts",
     "package.json",
     "README.md"
   ],
@@ -22,6 +22,14 @@
     "url": "https://github.com/justAnArthur/just-github-actions-n-workflows"
   },
   "license": "MIT",
+  "dependencies": {
+    "@oclif/core": "^4",
+    "@inquirer/prompts": "^7"
+  },
+  "oclif": {
+    "commands": "./src/commands",
+    "default": "init"
+  },
   "properties": {
     "gitCommitScopeRelatedNames": "toolkit,actions,workflows"
   }
