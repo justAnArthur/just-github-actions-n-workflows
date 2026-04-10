@@ -17,5 +17,8 @@
   },
   "scripts": {
     "test": "bun test"
+  },
+  "properties": {
+    "gitCommitScopeRelatedNames": "bump-version"
   }
 }

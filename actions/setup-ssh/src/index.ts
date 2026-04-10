@@ -1,6 +1,6 @@
 import { $ } from "bun"
 import { chmodSync, mkdirSync, writeFileSync } from "node:fs"
-import { getRequiredEnv, log } from "@justanarthur/actions-lib/github"
+import { getRequiredEnv, log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 const privateKey = getRequiredEnv("SSH_PRIVATE_KEY")
 const host = getRequiredEnv("SSH_HOST")

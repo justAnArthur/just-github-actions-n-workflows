@@ -1,5 +1,5 @@
 import { $ } from "bun"
-import { log, setOutput } from "@justanarthur/actions-lib/github"
+import { log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 log.group("check-ci-skip")
 

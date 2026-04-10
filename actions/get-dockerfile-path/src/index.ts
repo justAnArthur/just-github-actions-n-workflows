@@ -1,6 +1,6 @@
 import path from "node:path"
-import { getRequiredEnv, log, setOutput } from "@justanarthur/actions-lib/github"
-import { moduleFromTag } from "@justanarthur/actions-lib/git/tag-utils"
+import { getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { moduleFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 import { findManifests } from "@justanarthur/step-bump-manifest-versions/manifests"
 
 log.group("get-dockerfile-path")

@@ -3,6 +3,9 @@
 # publishes a package to npm and creates a github release when a
 # version tag is pushed (e.g. "my-package@1.2.3").
 #
+# automatically skips private packages by checking the package.json.
+# in a monorepo, only packages without `"private": true` get published.
+#
 # copy this file into your repo's `.github/workflows/` and adjust
 # the `push.tags` pattern to match your package naming convention.
 #
@@ -31,13 +34,13 @@ on:
   workflow_dispatch:
     inputs:
       tag:
-        description: 'tag to publish (e.g. "my-package@1.2.3")'
+        description: 'tag to publish (e.g. "@scope/pkg@1.2.3")'
         type: string
         required: true
   workflow_call:
     inputs:
       tag:
-        description: 'tag to publish (e.g. "my-package@1.2.3")'
+        description: 'tag to publish (e.g. "@scope/pkg@1.2.3")'
         type: string
         required: true
     secrets:
@@ -56,22 +59,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Determine tag and version metadata
+      - name: Resolve tag metadata
         id: meta
-        run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
-          VERSION="${TAG##*@}"
-
-          if echo "$VERSION" | grep -qiE '(canary|alpha|beta|rc)'; then
-            echo "npm_tag=canary" >> $GITHUB_OUTPUT
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "npm_tag=latest" >> $GITHUB_OUTPUT
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-          fi
-
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-tag-meta@main
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
 
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -87,10 +79,18 @@ jobs:
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
 
+      - name: Check if package is publishable
+        id: gate
+        uses: justAnArthur/just-github-actions-n-workflows/actions/check-publishable@main
+        with:
+          dir: ${{ steps.pkg.outputs.dir }}
+
       - name: Install dependencies
+        if: steps.gate.outputs.skip != 'true'
         run: bun install --frozen-lockfile
 
       - name: Build (if build script exists)
+        if: steps.gate.outputs.skip != 'true'
         run: |
           if bun run --silent build 2>/dev/null; then
             echo "build completed"
@@ -99,15 +99,18 @@ jobs:
           fi
 
       - name: Publish to npm
+        if: steps.gate.outputs.skip != 'true'
         working-directory: ${{ steps.pkg.outputs.dir }}
         run: bun publish --access public --tag ${{ steps.meta.outputs.npm_tag }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Fetch all tags
+        if: steps.gate.outputs.skip != 'true'
         uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
 
       - name: Generate release notes
+        if: steps.gate.outputs.skip != 'true'
         id: release_notes
         uses: justAnArthur/just-github-actions-n-workflows/actions/generate-release-notes@main
         with:
@@ -115,6 +118,7 @@ jobs:
           root_dir: ${{ github.workspace }}
 
       - name: Create GitHub release
+        if: steps.gate.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
@@ -128,7 +132,7 @@ jobs:
             ## Install
 
             ```sh
-            npm install $(echo "${{ steps.meta.outputs.tag }}" | sed 's/@[^@]*$//')@${{ steps.meta.outputs.version }}
+            npm install ${{ steps.meta.outputs.pkg_name }}@${{ steps.meta.outputs.version }}
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}

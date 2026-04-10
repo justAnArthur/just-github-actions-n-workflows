@@ -1,5 +1,5 @@
 {
-  "name": "@justanarthur/step-scp-upload",
+  "name": "@justanarthur/step-resolve-tag-meta",
   "version": "0.0.0-beta.1",
   "private": true,
   "type": "module",
@@ -10,6 +10,7 @@
     "test": "bun test"
   },
   "properties": {
-    "gitCommitScopeRelatedNames": "scp-transfer"
+    "gitCommitScopeRelatedNames": "resolve-tag-meta"
   }
 }
+

@@ -1,11 +1,11 @@
-import { getEnv, getRequiredEnv, log, setOutput } from "@justanarthur/actions-lib/github"
-import { execWithTimeout } from "@justanarthur/actions-lib/exec"
-import { parseCommitMessage } from "@justanarthur/actions-lib/git/conventional-commit-parser"
-import { isPrerelease, moduleFromTag, versionFromTag } from "@justanarthur/actions-lib/git/tag-utils"
-import { compareSemver } from "@justanarthur/actions-lib/version/compare-semver"
+import { getEnv, getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { execWithTimeout } from "@justanarthur/just-github-actions-n-workflows-lib/exec"
+import { parseCommitMessage } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
+import { isPrerelease, moduleFromTag, versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
+import { compareSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/compare-semver"
 import { findManifests } from "@justanarthur/step-bump-manifest-versions/manifests"
-import type { ParsedVersion } from "@justanarthur/actions-lib/version/parse-semver"
-import { parseSemver } from "@justanarthur/actions-lib/version/parse-semver"
+import type { ParsedVersion } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
+import { parseSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 
 // --- core ---
 

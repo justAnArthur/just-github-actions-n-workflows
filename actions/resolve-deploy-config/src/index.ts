@@ -1,4 +1,4 @@
-import { getEnv, getRequiredEnv, log, setEnv } from "@justanarthur/actions-lib/github"
+import { getEnv, getRequiredEnv, log, setEnv } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 interface DeployConfig {
   compose_profiles: string

@@ -1,6 +1,6 @@
-import { getEnv, getRequiredEnv, log, setEnv } from "@justanarthur/actions-lib/github"
-import { execWithTimeout } from "@justanarthur/actions-lib/exec"
-import { versionFromTag } from "@justanarthur/actions-lib/git/tag-utils"
+import { getEnv, getRequiredEnv, log, setEnv } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { execWithTimeout } from "@justanarthur/just-github-actions-n-workflows-lib/exec"
+import { versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 
 interface Component {
   name: string

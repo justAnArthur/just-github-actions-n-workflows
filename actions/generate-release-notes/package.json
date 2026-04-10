@@ -9,5 +9,8 @@
   },
   "scripts": {
     "test": "bun test"
+  },
+  "properties": {
+    "gitCommitScopeRelatedNames": "generate-release-notes"
   }
 }

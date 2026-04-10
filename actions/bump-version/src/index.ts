@@ -4,16 +4,16 @@
 // see package @justanarthur/actions-lib for shared utilities.
 // ---
 
-import { parseCommitMessage, type ParsedCommit } from "@justanarthur/actions-lib/git/conventional-commit-parser"
-import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarthur/actions-lib/version/calculate-semver"
+import { parseCommitMessage, type ParsedCommit } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
+import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
 import type { Manifest } from "./manifests"
 import { findManifestByName, findManifests, getManifestSearchDir, updateManifest } from "./manifests"
-import { commitAndPush } from "@justanarthur/actions-lib/git/commit-n-push"
-import { tagAndPush } from "@justanarthur/actions-lib/git/tag-n-push"
-import { getCommitsFromTheLastStable } from "@justanarthur/actions-lib/git/get-commits-from-the-last-stable"
-import { deletePrereleaseImages, manifestNameToImageName } from "@justanarthur/actions-lib/ghcr/delete-canary-images"
-import { log } from "@justanarthur/actions-lib/github"
-import { GITHUB_ACTIONS_BOT, withCoAuthors } from "@justanarthur/actions-lib/git/co-authors"
+import { commitAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/commit-n-push"
+import { tagAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
+import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n-workflows-lib/git/get-commits-from-the-last-stable"
+import { deletePrereleaseImages, manifestNameToImageName } from "@justanarthur/just-github-actions-n-workflows-lib/ghcr/delete-canary-images"
+import { log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { GITHUB_ACTIONS_BOT, withCoAuthors } from "@justanarthur/just-github-actions-n-workflows-lib/git/co-authors"
 
 // --- discover manifests ---
 

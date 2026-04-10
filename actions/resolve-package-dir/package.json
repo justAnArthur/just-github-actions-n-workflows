@@ -10,6 +10,9 @@
   },
   "scripts": {
     "test": "bun test"
+  },
+  "properties": {
+    "gitCommitScopeRelatedNames": "resolve-package-dir"
   }
 }
 

@@ -75,6 +75,7 @@ each action is a composite GitHub Action in `actions/` with its own `action.yml`
 | action                           | description                               | key inputs                                                    |
 |----------------------------------|-------------------------------------------|---------------------------------------------------------------|
 | `actions/bump-version`           | version bump with conventional commits    | `bump_type_and_channel`, `prerelease_channel`, `github_token` |
+| `actions/check-publishable`      | skip publish if package.json is private   | `dir`                                                         |
 | `actions/configure-git-user`     | set git user from push author or actor    | `mode`                                                        |
 | `actions/create-env-file`        | write a `.env` file from key=value pairs  | `variables`, `filename`, `path`                               |
 | `actions/fetch-tags`             | fetch all tags + unshallow if needed      | —                                                             |
@@ -82,6 +83,8 @@ each action is a composite GitHub Action in `actions/` with its own `action.yml`
 | `actions/get-dockerfile-path`    | resolve dockerfile from manifest metadata | `tag_name`                                                    |
 | `actions/resolve-deploy-config`  | determine compose profiles and timezone   | `environment`                                                 |
 | `actions/resolve-image-tags`     | resolve docker image tags from git tags   | `repo_url`, `components`, `gh_token`                          |
+| `actions/resolve-package-dir`    | resolve package directory from git tag    | `tag_name`                                                    |
+| `actions/resolve-tag-meta`       | parse git tag into version metadata       | `tag`                                                         |
 | `actions/scp-transfer`           | copy files to remote server via scp       | `host`, `username`, `source`, `target`                        |
 | `actions/setup-ssh`              | provision ssh key + known_hosts           | `private_key`, `host`                                         |
 | `actions/skip-check`             | detect `[skip bump]` loops                | —                                                             |
@@ -124,6 +127,7 @@ ready-to-copy workflow files in `workflows/`:
 │   ├── get-dockerfile-path/
 │   ├── resolve-deploy-config/
 │   ├── resolve-image-tags/
+│   ├── resolve-package-dir/
 │   ├── scp-transfer/
 │   ├── setup-ssh/
 │   ├── skip-check/

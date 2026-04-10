@@ -1,5 +1,5 @@
 import { $ } from "bun"
-import { getEnv, getRequiredEnv, log } from "@justanarthur/actions-lib/github"
+import { getEnv, getRequiredEnv, log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 log.group("setup-git-author")
 

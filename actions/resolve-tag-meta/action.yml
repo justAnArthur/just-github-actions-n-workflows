@@ -1,0 +1,46 @@
+name: Resolve Tag Metadata
+description: >
+  Parses a git tag in `<package>@<version>` format and outputs
+  structured metadata: package name, version, npm dist-tag, and
+  whether it's a prerelease.
+
+inputs:
+  tag:
+    description: "Git tag to parse (e.g. '@scope/pkg@1.2.3-canary.0')"
+    required: true
+
+outputs:
+  tag:
+    description: "The raw tag (cleaned of refs/ prefixes)"
+    value: ${{ steps.run.outputs.tag }}
+  pkg_name:
+    description: "Package name extracted from the tag"
+    value: ${{ steps.run.outputs.pkg_name }}
+  version:
+    description: "Version extracted from the tag"
+    value: ${{ steps.run.outputs.version }}
+  npm_tag:
+    description: "npm dist-tag: 'canary' for prereleases, 'latest' for stable"
+    value: ${{ steps.run.outputs.npm_tag }}
+  is_prerelease:
+    description: "'true' if the version contains a prerelease identifier"
+    value: ${{ steps.run.outputs.is_prerelease }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run resolve-tag-meta
+      id: run
+      shell: bash
+      env:
+        TAG: ${{ inputs.tag }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

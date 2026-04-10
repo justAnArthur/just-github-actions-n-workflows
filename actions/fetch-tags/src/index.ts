@@ -1,5 +1,5 @@
 import { $ } from "bun"
-import { log } from "@justanarthur/actions-lib/github"
+import { log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 log.group("git-fetch-and-unshallow")
 

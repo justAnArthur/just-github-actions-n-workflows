@@ -1,6 +1,6 @@
 import path from "node:path"
-import { getRequiredEnv, log, setOutput } from "@justanarthur/actions-lib/github"
-import { moduleFromTag, versionFromTag } from "@justanarthur/actions-lib/git/tag-utils"
+import { getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { moduleFromTag, versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 import { findManifests, type Manifest } from "@justanarthur/step-bump-manifest-versions/manifests"
 
 log.group("resolve-package-dir")

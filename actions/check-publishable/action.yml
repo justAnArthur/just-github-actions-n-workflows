@@ -1,0 +1,32 @@
+name: Check Publishable
+description: >
+  Checks whether a package is publishable by reading its package.json.
+  Outputs `skip=true` when `private: true` is set in the manifest.
+
+inputs:
+  dir:
+    description: "Path to the package directory containing package.json"
+    required: true
+
+outputs:
+  skip:
+    description: "'true' if the package is private and should not be published"
+    value: ${{ steps.run.outputs.skip }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run check-publishable
+      id: run
+      shell: bash
+      env:
+        PKG_DIR: ${{ inputs.dir }}
+      run: bun run ${{ github.action_path }}/src/index.ts

@@ -80,9 +80,10 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 
 ### Workflows (`workflows/`)
 - **`workflows/` is the source of truth**. Never edit `.github/workflows/` directly.
-- The pre-commit hook (`.githooks/pre-commit`) auto-syncs selected workflows to `.github/workflows/`.
+- The pre-commit hook (`.githooks/pre-commit`) auto-syncs selected workflows to `.github/workflows/` based on `.github/workflows/sync-from-root-workflows`.
 - Every workflow YAML must start with a header comment block containing: description, usage example, and `required secrets:` section.
 - Workflows support three trigger types: `push`, `workflow_dispatch`, `workflow_call`.
+- **No inline bash scripts in workflows.** Any logic beyond trivial shell one-liners **must** be extracted into a dedicated action in `actions/`. Workflows should only orchestrate actions, not contain business logic.
 
 ### CLI (`cli/`)
 - Built with **oclif** (`@oclif/core`) and **@inquirer/prompts**.

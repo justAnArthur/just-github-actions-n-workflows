@@ -1,5 +1,5 @@
 import { $ } from "bun"
-import { getRequiredEnv, log } from "@justanarthur/actions-lib/github"
+import { getRequiredEnv, log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 log.group("scp-upload")
 

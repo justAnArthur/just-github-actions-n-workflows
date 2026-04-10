@@ -1,6 +1,6 @@
 import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-import { getEnv, getRequiredEnv, log } from "@justanarthur/actions-lib/github"
+import { getEnv, getRequiredEnv, log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 log.group("create-dotenv")
 
