@@ -31,7 +31,7 @@ install a specific workflow:
 ```bash
 bunx just-github-actions-n-workflows init bump-version
 bunx just-github-actions-n-workflows init publish-npm
-bunx just-github-actions-n-workflows init publish-docker
+bunx just-github-actions-n-workflows init release
 bunx just-github-actions-n-workflows init --list
 ```
 
@@ -105,7 +105,7 @@ ready-to-copy workflow files in `workflows/`:
 |-----------------------------|----------------------------------------|--------------------------|
 | `bump-version.yml`          | auto-bump manifest versions on push    | push, dispatch, call     |
 | `publish-npm-on-tag.yml`    | publish to npm + github release        | tag push, dispatch, call |
-| `publish-docker-on-tag.yml` | build docker + push to ghcr + release  | tag push, dispatch, call |
+| `release-on-tag.yml`        | create github release with notes       | tag push, dispatch, call |
 | `deploy-to-vps.yml`         | deploy docker compose to VPS (example) | dispatch                 |
 
 ## project structure
@@ -143,7 +143,7 @@ ready-to-copy workflow files in `workflows/`:
 ├── workflows/                    # workflow templates (source of truth)
 │   ├── bump-version.yml
 │   ├── publish-npm-on-tag.yml
-│   ├── publish-docker-on-tag.yml
+│   ├── release-on-tag.yml
 │   └── deploy-to-vps.yml
 │
 ├── .githooks/                    # git hooks (run: git config core.hooksPath .githooks)

@@ -1,0 +1,98 @@
+# release-on-tag.yml
+# ---
+# creates a github release with auto-generated release notes when a
+# version tag is pushed.
+#
+# copy this file into your repo's `.github/workflows/` and adjust
+# the `push.tags` pattern to match your tagging convention.
+#
+# can also be called as a reusable workflow:
+#
+#   jobs:
+#     release:
+#       uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/release-on-tag.yml@main
+#       with:
+#         tag: ${{ github.ref_name }}
+#       secrets:
+#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
+#
+# required secrets:
+#   GH_TOKEN — github token with contents:write
+# ---
+
+name: release-on-tag
+run-name: "release — ${{ inputs.tag || github.ref_name }}"
+
+on:
+  push:
+    tags: [ "*@*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to release (e.g. "my-package@1.2.3")'
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      tag:
+        description: 'tag to release (e.g. "my-package@1.2.3")'
+        type: string
+        required: true
+    secrets:
+      GH_TOKEN:
+        description: "github token with contents:write"
+        required: true
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Determine tag metadata
+        id: meta
+        run: |
+          TAG="${{ inputs.tag || github.ref_name }}"
+          VERSION="${TAG##*@}"
+
+          if echo "$VERSION" | grep -qiE '(canary|alpha|beta|rc)'; then
+            echo "is_prerelease=true" >> $GITHUB_OUTPUT
+          else
+            echo "is_prerelease=false" >> $GITHUB_OUTPUT
+          fi
+
+          echo "tag=$TAG" >> $GITHUB_OUTPUT
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.tag }}
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Fetch all tags
+        uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
+
+      - name: Generate release notes
+        id: release_notes
+        uses: justAnArthur/just-github-actions-n-workflows/actions/generate-release-notes@main
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          root_dir: ${{ github.workspace }}
+
+      - name: Create GitHub release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ steps.meta.outputs.tag }}
+          name: ${{ steps.meta.outputs.tag }}
+          prerelease: ${{ steps.meta.outputs.is_prerelease == 'true' }}
+          body: |
+            ## Release Notes
+
+            ${{ steps.release_notes.outputs.release_notes }}
+        env:
+          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+

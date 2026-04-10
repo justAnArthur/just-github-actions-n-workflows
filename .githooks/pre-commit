@@ -17,7 +17,7 @@ REPO_ROOT="$(git rev-parse --show-toplevel)"
 SYNC_WORKFLOWS=(
   "bump-version.yml"
   "publish-npm-on-tag.yml"
-  "publish-docker-on-tag.yml"
+  "release-on-tag.yml"
 )
 # ────────────────────────────────────────────────────────────
 

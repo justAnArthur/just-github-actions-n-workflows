@@ -42,9 +42,9 @@ const WORKFLOWS: Record<string, { file: string; description: string }> = {
     file: "publish-npm-on-tag.yml",
     description: "publish npm package + github release on version tag"
   },
-  "publish-docker": {
-    file: "publish-docker-on-tag.yml",
-    description: "build + push docker image to ghcr + github release on tag"
+  "release": {
+    file: "release-on-tag.yml",
+    description: "create github release with notes on version tag"
   },
   "deploy-to-vps": {
     file: "deploy-to-vps.yml",
