@@ -164,7 +164,7 @@ ready-to-copy workflow files in `workflows/`:
    and `workflow_call` triggers — copy into your repo or call as reusable.
 
 3. **`init` cli** scaffolds the workflow files into any repo so you don't
-   have to copy yaml by hand.
+   have to copy YAML by hand.
 
 4. **pre-push hook** keeps `.github/workflows/` in sync with `workflows/`
    automatically — edit the template once, the hook copies it on push.
