@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+# -----------------------------------------------------------
+# pre-commit hook
+# Copies selected workflow templates from  workflows/  into
+# .github/workflows/  so GitHub Actions always sees the latest
+# version without manual duplication.
+#
+# Which files to sync is controlled by the SYNC_WORKFLOWS array
+# below.  Add or remove entries as needed.
+# -----------------------------------------------------------
+
+set -euo pipefail
+
+REPO_ROOT="$(git rev-parse --show-toplevel)"
+
+# ── workflows to sync ──────────────────────────────────────
+SYNC_WORKFLOWS=(
+  "bump-version.yml"
+  "publish-npm-on-tag.yml"
+  "publish-docker-on-tag.yml"
+)
+# ────────────────────────────────────────────────────────────
+
+SRC_DIR="$REPO_ROOT/workflows"
+DST_DIR="$REPO_ROOT/.github/workflows"
+
+dirty=0
+
+for wf in "${SYNC_WORKFLOWS[@]}"; do
+  src="$SRC_DIR/$wf"
+  dst="$DST_DIR/$wf"
+
+  if [[ ! -f "$src" ]]; then
+    echo "⚠  pre-commit: source not found — $src  (skipped)"
+    continue
+  fi
+
+  # create destination dir if missing
+  mkdir -p "$DST_DIR"
+
+  # copy only when content differs (or destination is missing)
+  if [[ ! -f "$dst" ]] || ! diff -q "$src" "$dst" > /dev/null 2>&1; then
+    cp "$src" "$dst"
+    git add "$dst"
+    dirty=1
+    echo "✓  pre-commit: synced $wf → .github/workflows/"
+  fi
+done
+
+if [[ "$dirty" -eq 1 ]]; then
+  echo "✓  pre-commit: staged synced workflows into this commit"
+fi
+
+exit 0
+

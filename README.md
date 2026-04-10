@@ -146,10 +146,10 @@ ready-to-copy workflow files in `workflows/`:
 │   ├── publish-docker-on-tag.yml
 │   └── deploy-to-vps.yml
 │
-├── .githooks/                    # git hooks
-│   └── pre-push                  # syncs workflows/ → .github/workflows/
+├── .githooks/                    # git hooks (run: git config core.hooksPath .githooks)
+│   └── pre-commit                # syncs workflows/ → .github/workflows/
 │
-└── .github/workflows/            # auto-synced by pre-push hook
+└── .github/workflows/            # auto-synced by pre-commit hook
 ```
 
 ## how it works
@@ -177,12 +177,13 @@ ready-to-copy workflow files in `workflows/`:
 | `NPM_TOKEN`       | publish-npm, publish-docker (npm registry) |
 | `SSH_PRIVATE_KEY` | deploy-to-vps (ssh authentication)         |
 | `SERVER_USERNAME` | deploy-to-vps (ssh/scp username)           |
-| `DOCKER_USERNAME` | deploy-to-vps (ghcr login)                 |
-| `DOCKER_PASSWORD` | deploy-to-vps (ghcr login)                 |
+4. **pre-commit hook** keeps `.github/workflows/` in sync with `workflows/`
+   automatically — edit the template once, the hook copies it on commit.
 
 ## development
 
 ```bash
+git config core.hooksPath .githooks   # enable git hooks (one-time setup)
 bun install          # install deps
 bun run build        # validate all action packages
 bun test             # run tests
