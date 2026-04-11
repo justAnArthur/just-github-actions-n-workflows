@@ -1,10 +1,7 @@
-import { createRequire } from "node:module"
+import pkg from "../package.json" with { type: "json" }
+import rootPkg from "../../package.json" with { type: "json" }
 
-const require = createRequire(import.meta.url)
-const pkg = require("../package.json")
-const rootPkg = require("../../package.json")
-
-const REPO = pkg.repository.url
+const REPO = (pkg.repository as any).url
   .replace(/^https?:\/\/github\.com\//, "")
   .replace(/\.git$/, "")
 

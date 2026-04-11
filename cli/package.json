@@ -7,7 +7,7 @@
     "just-github-actions-n-workflows": "./bin/run.js"
   },
   "scripts": {
-    "build": "tsc"
+    "build": "bun build src/commands/init.ts src/commands/update.ts src/commands/status.ts --outdir dist/commands --target node --format esm --splitting --minify --sourcemap=none --external @oclif/core --external @inquirer/prompts"
   },
   "files": [
     "bin/**/*.js",
@@ -25,9 +25,6 @@
   "dependencies": {
     "@oclif/core": "^4",
     "@inquirer/prompts": "^7"
-  },
-  "devDependencies": {
-    "typescript": "^5"
   },
   "oclif": {
     "commands": "./dist/commands",
