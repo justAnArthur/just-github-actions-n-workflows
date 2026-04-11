@@ -67,6 +67,14 @@ export async function fetchTags(): Promise<string[]> {
   return tags.map((t) => t.name)
 }
 
+// --- fetchLatestTag ---
+// returns the most recent tag, or "main" if no tags exist.
+
+export async function fetchLatestTag(): Promise<string> {
+  const tags = await fetchTags()
+  return tags.length > 0 ? tags[0] : "main"
+}
+
 export async function fetchWorkflowList(gitRef: string): Promise<WorkflowEntry[]> {
   const url = `${API_BASE}/contents/workflows?ref=${gitRef}`
   const res = await fetch(url, {

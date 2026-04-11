@@ -11,6 +11,8 @@ automatically by the `bump-version` workflow to determine version bumps.
 [optional footer]
 ```
 
+**Scope is required.** Every commit must target a specific package scope.
+
 ## Commit types and their version impact
 
 | Type       | Version bump | When to use                                      |
@@ -29,34 +31,44 @@ automatically by the `bump-version` workflow to determine version bumps.
 
 Append `!` after the type (before the scope) for **breaking changes** → triggers a **major** bump:
 ```
-feat!: remove legacy API endpoints
-feat!(api): redesign authentication flow
+feat!(cli): redesign authentication flow
+feat!(lib): remove deprecated API
 ```
 
 ## Scope
 
-The scope **must** match one of:
-- A package name from a `package.json` `name` field
-- A value from the `gitCommitScopeRelatedNames` property in a manifest's `properties` field
+**Scope is mandatory.** Every commit must include a scope matching one of the values below.
+This ensures only the affected package gets a version bump — never all packages at once.
 
-When a scope is provided, only the matching package gets a version bump.
-When no scope is provided, **all** packages in the repo are bumped.
+### Available scopes
 
-This monorepo has the following versioned packages:
+| Scope | Package | Location |
+|-------|---------|----------|
+| `toolkit` or `workflows` | `@justanarthur/just-github-actions-n-workflows` | root |
+| `cli` | `@justanarthur/just-github-actions-n-workflows-cli` | `cli/` |
+| `lib` | `@justanarthur/just-github-actions-n-workflows-lib` | `lib/` |
+| `bump-version` | `@justanarthur/step-bump-manifest-versions` | `actions/bump-version/` |
+| `check-publishable` | `@justanarthur/step-check-publishable` | `actions/check-publishable/` |
+| `configure-git-user` | `@justanarthur/step-configure-git-user` | `actions/configure-git-user/` |
+| `create-env-file` | `@justanarthur/step-create-env-file` | `actions/create-env-file/` |
+| `fetch-tags` | `@justanarthur/step-fetch-tags` | `actions/fetch-tags/` |
+| `generate-release-notes` | `@justanarthur/step-generate-release-notes` | `actions/generate-release-notes/` |
+| `get-dockerfile-path` | `@justanarthur/step-get-dockerfile-path` | `actions/get-dockerfile-path/` |
+| `resolve-deploy-config` | `@justanarthur/step-resolve-deploy-config` | `actions/resolve-deploy-config/` |
+| `resolve-image-tags` | `@justanarthur/step-resolve-image-tags` | `actions/resolve-image-tags/` |
+| `resolve-package-dir` | `@justanarthur/step-resolve-package-dir` | `actions/resolve-package-dir/` |
+| `resolve-tag-meta` | `@justanarthur/step-resolve-tag-meta` | `actions/resolve-tag-meta/` |
+| `scp-transfer` | `@justanarthur/step-scp-transfer` | `actions/scp-transfer/` |
+| `setup-ssh` | `@justanarthur/step-setup-ssh` | `actions/setup-ssh/` |
+| `skip-check` | `@justanarthur/step-skip-check` | `actions/skip-check/` |
+| `ssh-exec` | `@justanarthur/step-ssh-exec` | `actions/ssh-exec/` |
 
-| Scope | Package | Location | Published |
-|-------|---------|----------|-----------|
-| `toolkit` / `workflows` | `@justanarthur/just-github-actions-n-workflows` | root | private |
-| `cli` | `@justanarthur/just-github-actions-n-workflows-cli` | `cli/` | npm |
-| `lib` | `@justanarthur/just-github-actions-n-workflows-lib` | `lib/` | private |
-| _(omit scope)_ | all of the above | | |
-
-Each action in `actions/` also has its own `package.json` (e.g. `@justanarthur/step-bump-manifest-versions`)
-but they are private workspace packages without scope aliases — they get bumped when no scope is specified.
+If a commit affects multiple packages, use multiple conventional commit lines (see below).
 
 ## Multi-item commits
 
-Multiple conventional commit lines in one message are supported:
+Multiple conventional commit lines in one message are supported.
+Use this when a single change touches multiple packages:
 ```
 feat(cli): add --ref flag to init command
 fix(lib): handle empty tag list gracefully
@@ -77,7 +89,7 @@ feat(toolkit): add new resolve-package-dir action
 ```
 
 ```
-chore: update dependencies
+chore(workflows): update workflow templates
 ```
 
 ```
@@ -98,8 +110,14 @@ feat(cli): add --force flag
 fix(cli): handle existing files gracefully
 ```
 
+```
+fix(resolve-tag-meta): extract prerelease channel from version string
+```
+
 ## Rules
 
+- **Scope is required** — never omit the scope
+- Use only scopes listed in the table above
 - Use lowercase for type and scope
 - Use imperative mood in the subject ("add feature" not "added feature")
 - Do not end the subject with a period
@@ -107,4 +125,3 @@ fix(cli): handle existing files gracefully
 - Separate subject from body with a blank line
 - Use the body to explain *what* and *why*, not *how*
 - Commits containing `[skip bump]` in the message are ignored by the version bump workflow
-

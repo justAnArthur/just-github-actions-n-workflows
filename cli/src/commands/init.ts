@@ -11,6 +11,12 @@ import {
   fetchWorkflowList,
   type WorkflowEntry,
 } from "../github.js"
+import {
+  injectRefComment,
+  mergeLockfile,
+  readLockfile,
+  writeLockfile,
+} from "../lockfile.js"
 
 export default class Init extends Command {
   static override description = "Scaffold workflow files into .github/workflows/ of the current repo"
@@ -181,6 +187,7 @@ export default class Init extends Command {
 
     let created = 0
     let skipped = 0
+    const installed: { name: string; file: string }[] = []
 
     for (const workflow of selected) {
       const targetPath = join(targetDir, workflow.file)
@@ -192,13 +199,24 @@ export default class Init extends Command {
       }
 
       try {
-        const content = await fetchWorkflowContent(workflow.file, ref)
+        let content = await fetchWorkflowContent(workflow.file, ref)
+        content = injectRefComment(content, ref)
         writeFileSync(targetPath, content, "utf-8")
         this.log(`  ${ux.colorize("green", "create")}  .github/workflows/${workflow.file}`)
+        installed.push({ name: workflow.name, file: workflow.file })
         created++
       } catch (error: any) {
         this.log(`  ${ux.colorize("red", "error")}   ${workflow.file}: ${error.message}`)
       }
+    }
+
+    // --- write lock file ---
+
+    if (installed.length > 0) {
+      const existing = readLockfile()
+      const lock = mergeLockfile(existing, ref, installed)
+      writeLockfile(lock)
+      this.log(ux.colorize("dim", `\n  lock file written → .github/workflows/.toolkit-lock.json`))
     }
 
     return { created, skipped }
