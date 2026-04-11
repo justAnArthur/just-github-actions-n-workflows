@@ -6,9 +6,7 @@
   "bin": {
     "just-github-actions-n-workflows": "./src/index.ts"
   },
-  "scripts": {
-    "publish": "bun publish --access public"
-  },
+  "scripts": {},
   "files": [
     "src/**/*.ts",
     "package.json",
