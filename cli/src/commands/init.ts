@@ -164,7 +164,7 @@ export default class Init extends Command {
         return {
           name: `${wf.name.padEnd(26)} ${ux.colorize("dim", hint || wf.file)}`,
           value: wf.name,
-          checked: true,
+          checked: false,
         }
       }),
     })
