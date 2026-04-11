@@ -34,7 +34,7 @@ bunx just-github-actions-n-workflows init publish-npm
 bunx just-github-actions-n-workflows init release
 bunx just-github-actions-n-workflows init --list
 ```
-
+  
 ### what gets created
 
 each workflow is **self-contained** — it has all triggers (`push`, `workflow_dispatch`, `workflow_call`) built in. copy
