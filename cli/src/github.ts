@@ -2,6 +2,7 @@ import { createRequire } from "node:module"
 
 const require = createRequire(import.meta.url)
 const pkg = require("../package.json")
+const rootPkg = require("../../package.json")
 
 const REPO = pkg.repository.url
   .replace(/^https?:\/\/github\.com\//, "")
@@ -10,9 +11,20 @@ const REPO = pkg.repository.url
 const API_BASE = `https://api.github.com/repos/${REPO}`
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}`
 
+// --- root package tag prefix ---
+// tags for the root toolkit package follow `<root-name>@<version>`.
+// the CLI only shows these tags as version choices since workflows are part of the root package.
+
+const TAG_PREFIX = `${rootPkg.name}@`
+
 export { REPO }
 
 // --- types ---
+
+export type VersionTag = {
+  tag: string
+  version: string
+}
 
 export type WorkflowEntry = {
   name: string
@@ -57,22 +69,28 @@ export function parseWorkflowHeader(content: string): { description: string; sec
 
 // --- api ---
 
-export async function fetchTags(): Promise<string[]> {
-  const url = `${API_BASE}/tags?per_page=20`
+export async function fetchTags(): Promise<VersionTag[]> {
+  const url = `${API_BASE}/tags?per_page=100`
   const res = await fetch(url, {
     headers: { Accept: "application/vnd.github.v3+json" }
   })
   if (!res.ok) return []
   const tags: any[] = await res.json()
-  return tags.map((t) => t.name)
+  return tags
+    .map((t) => t.name as string)
+    .filter((name) => name.startsWith(TAG_PREFIX))
+    .map((name) => ({
+      tag: name,
+      version: name.slice(TAG_PREFIX.length)
+    }))
 }
 
 // --- fetchLatestTag ---
-// returns the most recent tag, or "main" if no tags exist.
+// returns the most recent root toolkit tag, or "main" if none exist.
 
 export async function fetchLatestTag(): Promise<string> {
   const tags = await fetchTags()
-  return tags.length > 0 ? tags[0] : "main"
+  return tags.length > 0 ? tags[0].tag : "main"
 }
 
 export async function fetchWorkflowList(gitRef: string): Promise<WorkflowEntry[]> {

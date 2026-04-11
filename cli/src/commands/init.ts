@@ -111,7 +111,10 @@ export default class Init extends Command {
 
     const choices = [
       { name: `main ${ux.colorize("dim", "(latest)")}`, value: "main" },
-      ...tags.slice(0, 9).map((tag) => ({ name: tag, value: tag })),
+      ...tags.slice(0, 9).map((t) => ({
+        name: `${t.version} ${ux.colorize("dim", `(${t.tag})`)}`,
+        value: t.tag,
+      })),
     ]
 
     const ref = await select({
