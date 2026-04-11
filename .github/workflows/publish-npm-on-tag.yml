@@ -101,7 +101,7 @@ jobs:
       - name: Publish to npm
         if: steps.gate.outputs.skip != 'true'
         working-directory: ${{ steps.pkg.outputs.dir }}
-        run: bun publish --access public --tag ${{ steps.meta.outputs.npm_tag }}
+        run: bun publish -p --access public --tag ${{ steps.meta.outputs.npm_tag }}
         env:
           NPM_CONFIG_TOKEN : ${{ secrets.NPM_TOKEN }}
 

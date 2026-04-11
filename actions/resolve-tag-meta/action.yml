@@ -20,11 +20,14 @@ outputs:
     description: "Version extracted from the tag"
     value: ${{ steps.run.outputs.version }}
   npm_tag:
-    description: "npm dist-tag: 'canary' for prereleases, 'latest' for stable"
+    description: "npm dist-tag: the prerelease channel (e.g. 'canary', 'beta', 'alpha', 'rc') or 'latest' for stable"
     value: ${{ steps.run.outputs.npm_tag }}
   is_prerelease:
     description: "'true' if the version contains a prerelease identifier"
     value: ${{ steps.run.outputs.is_prerelease }}
+  prerelease_channel:
+    description: "Prerelease channel name (e.g. 'canary', 'beta', 'alpha', 'rc') or empty for stable"
+    value: ${{ steps.run.outputs.prerelease_channel }}
 
 runs:
   using: composite

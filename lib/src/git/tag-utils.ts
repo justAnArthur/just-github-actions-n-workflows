@@ -38,3 +38,13 @@ export function isPrerelease(version: string): boolean {
   return /-(canary|rc|alpha|beta)/i.test(version)
 }
 
+// --- prereleaseChannel ---
+// extracts the prerelease channel from a version string.
+// e.g. `1.0.0-beta.1` → `beta`, `2.0.0-canary.3` → `canary`
+// returns `undefined` if the version is a stable release.
+
+export function prereleaseChannel(version: string): string | undefined {
+  const match = version.match(/-(canary|rc|alpha|beta)/i)
+  return match ? match[1].toLowerCase() : undefined
+}
+
