@@ -79,7 +79,7 @@ jobs:
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
 
-      - name: Check if package is publishable
+      - name: Check if package is published
         id: gate
         uses: justAnArthur/just-github-actions-n-workflows/actions/check-publishable@main
         with:
@@ -98,12 +98,14 @@ jobs:
             echo "no build script or build skipped"
           fi
 
+      - name: Setup npm auth
+        if: steps.gate.outputs.skip != 'true'
+        run: echo "//registry.npmjs.org/:_authToken=${{ secrets.NPM_TOKEN }}" > ~/.npmrc
+
       - name: Publish to npm
         if: steps.gate.outputs.skip != 'true'
         working-directory: ${{ steps.pkg.outputs.dir }}
         run: bun publish --access public --tag ${{ steps.meta.outputs.npm_tag }}
-        env:
-          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Fetch all tags
         if: steps.gate.outputs.skip != 'true'
