@@ -1,6 +1,7 @@
-#!/usr/bin/env node
+// cli/src/index.ts
+// ---
+// oclif entry point — re-exported for use by bin/run.js
+// ---
 
-import { execute } from "@oclif/core"
-
-await execute({ dir: import.meta.url })
+export { execute } from "@oclif/core"
 

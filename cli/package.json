@@ -4,11 +4,14 @@
   "description": "Release automation toolkit — version bumping, npm publishing, docker publishing, VPS deployment via GitHub Actions composite actions",
   "type": "module",
   "bin": {
-    "just-github-actions-n-workflows": "./src/index.ts"
+    "just-github-actions-n-workflows": "./bin/run.js"
   },
-  "scripts": {},
+  "scripts": {
+    "build": "tsc"
+  },
   "files": [
-    "src/**/*.ts",
+    "bin/**/*.js",
+    "dist/**/*.js",
     "package.json",
     "README.md"
   ],
@@ -23,8 +26,11 @@
     "@oclif/core": "^4",
     "@inquirer/prompts": "^7"
   },
+  "devDependencies": {
+    "typescript": "^5"
+  },
   "oclif": {
-    "commands": "./src/commands",
+    "commands": "./dist/commands",
     "default": "init"
   },
   "properties": {

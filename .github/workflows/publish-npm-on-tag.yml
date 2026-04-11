@@ -91,6 +91,7 @@ jobs:
 
       - name: Build (if build script exists)
         if: steps.gate.outputs.skip != 'true'
+        working-directory: ${{ steps.pkg.outputs.dir }}
         run: |
           if bun run --silent build 2>/dev/null; then
             echo "build completed"
