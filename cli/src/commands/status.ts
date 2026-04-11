@@ -6,7 +6,7 @@
 
 import { Command, Flags, ux } from "@oclif/core"
 
-import { fetchLatestTag } from "../github.js"
+import { fetchTags } from "../github.js"
 import { readLockfile } from "../lockfile.js"
 
 export default class Status extends Command {
@@ -33,7 +33,14 @@ export default class Status extends Command {
       return
     }
 
-    const targetRef = flags.ref ?? await fetchLatestTag()
+    const tags = await fetchTags()
+    const targetRef = flags.ref ?? (tags.length > 0 ? tags[0].tag : null)
+
+    if (!targetRef) {
+      this.log(ux.colorize("yellow", "\n  no published versions found.\n"))
+      return
+    }
+
     const entries = Object.values(lock.workflows)
 
     this.log()
@@ -43,11 +50,12 @@ export default class Status extends Command {
     let outdatedCount = 0
 
     for (const entry of entries) {
-      const current = entry.ref === targetRef
+      const entryRef = entry.ref === "main" ? targetRef : entry.ref
+      const current = entryRef === targetRef
       const icon = current ? ux.colorize("green", "✓") : ux.colorize("yellow", "⬆")
       const refLabel = current
-        ? ux.colorize("green", entry.ref)
-        : `${ux.colorize("yellow", entry.ref)} → ${ux.colorize("green", targetRef)}`
+        ? ux.colorize("green", entryRef)
+        : `${ux.colorize("yellow", entryRef)} → ${ux.colorize("green", targetRef)}`
       const date = ux.colorize("dim", new Date(entry.installedAt).toLocaleDateString())
 
       this.log(`  ${icon} ${ux.colorize("cyan", entry.name.padEnd(28))} ${refLabel.padEnd(50)} ${date}`)

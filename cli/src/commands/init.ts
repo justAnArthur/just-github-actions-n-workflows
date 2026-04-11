@@ -9,6 +9,7 @@ import {
   fetchTags,
   fetchWorkflowContent,
   fetchWorkflowList,
+  type VersionTag,
   type WorkflowEntry,
 } from "../github.js"
 import {
@@ -77,7 +78,8 @@ export default class Init extends Command {
     this.log(ux.colorize("bold", "  just-github-actions-n-workflows"))
     this.log(ux.colorize("dim", "  release automation toolkit\n"))
 
-    const ref = await this.resolveRef(flags, positional)
+    const tags = await fetchTags()
+    const ref = await this.resolveRef(flags, positional, tags)
     const selected = await this.selectWorkflows(ref, flags, positional)
 
     if (selected.length === 0) {
@@ -97,30 +99,33 @@ export default class Init extends Command {
 
   private async resolveRef(
     flags: { ref: string; yes: boolean },
-    positional: string[]
+    positional: string[],
+    tags: VersionTag[]
   ): Promise<string> {
+    const latest = tags.length > 0 ? tags[0].tag : "main"
+
     if (flags.ref !== "main" || positional.length > 0 || flags.yes) {
-      return flags.ref
+      return flags.ref === "main" ? latest : flags.ref
+    }
+
+    if (tags.length === 0) {
+      this.log(ux.colorize("yellow", "  no published versions found — using main\n"))
+      return "main"
     }
 
     this.log(ux.colorize("bold", "  step 1 — select version\n"))
 
-    const tags = await fetchTags()
-
-    if (tags.length === 0) return "main"
-
-    const choices = [
-      { name: `main ${ux.colorize("dim", "(latest)")}`, value: "main" },
-      ...tags.slice(0, 9).map((t) => ({
-        name: `${t.version} ${ux.colorize("dim", `(${t.tag})`)}`,
-        value: t.tag,
-      })),
-    ]
+    const choices = tags.slice(0, 10).map((t, i) => ({
+      name: i === 0
+        ? `${t.version} ${ux.colorize("dim", "(latest)")}`
+        : t.version,
+      value: t.tag,
+    }))
 
     const ref = await select({
       message: "Pick a version",
       choices,
-      default: "main",
+      default: latest,
     })
 
     this.log(ux.colorize("green", `\n  → using ${ref}\n`))

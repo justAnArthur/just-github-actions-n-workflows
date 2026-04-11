@@ -78,16 +78,8 @@ export async function fetchTags(): Promise<VersionTag[]> {
     .filter((name) => name.startsWith(TAG_PREFIX))
     .map((name) => ({
       tag: name,
-      version: name.slice(TAG_PREFIX.length)
+      version: name.slice(TAG_PREFIX.length),
     }))
-}
-
-// --- fetchLatestTag ---
-// returns the most recent root toolkit tag, or "main" if none exist.
-
-export async function fetchLatestTag(): Promise<string> {
-  const tags = await fetchTags()
-  return tags.length > 0 ? tags[0].tag : "main"
 }
 
 export async function fetchWorkflowList(gitRef: string): Promise<WorkflowEntry[]> {
