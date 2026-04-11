@@ -2,10 +2,11 @@
 // ---
 // parses conventional commit messages into structured data.
 // supports multi-item commits (several `type(scope): subject` lines),
+// comma-separated scopes (e.g. `fix(a,b): msg`),
 // extracts jira-style ticket references, and separates header/footer.
 //
 // grammar:
-//   <type>[!][(scope)]: <subject>
+//   <type>[!][(scope[,scope…])]: <subject>
 //   [body]
 //   [footer]
 // ---
@@ -13,6 +14,7 @@
 export type CommitItem = {
   type: string;
   scope: string | null;
+  scopes: string[];
   subject: string;
   body: string;
   raw: string;
@@ -75,6 +77,10 @@ export function parseCommitMessage(raw: string): ParsedCommit {
     if (!m) continue
 
     const groups = m.groups || {}
+    const rawScope = groups.scope || null
+    const scopes = rawScope
+      ? rawScope.split(",").map((s) => s.trim()).filter(Boolean)
+      : []
 
     // body = lines between this item and the next conventional line
     const nextIndex =
@@ -86,7 +92,8 @@ export function parseCommitMessage(raw: string): ParsedCommit {
 
     items.push({
       type: groups.type || "",
-      scope: groups.scope || null,
+      scope: scopes[0] ?? null,
+      scopes,
       subject: (groups.subject || "").trim(),
       body,
       raw: line

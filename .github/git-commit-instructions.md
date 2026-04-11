@@ -4,14 +4,19 @@ automatically by the `bump-version` workflow to determine version bumps.
 ## Format
 
 ```
-<type>(<scope>): <subject>
+<type>(<scope>[,<scope>…]): <subject>
 
 [optional body]
 
 [optional footer]
 ```
 
-**Scope is required.** Every commit must target a specific package scope.
+**Scope is REQUIRED.** Every commit must target a specific package scope.
+Commits without a scope are ignored — no version bump will occur.
+Multiple scopes can be comma-separated to bump several packages at once:
+```
+fix(cli,lib): shared fix across cli and lib
+```
 
 ## Commit types and their version impact
 
@@ -37,10 +42,17 @@ feat!(lib): remove deprecated API
 
 ## Scope
 
-**Scope is mandatory.** Every commit must include a scope matching one of the values below.
+**Scope is MANDATORY — commits without a scope are ignored by the version bump workflow.**
+A commit without a valid scope will NOT trigger any version bump for any package.
+
+Every commit must include a scope matching one of the values below.
 This ensures only the affected package gets a version bump — never all packages at once.
 
+⚠️ **Invalid or missing scopes = no version bump. The commit is silently skipped.**
+
 ### Available scopes
+
+Only the following scope values are recognized. Any other value is treated as unknown and skipped:
 
 | Scope | Package | Location |
 |-------|---------|----------|
@@ -63,12 +75,21 @@ This ensures only the affected package gets a version bump — never all package
 | `skip-check` | `@justanarthur/step-skip-check` | `actions/skip-check/` |
 | `ssh-exec` | `@justanarthur/step-ssh-exec` | `actions/ssh-exec/` |
 
-If a commit affects multiple packages, use multiple conventional commit lines (see below).
+If a commit affects multiple packages, either use comma-separated scopes or multiple conventional commit lines.
 
-## Multi-item commits
+## Comma-separated scopes
 
-Multiple conventional commit lines in one message are supported.
-Use this when a single change touches multiple packages:
+When a single change affects multiple packages equally, list scopes with commas.
+Each listed scope gets the same version bump:
+```
+fix(cli,lib): fix shared utility used by both packages
+refactor(resolve-tag-meta,check-publishable): standardize output format
+```
+
+## Multi-line commits
+
+Multiple conventional commit lines in one message are also supported.
+Use this when different packages get different change types:
 ```
 feat(cli): add --ref flag to init command
 fix(lib): handle empty tag list gracefully
@@ -114,10 +135,15 @@ fix(cli): handle existing files gracefully
 fix(resolve-tag-meta): extract prerelease channel from version string
 ```
 
+```
+fix(cli,lib): normalize scope matching across packages
+```
+
 ## Rules
 
-- **Scope is required** — never omit the scope
-- Use only scopes listed in the table above
+- **Scope is REQUIRED** — commits without a scope are silently ignored and trigger NO version bump
+- **Use ONLY scopes from the table above** — unknown scopes are skipped
+- **Never omit the parentheses** — `fix: something` is wrong, `fix(lib): something` is correct
 - Use lowercase for type and scope
 - Use imperative mood in the subject ("add feature" not "added feature")
 - Do not end the subject with a period

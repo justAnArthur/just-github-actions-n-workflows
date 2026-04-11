@@ -32,6 +32,25 @@ describe("parseCommitMessage", () => {
     expect(result.items[1].scope).toBe("b")
   })
 
+  test("parses comma-separated scopes", () => {
+    const result = parseCommitMessage("fix(cli,lib): shared fix")
+    expect(result.items).toHaveLength(1)
+    expect(result.items[0].scope).toBe("cli")
+    expect(result.items[0].scopes).toEqual(["cli", "lib"])
+  })
+
+  test("parses single scope into scopes array", () => {
+    const result = parseCommitMessage("feat(cli): add feature")
+    expect(result.items[0].scope).toBe("cli")
+    expect(result.items[0].scopes).toEqual(["cli"])
+  })
+
+  test("empty scopes array for scopeless commit", () => {
+    const result = parseCommitMessage("fix: correct a typo")
+    expect(result.items[0].scope).toBeNull()
+    expect(result.items[0].scopes).toEqual([])
+  })
+
   test("handles non-conventional message", () => {
     const result = parseCommitMessage("just a plain commit message")
     expect(result.items).toHaveLength(0)

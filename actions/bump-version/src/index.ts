@@ -75,7 +75,10 @@ if (bumpToCalculatedStableEnv) {
       const parsedCommits = commits.map(parseCommitMessage)
       const scopedItems = parsedCommits
         .flatMap((c) => c.items)
-        .filter((i) => i.scope && findManifestByName([manifest], i.scope))
+        .filter((i) =>
+          i.scopes.length > 0 &&
+          i.scopes.some((s) => findManifestByName([manifest], s))
+        )
 
       let semver = -1
       for (const item of scopedItems) {
@@ -133,23 +136,21 @@ if (bumpToCalculatedStableEnv) {
     const level = CONVENTIONAL_TO_SEMVER[item.type]
     if (level === undefined) continue
 
-    if (!item.scope) {
-      for (const manifest of bumpManifests) {
-        if ((perManifestBump.get(manifest.name) ?? -1) < level) {
-          perManifestBump.set(manifest.name, level)
-        }
+    if (item.scopes.length === 0) {
+      log.debug(`skipping commit item with no scope: ${item.raw}`)
+      continue
+    }
+
+    for (const scope of item.scopes) {
+      const manifest = findManifestByName(manifests, scope)
+      if (!manifest) {
+        log.debug(`skipping commit item with unknown scope: ${scope}`)
+        continue
       }
-      continue
-    }
 
-    const manifest = findManifestByName(manifests, item.scope)
-    if (!manifest) {
-      log.debug(`skipping commit item with unknown scope: ${item.scope}`)
-      continue
-    }
-
-    if ((perManifestBump.get(manifest.name) ?? -1) < level) {
-      perManifestBump.set(manifest.name, level)
+      if ((perManifestBump.get(manifest.name) ?? -1) < level) {
+        perManifestBump.set(manifest.name, level)
+      }
     }
   }
 
