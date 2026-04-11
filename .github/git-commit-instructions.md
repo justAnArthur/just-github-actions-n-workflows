@@ -45,41 +45,66 @@ feat!(lib): remove deprecated API
 **Scope is MANDATORY — commits without a scope are ignored by the version bump workflow.**
 A commit without a valid scope will NOT trigger any version bump for any package.
 
-Every commit must include a scope matching one of the values below.
-This ensures only the affected package gets a version bump — never all packages at once.
+The scope must reflect **where the change was made** in the codebase.
+Choose the scope based on which directory/package you actually modified:
 
 ⚠️ **Invalid or missing scopes = no version bump. The commit is silently skipped.**
 
-### Available scopes
+### How to pick the right scope
+
+| You changed files in… | Use scope |
+|------------------------|-----------|
+| `cli/` | `cli` |
+| `lib/` | `lib` |
+| `actions/bump-version/` | `bump-version` |
+| `actions/check-publishable/` | `check-publishable` |
+| `actions/configure-git-user/` | `configure-git-user` |
+| `actions/create-env-file/` | `create-env-file` |
+| `actions/fetch-tags/` | `fetch-tags` |
+| `actions/generate-release-notes/` | `generate-release-notes` |
+| `actions/get-dockerfile-path/` | `get-dockerfile-path` |
+| `actions/resolve-deploy-config/` | `resolve-deploy-config` |
+| `actions/resolve-image-tags/` | `resolve-image-tags` |
+| `actions/resolve-package-dir/` | `resolve-package-dir` |
+| `actions/resolve-tag-meta/` | `resolve-tag-meta` |
+| `actions/scp-transfer/` | `scp-transfer` |
+| `actions/setup-ssh/` | `setup-ssh` |
+| `actions/skip-check/` | `skip-check` |
+| `actions/ssh-exec/` | `ssh-exec` |
+| `workflows/`, root config, `package.json`, README | `toolkit` or `workflows` |
+
+If a change spans multiple directories, use comma-separated scopes or multi-line commits (see below).
+
+### Scope-to-package mapping
 
 Only the following scope values are recognized. Any other value is treated as unknown and skipped:
 
-| Scope | Package | Location |
-|-------|---------|----------|
-| `toolkit` or `workflows` | `@justanarthur/just-github-actions-n-workflows` | root |
-| `cli` | `@justanarthur/just-github-actions-n-workflows-cli` | `cli/` |
-| `lib` | `@justanarthur/just-github-actions-n-workflows-lib` | `lib/` |
-| `bump-version` | `@justanarthur/step-bump-manifest-versions` | `actions/bump-version/` |
-| `check-publishable` | `@justanarthur/step-check-publishable` | `actions/check-publishable/` |
-| `configure-git-user` | `@justanarthur/step-configure-git-user` | `actions/configure-git-user/` |
-| `create-env-file` | `@justanarthur/step-create-env-file` | `actions/create-env-file/` |
-| `fetch-tags` | `@justanarthur/step-fetch-tags` | `actions/fetch-tags/` |
-| `generate-release-notes` | `@justanarthur/step-generate-release-notes` | `actions/generate-release-notes/` |
-| `get-dockerfile-path` | `@justanarthur/step-get-dockerfile-path` | `actions/get-dockerfile-path/` |
-| `resolve-deploy-config` | `@justanarthur/step-resolve-deploy-config` | `actions/resolve-deploy-config/` |
-| `resolve-image-tags` | `@justanarthur/step-resolve-image-tags` | `actions/resolve-image-tags/` |
-| `resolve-package-dir` | `@justanarthur/step-resolve-package-dir` | `actions/resolve-package-dir/` |
-| `resolve-tag-meta` | `@justanarthur/step-resolve-tag-meta` | `actions/resolve-tag-meta/` |
-| `scp-transfer` | `@justanarthur/step-scp-transfer` | `actions/scp-transfer/` |
-| `setup-ssh` | `@justanarthur/step-setup-ssh` | `actions/setup-ssh/` |
-| `skip-check` | `@justanarthur/step-skip-check` | `actions/skip-check/` |
-| `ssh-exec` | `@justanarthur/step-ssh-exec` | `actions/ssh-exec/` |
+| Scope | Package |
+|-------|---------|
+| `toolkit` or `workflows` | `@justanarthur/just-github-actions-n-workflows` |
+| `cli` | `@justanarthur/just-github-actions-n-workflows-cli` |
+| `lib` | `@justanarthur/just-github-actions-n-workflows-lib` |
+| `bump-version` | `@justanarthur/step-bump-manifest-versions` |
+| `check-publishable` | `@justanarthur/step-check-publishable` |
+| `configure-git-user` | `@justanarthur/step-configure-git-user` |
+| `create-env-file` | `@justanarthur/step-create-env-file` |
+| `fetch-tags` | `@justanarthur/step-fetch-tags` |
+| `generate-release-notes` | `@justanarthur/step-generate-release-notes` |
+| `get-dockerfile-path` | `@justanarthur/step-get-dockerfile-path` |
+| `resolve-deploy-config` | `@justanarthur/step-resolve-deploy-config` |
+| `resolve-image-tags` | `@justanarthur/step-resolve-image-tags` |
+| `resolve-package-dir` | `@justanarthur/step-resolve-package-dir` |
+| `resolve-tag-meta` | `@justanarthur/step-resolve-tag-meta` |
+| `scp-transfer` | `@justanarthur/step-scp-transfer` |
+| `setup-ssh` | `@justanarthur/step-setup-ssh` |
+| `skip-check` | `@justanarthur/step-skip-check` |
+| `ssh-exec` | `@justanarthur/step-ssh-exec` |
 
 If a commit affects multiple packages, either use comma-separated scopes or multiple conventional commit lines.
 
 ## Comma-separated scopes
 
-When a single change affects multiple packages equally, list scopes with commas.
+When a single change affects multiple directories equally, list scopes with commas.
 Each listed scope gets the same version bump:
 ```
 fix(cli,lib): fix shared utility used by both packages
@@ -89,7 +114,7 @@ refactor(resolve-tag-meta,check-publishable): standardize output format
 ## Multi-line commits
 
 Multiple conventional commit lines in one message are also supported.
-Use this when different packages get different change types:
+Use this when changes in different directories have different types:
 ```
 feat(cli): add --ref flag to init command
 fix(lib): handle empty tag list gracefully
