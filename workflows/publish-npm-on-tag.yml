@@ -55,8 +55,16 @@ permissions:
   contents: write
 
 jobs:
-  publish-npm:
+  check:
     runs-on: ubuntu-latest
+    outputs:
+      skip: ${{ steps.gate.outputs.skip }}
+      tag: ${{ steps.meta.outputs.tag }}
+      pkg_name: ${{ steps.meta.outputs.pkg_name }}
+      version: ${{ steps.meta.outputs.version }}
+      npm_tag: ${{ steps.meta.outputs.npm_tag }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      dir: ${{ steps.pkg.outputs.dir }}
 
     steps:
       - name: Resolve tag metadata
@@ -69,9 +77,8 @@ jobs:
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.meta.outputs.tag }}
-          fetch-depth: 0
+          fetch-depth: 1
           token: ${{ secrets.GH_TOKEN }}
-          lfs: true
 
       - name: Resolve package directory
         id: pkg
@@ -79,19 +86,31 @@ jobs:
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
 
-      - name: Check if package is published
+      - name: Check if package is publishable
         id: gate
         uses: justAnArthur/just-github-actions-n-workflows/actions/check-publishable@main
         with:
           dir: ${{ steps.pkg.outputs.dir }}
 
+  publish-npm:
+    needs: check
+    if: needs.check.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.check.outputs.tag }}
+          fetch-depth: 0
+          token: ${{ secrets.GH_TOKEN }}
+          lfs: true
+
       - name: Install dependencies
-        if: steps.gate.outputs.skip != 'true'
         run: bun install --frozen-lockfile
 
       - name: Build (if build script exists)
-        if: steps.gate.outputs.skip != 'true'
-        working-directory: ${{ steps.pkg.outputs.dir }}
+        working-directory: ${{ needs.check.outputs.dir }}
         run: |
           if bun run --silent build 2>/dev/null; then
             echo "build completed"
@@ -100,31 +119,27 @@ jobs:
           fi
 
       - name: Publish to npm
-        if: steps.gate.outputs.skip != 'true'
-        working-directory: ${{ steps.pkg.outputs.dir }}
-        run: bun publish -p --access public --tag ${{ steps.meta.outputs.npm_tag }}
+        working-directory: ${{ needs.check.outputs.dir }}
+        run: bun publish -p --access public --tag ${{ needs.check.outputs.npm_tag }}
         env:
-          NPM_CONFIG_TOKEN : ${{ secrets.NPM_TOKEN }}
+          NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Fetch all tags
-        if: steps.gate.outputs.skip != 'true'
         uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
 
       - name: Generate release notes
-        if: steps.gate.outputs.skip != 'true'
         id: release_notes
         uses: justAnArthur/just-github-actions-n-workflows/actions/generate-release-notes@main
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
+          tag_name: ${{ needs.check.outputs.tag }}
           root_dir: ${{ github.workspace }}
 
       - name: Create GitHub release
-        if: steps.gate.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
-          tag_name: ${{ steps.meta.outputs.tag }}
-          name: ${{ steps.meta.outputs.tag }}
-          prerelease: ${{ steps.meta.outputs.is_prerelease == 'true' }}
+          tag_name: ${{ needs.check.outputs.tag }}
+          name: ${{ needs.check.outputs.tag }}
+          prerelease: ${{ needs.check.outputs.is_prerelease == 'true' }}
           body: |
             ## Release Notes
 
@@ -133,7 +148,7 @@ jobs:
             ## Install
 
             ```sh
-            npm install ${{ steps.meta.outputs.pkg_name }}@${{ steps.meta.outputs.version }}
+            npm install ${{ needs.check.outputs.pkg_name }}@${{ needs.check.outputs.version }}
             ```
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
