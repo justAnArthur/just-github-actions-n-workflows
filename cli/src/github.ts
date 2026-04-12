@@ -1,3 +1,6 @@
+import { parseSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
+import { compareSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/compare-semver"
+
 import pkg from "../package.json" with { type: "json" }
 import rootPkg from "../../package.json" with { type: "json" }
 
@@ -102,17 +105,23 @@ export async function fetchTags(): Promise<VersionTag[]> {
   )
 
   const seen = new Set<string>()
-  return results
+  const deduped = results
     .flat()
     .filter((t) => {
       if (seen.has(t.version)) return false
       seen.add(t.version)
       return true
     })
-    .reverse()
+
+  return deduped.sort((a, b) => {
+    const pa = parseSemver(a.version)
+    const pb = parseSemver(b.version)
+    if (!pa || !pb) return 0
+    return compareSemver(pb, pa)
+  })
 }
 
-export async function fetchWorkflowList(gitRef: string): Promise<WorkflowEntry[]> {
+export async function fetchWorkflowList(gitRef: string, log): Promise<WorkflowEntry[]> {
   const url = `${API_BASE}/contents/workflows?ref=${gitRef}`
   const res = await fetch(url, { headers: authHeaders() })
 
@@ -155,5 +164,18 @@ export async function enrichWorkflows(workflows: WorkflowEntry[], gitRef: string
   }
 
   return enriched
+}
+
+// --- settings template ---
+
+export const SETTINGS_FILENAME = ".justactions.yml"
+
+export async function fetchSettingsTemplate(gitRef: string): Promise<string | null> {
+  const url = `${RAW_BASE}/${gitRef}/${SETTINGS_FILENAME}`
+  const res = await fetch(url, { headers: authHeaders() })
+
+  if (!res.ok) return null
+
+  return await res.text()
 }
 

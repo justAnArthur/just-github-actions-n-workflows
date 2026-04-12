@@ -9,7 +9,7 @@ import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarth
 import type { Manifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
 import { findManifestByName, findManifests, getManifestSearchDir, updateManifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
 import { commitAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/commit-n-push"
-import { tagAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
+import { tagAndPush, type TagAnnotation } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n-workflows-lib/git/get-commits-from-the-last-stable"
 import { deletePrereleaseImages, manifestNameToImageName } from "@justanarthur/just-github-actions-n-workflows-lib/ghcr/delete-canary-images"
 import { log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
@@ -190,8 +190,11 @@ if (manifestNextVersions.length !== 0) {
 }
 
 for (const [manifest, newVersion] of manifestNextVersions) {
-  await tagAndPush(`${manifest.name}@${newVersion}`)
-  log.info(`tagged ${manifest.name}@${newVersion}`)
+  const annotation: TagAnnotation = {
+    deployTargets: manifest.deployTargets ?? []
+  }
+  await tagAndPush(`${manifest.name}@${newVersion}`, annotation)
+  log.info(`tagged ${manifest.name}@${newVersion} (deployTargets: ${annotation.deployTargets.join(", ") || "none"})`)
 }
 
 // --- post-stable: advance to next prerelease ---

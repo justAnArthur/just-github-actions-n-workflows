@@ -1,0 +1,120 @@
+# deploy-vercel-on-tag.yml
+# ---
+# triggers a vercel deployment when a version tag is pushed that has
+# "vercel" in its deploy targets annotation.
+#
+# uses the vercel CLI to deploy directly — vercel handles the build
+# remotely. stable tags deploy to production, prereleases to preview.
+#
+# the tag annotation is written by the bump-version action and contains
+# a JSON object with a `deployTargets` array. this workflow reads the
+# annotation via resolve-tag-meta and skips if "vercel" is not present.
+#
+# copy this file into your repo's `.github/workflows/` and adjust
+# the `push.tags` pattern to match your package naming convention.
+#
+# can also be called as a reusable workflow:
+#
+#   jobs:
+#     deploy:
+#       uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/deploy-vercel-on-tag.yml@main
+#       with:
+#         tag: ${{ github.ref_name }}
+#       secrets:
+#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
+#         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
+#         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+#         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+#
+# required secrets:
+#   GH_TOKEN          — github token with contents:read
+#   VERCEL_TOKEN      — vercel API token
+#   VERCEL_ORG_ID     — vercel organization/team ID
+#   VERCEL_PROJECT_ID — vercel project ID
+# ---
+
+name: deploy-vercel-on-tag
+run-name: "deploy-vercel — ${{ inputs.tag || github.ref_name }}"
+
+on:
+  push:
+    tags: [ "**@*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to deploy (e.g. "@scope/frontend@1.2.3")'
+        type: string
+        required: true
+      production:
+        description: "Deploy to production (true/false)"
+        type: boolean
+        required: false
+        default: false
+  workflow_call:
+    inputs:
+      tag:
+        description: 'tag to deploy (e.g. "@scope/frontend@1.2.3")'
+        type: string
+        required: true
+      production:
+        description: "Deploy to production"
+        type: boolean
+        required: false
+        default: false
+    secrets:
+      GH_TOKEN:
+        description: "github token with contents:read"
+        required: true
+      VERCEL_TOKEN:
+        description: "vercel API token"
+        required: true
+      VERCEL_ORG_ID:
+        description: "vercel organization/team ID"
+        required: true
+      VERCEL_PROJECT_ID:
+        description: "vercel project ID"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  deploy-vercel:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Resolve tag metadata
+        id: meta
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-tag-meta@main
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+
+      - name: Skip if vercel is not a deploy target
+        if: steps.meta.outputs.has_annotation == 'true' && steps.meta.outputs.publish_vercel != 'true'
+        run: |
+          echo "tag annotation does not include 'vercel' deploy target — skipping"
+          echo "SKIP_VERCEL=true" >> "$GITHUB_ENV"
+
+      - name: Checkout repo
+        if: env.SKIP_VERCEL != 'true'
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ steps.meta.outputs.tag }}
+          token: ${{ secrets.GH_TOKEN }}
+
+      - name: Install Vercel CLI
+        if: env.SKIP_VERCEL != 'true'
+        run: npm install -g vercel@latest
+
+      - name: Deploy to Vercel
+        if: env.SKIP_VERCEL != 'true'
+        working-directory: ${{ steps.pkg.outputs.dir || '.' }}
+        run: |
+          PROD_FLAG=""
+          if [[ "${{ steps.meta.outputs.is_prerelease }}" != "true" ]] || [[ "${{ inputs.production }}" == "true" ]]; then
+            PROD_FLAG="--prod"
+          fi
+          vercel deploy $PROD_FLAG --token=${{ secrets.VERCEL_TOKEN }}
+        env:
+          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
+          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}

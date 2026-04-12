@@ -31,6 +31,8 @@ export type Module = {
   manifestType: ManifestType;
   /** relative or absolute path to the Dockerfile, if declared */
   dockerfilePath: string | undefined;
+  /** deployment targets inferred from the manifest (e.g. ["npm", "docker", "vercel"]) */
+  deployTargets: string[];
   /** commit scope aliases for this module */
   scopeAliases: string[];
   /** optional build priority (lower = build first) */
@@ -66,6 +68,7 @@ export async function discoverModules(
     manifestPath: m.path,
     manifestType: detectManifestType(m.path),
     dockerfilePath: m.dockerfilePath,
+    deployTargets: m.deployTargets ?? [],
     scopeAliases: m.scopeAliases ?? [],
     priority: m.priority,
     manifest: m

@@ -3,8 +3,9 @@
 # publishes a package to npm and creates a github release when a
 # version tag is pushed (e.g. "my-package@1.2.3").
 #
-# automatically skips private packages by checking the package.json.
-# in a monorepo, only packages without `"private": true` get published.
+# automatically skips packages that don't have "npm" in their tag
+# annotation's deploy targets. for legacy tags without annotations,
+# falls back to the check-publishable action.
 #
 # copy this file into your repo's `.github/workflows/` and adjust
 # the `push.tags` pattern to match your package naming convention.
@@ -65,7 +66,14 @@ jobs:
         with:
           tag: ${{ inputs.tag || github.ref_name }}
 
+      - name: Skip if npm is not a deploy target
+        if: steps.meta.outputs.has_annotation == 'true' && steps.meta.outputs.publish_npm != 'true'
+        run: |
+          echo "tag annotation does not include 'npm' deploy target — skipping"
+          echo "SKIP_PUBLISH=true" >> "$GITHUB_ENV"
+
       - name: Checkout repo
+        if: env.SKIP_PUBLISH != 'true'
         uses: actions/checkout@v4
         with:
           ref: ${{ steps.meta.outputs.tag }}
@@ -74,39 +82,41 @@ jobs:
           lfs: true
 
       - name: Resolve package directory
+        if: env.SKIP_PUBLISH != 'true'
         id: pkg
         uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-package-dir@main
         with:
           tag_name: ${{ steps.meta.outputs.tag }}
 
-      - name: Check if package is publishable
+      - name: Check if package is publishable (legacy fallback)
+        if: env.SKIP_PUBLISH != 'true' && steps.meta.outputs.has_annotation != 'true'
         id: gate
         uses: justAnArthur/just-github-actions-n-workflows/actions/check-publishable@main
         with:
           dir: ${{ steps.pkg.outputs.dir }}
 
       - name: Install dependencies
-        if: steps.gate.outputs.skip != 'true'
+        if: env.SKIP_PUBLISH != 'true' && steps.gate.outputs.skip != 'true'
         run: bun install --frozen-lockfile
 
       - name: Build (if build script exists)
-        if: steps.gate.outputs.skip != 'true'
+        if: env.SKIP_PUBLISH != 'true' && steps.gate.outputs.skip != 'true'
         working-directory: ${{ steps.pkg.outputs.dir }}
         run: bun run --silent build 2>/dev/null || echo "no build script, skipping"
 
       - name: Publish to npm
-        if: steps.gate.outputs.skip != 'true'
+        if: env.SKIP_PUBLISH != 'true' && steps.gate.outputs.skip != 'true'
         working-directory: ${{ steps.pkg.outputs.dir }}
         run: bun publish -p --access public --tag ${{ steps.meta.outputs.npm_tag }}
         env:
           NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
 
       - name: Fetch all tags
-        if: steps.gate.outputs.skip != 'true'
+        if: env.SKIP_PUBLISH != 'true' && steps.gate.outputs.skip != 'true'
         uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
 
       - name: Generate release notes
-        if: steps.gate.outputs.skip != 'true'
+        if: env.SKIP_PUBLISH != 'true' && steps.gate.outputs.skip != 'true'
         id: release_notes
         uses: justAnArthur/just-github-actions-n-workflows/actions/generate-release-notes@main
         with:
@@ -114,7 +124,7 @@ jobs:
           root_dir: ${{ github.workspace }}
 
       - name: Create GitHub release
-        if: steps.gate.outputs.skip != 'true'
+        if: env.SKIP_PUBLISH != 'true' && steps.gate.outputs.skip != 'true'
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ steps.meta.outputs.tag }}

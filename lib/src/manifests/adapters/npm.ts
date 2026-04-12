@@ -21,12 +21,24 @@ const npmAdapter: ManifestAdapter = {
       ? props.gitCommitScopeRelatedNames.split(",").map((s: string) => s.trim())
       : []
 
+    // --- infer deploy targets ---
+    const deployTargets: string[] = []
+    if (pkg.private !== true) deployTargets.push("npm")
+    if (props.DockerfilePath || props.dockerfilePath) deployTargets.push("docker")
+    if (props.vercelProjectId) deployTargets.push("vercel")
+
+    // allow explicit override via properties.deployTargets (comma-separated)
+    const explicitTargets = props.deployTargets
+      ? props.deployTargets.split(",").map((s: string) => s.trim()).filter(Boolean)
+      : null
+
     return {
       name: pkg.name,
       version: pkg.version,
       priority: props.priority,
       dockerfilePath: props.DockerfilePath ?? props.dockerfilePath,
       scopeAliases,
+      deployTargets: explicitTargets ?? deployTargets,
       gitCommitScopeRelatedNames: scopeAliases.length > 0 ? scopeAliases : undefined
     }
   },

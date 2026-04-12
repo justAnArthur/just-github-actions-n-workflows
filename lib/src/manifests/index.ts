@@ -12,7 +12,7 @@
 
 // --- re-export types and registry from registry.ts ---
 
-export type { Manifest, ManifestAdapter, ManifestModule } from "./registry"
+export type { DeployTarget, Manifest, ManifestAdapter, ManifestModule } from "./registry"
 export { registerAdapter, getAdapters } from "./registry"
 
 // --- built-in adapters ---

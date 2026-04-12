@@ -1,8 +1,8 @@
 name: Resolve Tag Metadata
 description: >
   Parses a git tag in `<package>@<version>` format and outputs
-  structured metadata: package name, version, npm dist-tag, and
-  whether it's a prerelease.
+  structured metadata: package name, version, npm dist-tag,
+  prerelease status, and deployment targets from the tag annotation.
 
 inputs:
   tag:
@@ -28,6 +28,21 @@ outputs:
   prerelease_channel:
     description: "Prerelease channel name (e.g. 'canary', 'beta', 'alpha', 'rc') or empty for stable"
     value: ${{ steps.run.outputs.prerelease_channel }}
+  deploy_targets:
+    description: "JSON array of deployment targets from the tag annotation (e.g. '[\"npm\",\"docker\"]')"
+    value: ${{ steps.run.outputs.deploy_targets }}
+  publish_npm:
+    description: "'true' if the tag annotation includes 'npm' as a deploy target"
+    value: ${{ steps.run.outputs.publish_npm }}
+  publish_docker:
+    description: "'true' if the tag annotation includes 'docker' as a deploy target"
+    value: ${{ steps.run.outputs.publish_docker }}
+  publish_vercel:
+    description: "'true' if the tag annotation includes 'vercel' as a deploy target"
+    value: ${{ steps.run.outputs.publish_vercel }}
+  has_annotation:
+    description: "'true' if the tag has a valid annotation with deploy metadata"
+    value: ${{ steps.run.outputs.has_annotation }}
 
 runs:
   using: composite

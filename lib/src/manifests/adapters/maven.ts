@@ -64,12 +64,25 @@ const mavenAdapter: ManifestAdapter = {
       ? scopeNames.split(",").map((s) => s.trim())
       : []
 
+    // --- infer deploy targets ---
+    const dockerfilePath = findTagValue(props, "DockerfilePath") ?? findTagValue(props, "dockerfilePath")
+    const deployTargets: string[] = []
+    if (dockerfilePath) deployTargets.push("docker")
+    if (findTagValue(props, "vercelProjectId")) deployTargets.push("vercel")
+
+    // allow explicit override via <deployTargets> property (comma-separated)
+    const explicitStr = findTagValue(props, "deployTargets")
+    const explicitTargets = explicitStr
+      ? explicitStr.split(",").map((s) => s.trim()).filter(Boolean)
+      : null
+
     return {
       name,
       version,
       priority: priorityStr ? parseInt(priorityStr, 10) : undefined,
-      dockerfilePath: findTagValue(props, "DockerfilePath") ?? findTagValue(props, "dockerfilePath"),
+      dockerfilePath,
       scopeAliases,
+      deployTargets: explicitTargets ?? deployTargets,
       gitCommitScopeRelatedNames: scopeAliases.length > 0 ? scopeAliases : undefined
     }
   },

@@ -25,13 +25,15 @@
   },
   "dependencies": {
     "@oclif/core": "^4",
-    "@inquirer/prompts": "^7"
+    "@inquirer/prompts": "^7",
+    "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*"
   },
   "oclif": {
     "commands": "./dist/commands",
     "default": "init"
   },
   "properties": {
-    "gitCommitScopeRelatedNames": "cli"
+    "gitCommitScopeRelatedNames": "cli",
+    "deployTargets": "npm"
   }
 }

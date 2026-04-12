@@ -4,20 +4,17 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import {
-  REPO,
   enrichWorkflows,
+  fetchSettingsTemplate,
   fetchTags,
   fetchWorkflowContent,
   fetchWorkflowList,
+  REPO,
+  SETTINGS_FILENAME,
   type VersionTag,
-  type WorkflowEntry,
+  type WorkflowEntry
 } from "../github.js"
-import {
-  injectRefComment,
-  mergeLockfile,
-  readLockfile,
-  writeLockfile,
-} from "../lockfile.js"
+import { injectRefComment, mergeLockfile, readLockfile, writeLockfile } from "../lockfile.js"
 
 export default class Init extends Command {
   static override description = "Scaffold workflow files into .github/workflows/ of the current repo"
@@ -27,14 +24,14 @@ export default class Init extends Command {
     "<%= config.bin %> init bump-version",
     "<%= config.bin %> init --ref v1.0.0",
     "<%= config.bin %> init --list",
-    "<%= config.bin %> init --yes --force",
+    "<%= config.bin %> init --yes --force"
   ]
 
   static override args = {
     workflows: Args.string({
       description: "Specific workflow names to install (space-separated)",
-      required: false,
-    }),
+      required: false
+    })
   }
 
   static override strict = false
@@ -43,21 +40,25 @@ export default class Init extends Command {
     list: Flags.boolean({
       char: "l",
       description: "Show available workflows",
-      default: false,
+      default: false
     }),
     force: Flags.boolean({
       char: "f",
       description: "Overwrite existing workflow files",
-      default: false,
+      default: false
     }),
     yes: Flags.boolean({
       char: "y",
       description: "Skip interactive prompts, install all workflows",
-      default: false,
+      default: false
     }),
     ref: Flags.string({
-      description: "Git ref to fetch from (tag or sha)",
+      description: "Git ref to fetch from (tag, branch, or sha). Defaults to 'main'."
     }),
+    "no-settings": Flags.boolean({
+      description: "Skip creating the .justactions.yml settings file",
+      default: false
+    })
   }
 
   async run(): Promise<void> {
@@ -67,11 +68,7 @@ export default class Init extends Command {
     // --- list mode ---
 
     if (flags.list) {
-      const tags = await fetchTags()
-      const ref = flags.ref ?? (tags.length > 0 ? tags[0].tag : null)
-      if (!ref) {
-        this.error("No published versions found. Use --ref to specify a git ref manually.", { exit: 1 })
-      }
+      const ref = flags.ref ?? "main"
       await this.listWorkflows(ref)
       return
     }
@@ -93,6 +90,12 @@ export default class Init extends Command {
 
     const { created, skipped } = await this.installWorkflows(selected, ref, flags)
 
+    // --- scaffold .justactions.yml ---
+
+    if (!flags["no-settings"]) {
+      await this.scaffoldSettings(ref, flags)
+    }
+
     this.log(`\n  done — ${ux.colorize("green", `${created} created`)}, ${skipped} skipped\n`)
 
     this.printSecretsReminder(selected)
@@ -110,8 +113,13 @@ export default class Init extends Command {
       return flags.ref
     }
 
+    // default to "main" when no tags exist
     if (tags.length === 0) {
-      this.error("No published versions found. Use --ref to specify a git ref manually.", { exit: 1 })
+      if (positional.length > 0 || flags.yes) {
+        return "main"
+      }
+      this.log(ux.colorize("yellow", "  no published versions found — using 'main' branch\n"))
+      return "main"
     }
 
     const latest = tags[0].tag
@@ -122,17 +130,19 @@ export default class Init extends Command {
 
     this.log(ux.colorize("bold", "  step 1 — select version\n"))
 
-    const choices = tags.slice(0, 10).map((t, i) => ({
-      name: i === 0
-        ? `${t.version} ${ux.colorize("dim", "(latest)")}`
-        : t.version,
-      value: t.tag,
-    }))
+    const choices = [
+      ...tags.slice(0, 10).map((t, i) => ({
+        name: i === 0
+          ? `${t.version} ${ux.colorize("dim", "(latest tag)")}`
+          : t.version,
+        value: t.tag
+      }))
+    ]
 
     const ref = await select({
       message: "Pick a version",
       choices,
-      default: latest,
+      default: "main"
     })
 
     this.log(ux.colorize("green", `\n  → using ${ref}\n`))
@@ -148,6 +158,10 @@ export default class Init extends Command {
   ): Promise<WorkflowEntry[]> {
     let available = await fetchWorkflowList(ref)
     available = await enrichWorkflows(available, ref)
+
+    if (available.length === 0) {
+      this.error(`No workflows found at ref "${ref}". Try --ref main or a different version.`)
+    }
 
     if (positional.length > 0) {
       return positional.map((name) => {
@@ -170,15 +184,15 @@ export default class Init extends Command {
         const secretNames = wf.secrets?.map((s) => s.split(/\s+[—–]\s*/)[0]).join(", ")
         const hint = [
           wf.description,
-          secretNames ? `requires: ${secretNames}` : null,
+          secretNames ? `requires: ${secretNames}` : null
         ].filter(Boolean).join(" · ")
 
         return {
           name: `${wf.name.padEnd(26)} ${ux.colorize("dim", hint || wf.file)}`,
           value: wf.name,
-          checked: false,
+          checked: false
         }
-      }),
+      })
     })
 
     return available.filter((w) => selected.includes(w.name))
@@ -237,6 +251,55 @@ export default class Init extends Command {
     return { created, skipped }
   }
 
+  // ── scaffold .justactions.yml ──────────────────────────
+
+  private async scaffoldSettings(
+    ref: string,
+    flags: { force: boolean }
+  ): Promise<void> {
+    const targetPath = join(process.cwd(), SETTINGS_FILENAME)
+
+    if (!flags.force && existsSync(targetPath)) {
+      this.log(`  ${ux.colorize("yellow", "skip")}    ${SETTINGS_FILENAME} ${ux.colorize("dim", "(already exists)")}`)
+      return
+    }
+
+    const template = await fetchSettingsTemplate(ref)
+
+    if (template) {
+      writeFileSync(targetPath, template, "utf-8")
+      this.log(`  ${ux.colorize("green", "create")}  ${SETTINGS_FILENAME}`)
+    } else {
+      // fallback: write a minimal template if the remote file doesn't exist at this ref
+      const fallback = [
+        "# .justactions.yml",
+        "# ---",
+        "# project settings for just-github-actions-n-workflows.",
+        "# configure deploy targets, module overrides, and workflow settings.",
+        "# see https://github.com/justAnArthur/just-github-actions-n-workflows",
+        "# ---",
+        "",
+        "# deploy:",
+        "#   ssh_target_path: ~/my-app",
+        "#   targets:",
+        "#     production:",
+        "#       host: app.example.com",
+        "#       compose_profiles: \"@scope/backend,@scope/frontend\"",
+        "#       profiles: \"prod\"",
+        "#       timezone: Europe/Bratislava",
+        "",
+        "# modules:",
+        "#   overrides:",
+        "#     - name: \"@scope/backend\"",
+        "#       docker_compose_service: backend",
+        ""
+      ].join("\n")
+
+      writeFileSync(targetPath, fallback, "utf-8")
+      this.log(`  ${ux.colorize("green", "create")}  ${SETTINGS_FILENAME}`)
+    }
+  }
+
   // ── step 4: secrets reminder ───────────────────────────
 
   private printSecretsReminder(selected: WorkflowEntry[]): void {
@@ -269,8 +332,9 @@ export default class Init extends Command {
     this.log(ux.colorize("bold", "  next steps:\n"))
     this.log(`  1. ${hasSecrets ? "set the secrets listed above" : "set the GH_TOKEN secret in your repo settings"}`)
     this.log(`  2. adjust push.branches / push.tags triggers for your repo`)
-    this.log(`  3. commit and push:`)
-    this.log(ux.colorize("dim", `     git add .github/ && git commit -m "ci: add workflows" && git push`))
+    this.log(`  3. configure .justactions.yml with your deploy targets (if using deploy workflow)`)
+    this.log(`  4. commit and push:`)
+    this.log(ux.colorize("dim", `     git add .github/ .justactions.yml && git commit -m "ci: add workflows" && git push`))
     this.log()
   }
 
@@ -294,5 +358,4 @@ export default class Init extends Command {
     }
   }
 }
-
 

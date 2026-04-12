@@ -7,12 +7,16 @@
 
 // --- types ---
 
+export type DeployTarget = "npm" | "docker" | "vercel" | string
+
 export type Manifest = {
   name: string;
   version: string;
   priority: number | undefined;
   dockerfilePath: string | undefined;
   scopeAliases: string[];
+  /** deployment targets inferred from the manifest (e.g. ["npm", "docker", "vercel"]) */
+  deployTargets: DeployTarget[];
   /** @deprecated use `scopeAliases` */
   gitCommitScopeRelatedNames?: string[];
 };
