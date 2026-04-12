@@ -86,6 +86,7 @@ export function mergeLockfile(
 // prepends a `# toolkit-ref: <ref>` comment to workflow content
 // and rewrites action `uses:` references to point at the selected ref.
 
+
 export function injectRefComment(content: string, ref: string): string {
   const marker = "# toolkit-ref:"
   const comment = `${marker} ${ref}`
