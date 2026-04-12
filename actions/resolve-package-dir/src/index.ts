@@ -1,7 +1,7 @@
 import path from "node:path"
 import { getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { moduleFromTag, versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
-import { findManifests, type Manifest } from "@justanarthur/step-bump-manifest-versions/manifests"
+import { discoverModules, findModuleByScope } from "@justanarthur/just-github-actions-n-workflows-lib/modules"
 
 log.group("resolve-package-dir")
 
@@ -18,19 +18,18 @@ if (!moduleName) {
   process.exit(1)
 }
 
-const manifests = await findManifests(process.cwd())
-log.info(`discovered ${manifests.length} manifest(s)`)
+const modules = await discoverModules(process.cwd())
+log.info(`discovered ${modules.length} module(s)`)
 
-const manifest = manifests.find((m: Manifest) => m.name === moduleName)
+const mod = findModuleByScope(modules, moduleName)
 
-if (!manifest) {
-  log.error(`no manifest found matching module "${moduleName}"`)
-  log.error(`available: ${manifests.map((m: Manifest) => m.name).join(", ")}`)
+if (!mod) {
+  log.error(`no module found matching "${moduleName}"`)
+  log.error(`available: ${modules.map((m) => m.name).join(", ")}`)
   process.exit(1)
 }
 
-const manifestPath = (manifest as any).path as string
-const dir = path.relative(process.cwd(), path.dirname(manifestPath)) || "."
+const dir = path.relative(process.cwd(), mod.dir) || "."
 log.info(`resolved directory: ${dir}`)
 
 setOutput("dir", dir)
@@ -38,5 +37,3 @@ setOutput("name", moduleName)
 setOutput("version", version)
 
 log.groupEnd()
-
-

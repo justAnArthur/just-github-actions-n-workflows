@@ -3,14 +3,16 @@ description: >
   Resolves Docker image tags from remote git tags for a list of components.
   For each component, looks up the latest stable or canary tag and exports
   the resolved version as a DOCKER_<NAME>_IMAGE_TAG environment variable.
+  When no explicit components are provided, auto-discovers modules from manifests.
 
 inputs:
   repo_url:
     description: "Git repository URL to fetch tags from"
     required: true
   components:
-    description: 'JSON array of components to resolve, each with "name", "package", and "version" fields'
-    required: true
+    description: 'JSON array of components to resolve, each with "name", "package", and "version" fields. Leave empty to auto-discover from project modules.'
+    required: false
+    default: ""
   gh_token:
     description: "GitHub token for authenticated tag fetching (optional, falls back to public)"
     required: false

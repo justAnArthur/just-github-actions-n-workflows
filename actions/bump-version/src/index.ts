@@ -6,8 +6,8 @@
 
 import { parseCommitMessage, type ParsedCommit } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
 import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
-import type { Manifest } from "./manifests"
-import { findManifestByName, findManifests, getManifestSearchDir, updateManifest } from "./manifests"
+import type { Manifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
+import { findManifestByName, findManifests, getManifestSearchDir, updateManifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
 import { commitAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/commit-n-push"
 import { tagAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n-workflows-lib/git/get-commits-from-the-last-stable"
@@ -254,4 +254,3 @@ if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
 
 log.info("bump-version complete")
 log.groupEnd()
-

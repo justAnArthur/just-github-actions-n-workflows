@@ -1,0 +1,67 @@
+name: Prepare Docker Metadata
+description: >
+  Prepares docker image metadata from a git tag for publishing workflows.
+  Extracts and sanitizes the image tag, package image name, repository info,
+  prerelease status, and build context. Used by publish-docker-on-tag workflow.
+
+inputs:
+  tag_name:
+    description: "Git tag to prepare metadata for (e.g. '@scope/pkg@1.2.3-canary.0')"
+    required: true
+  dockerfile:
+    description: "Absolute path to the resolved Dockerfile"
+    required: true
+  context:
+    description: "Optional build context directory (defaults to Dockerfile directory)"
+    required: false
+    default: ""
+
+outputs:
+  dockerfile:
+    description: "Absolute path to the Dockerfile"
+    value: ${{ steps.run.outputs.dockerfile }}
+  context:
+    description: "Docker build context directory"
+    value: ${{ steps.run.outputs.context }}
+  image_tag:
+    description: "Sanitized version string for use as docker tag"
+    value: ${{ steps.run.outputs.image_tag }}
+  repository:
+    description: "Lowercase repository (owner/repo)"
+    value: ${{ steps.run.outputs.repository }}
+  repo_name:
+    description: "Repository name only (no owner)"
+    value: ${{ steps.run.outputs.repo_name }}
+  package_raw:
+    description: "Raw package name from the tag"
+    value: ${{ steps.run.outputs.package_raw }}
+  package_image_name:
+    description: "Sanitized package name for use in image path"
+    value: ${{ steps.run.outputs.package_image_name }}
+  is_prerelease:
+    description: "'true' if the version is a prerelease"
+    value: ${{ steps.run.outputs.is_prerelease }}
+  original_tag:
+    description: "Cleaned tag (without refs/ prefixes)"
+    value: ${{ steps.run.outputs.original_tag }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run prepare-docker-meta
+      id: run
+      shell: bash
+      env:
+        TAG_NAME: ${{ inputs.tag_name }}
+        DOCKERFILE: ${{ inputs.dockerfile }}
+        CONTEXT: ${{ inputs.context }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

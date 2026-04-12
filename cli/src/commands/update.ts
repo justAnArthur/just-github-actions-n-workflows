@@ -78,8 +78,7 @@ export default class Update extends Command {
     const upToDate: LockEntry[] = []
 
     for (const entry of entries) {
-      const entryRef = entry.ref === "main" ? targetRef : entry.ref
-      if (entryRef === targetRef) {
+      if (entry.ref === targetRef) {
         upToDate.push(entry)
       } else {
         outdated.push(entry)
@@ -89,12 +88,11 @@ export default class Update extends Command {
     // --- print status table ---
 
     for (const entry of entries) {
-      const entryRef = entry.ref === "main" ? targetRef : entry.ref
-      const current = entryRef === targetRef
+      const current = entry.ref === targetRef
       const icon = current ? ux.colorize("green", "✓") : ux.colorize("yellow", "⬆")
       const refLabel = current
-        ? ux.colorize("green", entryRef)
-        : `${ux.colorize("yellow", entryRef)} → ${ux.colorize("green", targetRef)}`
+        ? ux.colorize("green", entry.ref)
+        : `${ux.colorize("yellow", entry.ref)} → ${ux.colorize("green", targetRef)}`
 
       this.log(`  ${icon} ${ux.colorize("cyan", entry.name.padEnd(28))} ${refLabel}`)
     }

@@ -8,7 +8,18 @@
     "./*": "./src/*.ts",
     "./ghcr/*": "./src/ghcr/*.ts",
     "./git/*": "./src/git/*.ts",
-    "./version/*": "./src/version/*.ts"
+    "./version/*": "./src/version/*.ts",
+    "./manifests": "./src/manifests/index.ts",
+    "./manifests/*": "./src/manifests/*.ts",
+    "./manifests/adapters/*": "./src/manifests/adapters/*.ts",
+    "./modules": "./src/modules/index.ts",
+    "./modules/*": "./src/modules/*.ts",
+    "./settings": "./src/settings/index.ts",
+    "./settings/*": "./src/settings/*.ts",
+    "./codecs/*": "./src/codecs/*.ts"
+  },
+  "dependencies": {
+    "fast-xml-parser": "^5.5.9"
   },
   "properties": {
     "gitCommitScopeRelatedNames": "lib"

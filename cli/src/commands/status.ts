@@ -50,12 +50,11 @@ export default class Status extends Command {
     let outdatedCount = 0
 
     for (const entry of entries) {
-      const entryRef = entry.ref === "main" ? targetRef : entry.ref
-      const current = entryRef === targetRef
+      const current = entry.ref === targetRef
       const icon = current ? ux.colorize("green", "✓") : ux.colorize("yellow", "⬆")
       const refLabel = current
-        ? ux.colorize("green", entryRef)
-        : `${ux.colorize("yellow", entryRef)} → ${ux.colorize("green", targetRef)}`
+        ? ux.colorize("green", entry.ref)
+        : `${ux.colorize("yellow", entry.ref)} → ${ux.colorize("green", targetRef)}`
       const date = ux.colorize("dim", new Date(entry.installedAt).toLocaleDateString())
 
       this.log(`  ${icon} ${ux.colorize("cyan", entry.name.padEnd(28))} ${refLabel.padEnd(50)} ${date}`)

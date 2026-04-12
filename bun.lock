@@ -13,7 +13,6 @@
       "version": "0.0.0-beta.5",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
-        "fast-xml-parser": "^5.5.9",
       },
     },
     "actions/check-publishable": {
@@ -49,7 +48,6 @@
       "version": "0.0.0-beta.4",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
-        "@justanarthur/step-bump-manifest-versions": "workspace:*",
       },
     },
     "actions/get-dockerfile-path": {
@@ -57,7 +55,6 @@
       "version": "0.0.0-beta.4",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
-        "@justanarthur/step-bump-manifest-versions": "workspace:*",
       },
     },
     "actions/resolve-deploy-config": {
@@ -79,7 +76,6 @@
       "version": "0.0.0-beta.4",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
-        "@justanarthur/step-bump-manifest-versions": "workspace:*",
       },
     },
     "actions/resolve-tag-meta": {
@@ -119,7 +115,7 @@
     },
     "cli": {
       "name": "@justanarthur/just-github-actions-n-workflows-cli",
-      "version": "0.0.0-beta.15",
+      "version": "0.0.0-beta.17",
       "bin": {
         "just-github-actions-n-workflows": "./bin/run.js",
       },
@@ -131,6 +127,9 @@
     "lib": {
       "name": "@justanarthur/just-github-actions-n-workflows-lib",
       "version": "0.0.0-beta.6",
+      "dependencies": {
+        "fast-xml-parser": "^5.5.9",
+      },
     },
   },
   "packages": {

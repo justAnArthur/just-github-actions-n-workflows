@@ -1,43 +1,11 @@
+// resolves deployment configuration for a target environment.
+// reads deploy targets from `.justactions.yml` settings file,
+// with fallback to a JSON-encoded DEPLOY_CONFIG env var override.
+// no hardcoded defaults — all config comes from the project.
+// ---
+
 import { getEnv, getRequiredEnv, log, setEnv } from "@justanarthur/just-github-actions-n-workflows-lib/github"
-
-interface DeployConfig {
-  compose_profiles: string
-  profiles: string
-  app_tz: string
-}
-
-const DEFAULTS: Record<string, DeployConfig> = {
-  "test.camasys.com": {
-    compose_profiles: "@camasys/frontend_core,@camasys/backend_core,@camasys/backend_gps,camasys-external-signature-app",
-    profiles: "test",
-    app_tz: "Europe/Bratislava"
-  },
-  "app.camasys.com": {
-    compose_profiles: "@camasys/frontend_core,@camasys/backend_core,camasys-external-signature-app",
-    profiles: "avis-sk",
-    app_tz: "Europe/Bratislava"
-  },
-  "camasys.autoin.cz": {
-    compose_profiles: "@camasys/frontend_core,@camasys/backend_core,camasys-external-signature-app",
-    profiles: "auto-in",
-    app_tz: "Europe/Bratislava"
-  },
-  "camasys.avis.fo": {
-    compose_profiles: "@camasys/frontend_core,@camasys/backend_core,camasys-external-signature-app",
-    profiles: "avis-fo",
-    app_tz: "Europe/Bratislava"
-  },
-  "camasys.net": {
-    compose_profiles: "@camasys/frontend_core,@camasys/backend_core",
-    profiles: "single-instance-test",
-    app_tz: "UTC"
-  },
-  "78.47.109.42": {
-    compose_profiles: "@camasys/backend_gps",
-    profiles: "",
-    app_tz: "UTC"
-  }
-}
+import { loadSettings, resolveDeployTarget, type DeployTarget } from "@justanarthur/just-github-actions-n-workflows-lib/settings"
 
 const environment = getRequiredEnv("DEPLOY_ENVIRONMENT")
 const customConfigRaw = getEnv("DEPLOY_CONFIG", "")
@@ -45,7 +13,10 @@ const customConfigRaw = getEnv("DEPLOY_CONFIG", "")
 log.group("resolve-deploy-config")
 log.info(`target environment: ${environment}`)
 
-let config: DeployConfig | undefined
+const settings = await loadSettings(process.cwd())
+let config: DeployTarget | undefined
+
+// --- priority 1: JSON env var override ---
 
 if (customConfigRaw) {
   try {
@@ -59,24 +30,35 @@ if (customConfigRaw) {
   }
 }
 
+// --- priority 2: .justactions.yml settings file ---
+
 if (!config) {
-  config = DEFAULTS[environment]
-  if (config) log.info("using built-in default config")
+  config = resolveDeployTarget(settings, environment)
+  if (config) {
+    log.info("using deploy target from .justactions.yml")
+  }
 }
 
 if (!config) {
   log.error(`unknown environment: "${environment}"`)
-  log.error(`known environments: ${Object.keys(DEFAULTS).join(", ")}`)
+  log.error(`no deploy target found in .justactions.yml or DEPLOY_CONFIG env var`)
+  log.error(`create a .justactions.yml with deploy.targets.${environment} or pass DEPLOY_CONFIG`)
   process.exit(1)
 }
 
-setEnv("COMPOSE_PROFILES", config.compose_profiles)
-setEnv("PROFILES", config.profiles)
-setEnv("APP_TZ", config.app_tz)
+setEnv("DEPLOY_HOST", config.host ?? environment)
+setEnv("COMPOSE_PROFILES", config.compose_profiles ?? "")
+setEnv("PROFILES", config.profiles ?? "")
+setEnv("APP_TZ", config.timezone ?? "UTC")
 
-log.info(`COMPOSE_PROFILES=${config.compose_profiles}`)
-log.info(`PROFILES=${config.profiles}`)
-log.info(`APP_TZ=${config.app_tz}`)
+if (settings.deploy?.ssh_target_path) {
+  setEnv("SSH_TARGET_PATH", settings.deploy.ssh_target_path)
+  log.info(`SSH_TARGET_PATH=${settings.deploy.ssh_target_path}`)
+}
+
+log.info(`DEPLOY_HOST=${config.host ?? environment}`)
+log.info(`COMPOSE_PROFILES=${config.compose_profiles ?? ""}`)
+log.info(`PROFILES=${config.profiles ?? ""}`)
+log.info(`APP_TZ=${config.timezone ?? "UTC"}`)
 
 log.groupEnd()
-

@@ -8,11 +8,30 @@ const REPO = (pkg.repository as any).url
 const API_BASE = `https://api.github.com/repos/${REPO}`
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}`
 
-// --- root package tag prefix ---
-// tags for the root toolkit package follow `<root-name>@<version>`.
-// the CLI only shows these tags as version choices since workflows are part of the root package.
+// --- auth ---
+// supports private repos via GH_TOKEN or GITHUB_TOKEN env var.
 
-const TAG_PREFIX = `${rootPkg.name}@`
+function authHeaders(): Record<string, string> {
+  const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
+  const headers: Record<string, string> = {
+    Accept: "application/vnd.github.v3+json",
+  }
+  if (token) {
+    headers.Authorization = `Bearer ${token}`
+  }
+  return headers
+}
+
+// --- root package tag prefixes ---
+// tags may use the package name (e.g. "@justanarthur/just-github-actions-n-workflows@1.0.0")
+// or the repo name (e.g. "just-github-actions-n-workflows@1.0.0").
+// we search for both and deduplicate.
+
+const REPO_NAME = REPO.split("/").pop()!
+const TAG_PREFIXES = [
+  `${rootPkg.name}@`,
+  `${REPO_NAME}@`,
+]
 
 export { REPO }
 
@@ -67,26 +86,35 @@ export function parseWorkflowHeader(content: string): { description: string; sec
 // --- api ---
 
 export async function fetchTags(): Promise<VersionTag[]> {
-  const url = `${API_BASE}/tags?per_page=100`
-  const res = await fetch(url, {
-    headers: { Accept: "application/vnd.github.v3+json" }
-  })
-  if (!res.ok) return []
-  const tags: any[] = await res.json()
-  return tags
-    .map((t) => t.name as string)
-    .filter((name) => name.startsWith(TAG_PREFIX))
-    .map((name) => ({
-      tag: name,
-      version: name.slice(TAG_PREFIX.length),
-    }))
+  const results = await Promise.all(
+    TAG_PREFIXES.map(async (prefix) => {
+      const encoded = encodeURIComponent(prefix)
+      const url = `${API_BASE}/git/matching-refs/tags/${encoded}`
+      const res = await fetch(url, { headers: authHeaders() })
+      if (!res.ok) return []
+      const refs: any[] = await res.json()
+      return refs.map((r) => {
+        const tag = (r.ref as string).replace("refs/tags/", "")
+        const version = tag.slice(prefix.length)
+        return { tag, version }
+      })
+    })
+  )
+
+  const seen = new Set<string>()
+  return results
+    .flat()
+    .filter((t) => {
+      if (seen.has(t.version)) return false
+      seen.add(t.version)
+      return true
+    })
+    .reverse()
 }
 
 export async function fetchWorkflowList(gitRef: string): Promise<WorkflowEntry[]> {
   const url = `${API_BASE}/contents/workflows?ref=${gitRef}`
-  const res = await fetch(url, {
-    headers: { Accept: "application/vnd.github.v3+json" }
-  })
+  const res = await fetch(url, { headers: authHeaders() })
 
   if (!res.ok) {
     throw new Error(`failed to list workflows from ${REPO} @ ${gitRef} (${res.status})`)
@@ -104,7 +132,7 @@ export async function fetchWorkflowList(gitRef: string): Promise<WorkflowEntry[]
 
 export async function fetchWorkflowContent(file: string, gitRef: string): Promise<string> {
   const url = `${RAW_BASE}/${gitRef}/workflows/${file}`
-  const res = await fetch(url)
+  const res = await fetch(url, { headers: authHeaders() })
 
   if (!res.ok) {
     throw new Error(`failed to fetch workflows/${file} from ${REPO} @ ${gitRef} (${res.status})`)

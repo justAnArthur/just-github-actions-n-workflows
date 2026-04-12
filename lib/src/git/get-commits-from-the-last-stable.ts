@@ -5,7 +5,7 @@
 // related scope aliases to find the last stable tag.
 // ---
 
-import type { Manifest } from "../manifests"
+import type { Manifest } from "../manifests/registry"
 import { exec } from "../exec"
 import { log } from "../github"
 import { getLastStableTagCommit } from "./get-last-stable-tag-commit"
@@ -16,7 +16,7 @@ export async function getCommitsFromTheLastStable(
   let lastStableCommit = ""
 
   // try the primary name first, then fall back to related scope names
-  const scopes = [manifest.name, ...(manifest.gitCommitScopeRelatedNames || [])]
+  const scopes = [manifest.name, ...(manifest.scopeAliases ?? manifest.gitCommitScopeRelatedNames ?? [])]
 
   for (const scope of scopes) {
     log.debug(`checking scope for stable tag: ${scope}`)

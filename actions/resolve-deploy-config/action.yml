@@ -1,12 +1,12 @@
 name: Resolve Deploy Config
 description: >
-  Resolves deployment configuration (compose profiles, Spring profiles, timezone)
-  for a target environment. Uses built-in defaults or a custom JSON override.
-  Exports resolved values as environment variables for subsequent steps.
+  Resolves deployment configuration (compose profiles, Spring profiles, timezone,
+  host) for a target environment. Reads from `.justactions.yml` settings file or
+  a custom JSON override. Exports resolved values as environment variables.
 
 inputs:
   environment:
-    description: "Target deployment environment (hostname or identifier)"
+    description: "Target deployment environment name (must match a key in .justactions.yml deploy.targets)"
     required: true
   config:
     description: "Optional JSON override for deployment configuration (keyed by environment)"
@@ -30,4 +30,3 @@ runs:
         DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
         DEPLOY_CONFIG: ${{ inputs.config }}
       run: bun run ${{ github.action_path }}/src/index.ts
-

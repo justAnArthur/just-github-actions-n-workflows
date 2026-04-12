@@ -1,7 +1,7 @@
 import path from "node:path"
 import { getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { moduleFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
-import { findManifests } from "@justanarthur/step-bump-manifest-versions/manifests"
+import { discoverModules, findModuleByScope } from "@justanarthur/just-github-actions-n-workflows-lib/modules"
 
 log.group("get-dockerfile-path")
 
@@ -9,28 +9,28 @@ const tagName = getRequiredEnv("TAG_NAME")
 log.info(`tag: ${tagName}`)
 
 const excludes = new Set(["node_modules", "dist", ".git", ".github"])
-const manifests = await findManifests(process.cwd(), { exclude: excludes })
-log.info(`discovered ${manifests.length} manifest(s)`)
+const modules = await discoverModules(process.cwd(), { exclude: excludes })
+log.info(`discovered ${modules.length} module(s)`)
 
 const moduleName = moduleFromTag(tagName)
 log.info(`module: ${moduleName}`)
 
-const manifest = manifests.find((m) => m.name === moduleName)
+const mod = findModuleByScope(modules, moduleName)
 
-if (!manifest) {
-  log.error(`no manifest found matching module "${moduleName}"`)
-  log.error(`available: ${manifests.map((m) => m.name).join(", ")}`)
+if (!mod) {
+  log.error(`no module found matching "${moduleName}"`)
+  log.error(`available: ${modules.map((m) => m.name).join(", ")}`)
   process.exit(1)
 }
 
-const rawPath = manifest?.DockerfilePath
+const rawPath = mod.dockerfilePath
 
 const dockerfilePath = rawPath
-  ? path.resolve(path.dirname((manifest as any).path), rawPath)
+  ? path.resolve(mod.dir, rawPath)
   : null
 
 if (!dockerfilePath) {
-  log.error(`no DockerfilePath found for module ${moduleName}`)
+  log.error(`no dockerfilePath found for module ${moduleName}`)
   process.exit(1)
 }
 
@@ -42,4 +42,3 @@ log.info(`context directory: ${contextDir}`)
 setOutput("context", contextDir)
 
 log.groupEnd()
-

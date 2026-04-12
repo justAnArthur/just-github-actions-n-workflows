@@ -3,7 +3,7 @@ import { execWithTimeout } from "@justanarthur/just-github-actions-n-workflows-l
 import { parseCommitMessage } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
 import { isPrerelease, moduleFromTag, versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 import { compareSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/compare-semver"
-import { findManifests } from "@justanarthur/step-bump-manifest-versions/manifests"
+import { discoverModules, findModuleByScope } from "@justanarthur/just-github-actions-n-workflows-lib/modules"
 import type { ParsedVersion } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 import { parseSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 
@@ -98,14 +98,14 @@ async function generateReleaseNotes(
   if (commitsByScope.size === 0) return ""
 
   const excludes = new Set(["node_modules", "dist", ".git", ".github"])
-  const foundManifests = await findManifests(rootDir, { exclude: excludes })
-  const manifest = foundManifests.find((m) => m.name === moduleName)
+  const modules = await discoverModules(rootDir, { exclude: excludes })
+  const mod = findModuleByScope(modules, moduleName)
 
   const relevantScopes = new Set<string>()
 
-  if (manifest) {
+  if (mod) {
     relevantScopes.add(moduleName)
-    manifest.gitCommitScopeRelatedNames?.forEach((s: string) => relevantScopes.add(s))
+    mod.scopeAliases.forEach((s: string) => relevantScopes.add(s))
   } else {
     for (const scope of commitsByScope.keys()) {
       if (scope !== "general") relevantScopes.add(scope)
@@ -167,4 +167,3 @@ if (notes) {
 }
 
 log.groupEnd()
-

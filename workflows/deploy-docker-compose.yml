@@ -1,0 +1,163 @@
+# deploy-docker-compose.yml
+# ---
+# deploys docker compose services to a remote server via SSH.
+# reads deployment configuration from `.justactions.yml` settings file
+# or from workflow inputs. modules are auto-discovered from manifests.
+#
+# before using this workflow, create a `.justactions.yml` in your repo root:
+#
+# ```yaml
+# deploy:
+#   ssh_target_path: ~/my-app
+#   targets:
+#     production:
+#       host: app.example.com
+#       compose_profiles: "@scope/backend,@scope/frontend"
+#       profiles: "prod"
+#       timezone: Europe/Bratislava
+#     staging:
+#       host: staging.example.com
+#       compose_profiles: "@scope/backend"
+#       profiles: "staging"
+#       timezone: UTC
+# ```
+#
+# actions used: setup-ssh, resolve-deploy-config, resolve-image-tags,
+#               create-env-file, scp-transfer, deploy-compose-remote, ssh-exec
+#
+# required secrets:
+#   GH_TOKEN         — github token with contents:read and packages:read
+#   SSH_PRIVATE_KEY  — ssh private key for server access
+#   SERVER_USERNAME  — ssh username on the target server
+#   DOCKER_USERNAME  — container registry username
+#   DOCKER_PASSWORD  — container registry password
+# ---
+
+name: "deploy-docker-compose"
+run-name: >-
+  ${{
+    format('deploy ({0}) — env={1}',
+      github.event_name,
+      inputs.environment || 'unknown')
+  }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: string
+        description: "Target environment name (must match a key in .justactions.yml deploy.targets)"
+        required: true
+      module_versions:
+        type: string
+        description: >
+          JSON object of module versions to deploy.
+          keys are module names, values are version specifiers
+          (e.g. '{"@scope/backend": "stable", "@scope/frontend": "1.2.3"}').
+          leave empty to auto-discover modules and use "stable".
+        required: false
+        default: ""
+      ssh_target_path:
+        type: string
+        description: "Remote path for deployment files (overrides .justactions.yml)"
+        required: false
+        default: ""
+      compose_file:
+        type: string
+        description: "Path to docker-compose.yml in the repo"
+        required: false
+        default: "./docker-compose.yml"
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      module_versions:
+        type: string
+        required: false
+        default: ""
+      ssh_target_path:
+        type: string
+        required: false
+        default: ""
+      compose_file:
+        type: string
+        required: false
+        default: "./docker-compose.yml"
+    secrets:
+      GH_TOKEN:
+        description: "github token with contents:read and packages:read"
+        required: true
+      SSH_PRIVATE_KEY:
+        description: "ssh private key for server access"
+        required: true
+      SERVER_USERNAME:
+        description: "ssh username on the target server"
+        required: true
+      DOCKER_USERNAME:
+        description: "container registry username"
+        required: true
+      DOCKER_PASSWORD:
+        description: "container registry password"
+        required: true
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GH_TOKEN }}
+          lfs: true
+
+      - name: Resolve deploy config from settings
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-deploy-config@main
+        with:
+          environment: ${{ inputs.environment }}
+
+      - name: Set up SSH key
+        uses: justAnArthur/just-github-actions-n-workflows/actions/setup-ssh@main
+        with:
+          private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ env.DEPLOY_HOST || inputs.environment }}
+
+      - name: Resolve image tags
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-image-tags@main
+        with:
+          repo_url: https://github.com/${{ github.repository }}.git
+          gh_token: ${{ secrets.GH_TOKEN }}
+          components: ${{ inputs.module_versions }}
+
+      - name: Create .env file for Docker Compose
+        uses: justAnArthur/just-github-actions-n-workflows/actions/create-env-file@main
+        with:
+          variables: |
+            DOCKER_USERNAME=${{ secrets.DOCKER_USERNAME }}
+            COMPOSE_PROFILES=${{ env.COMPOSE_PROFILES }}
+            PROFILES=${{ env.PROFILES }}
+            APP_TZ=${{ env.APP_TZ }}
+
+      - name: Transfer compose and env files to server
+        uses: justAnArthur/just-github-actions-n-workflows/actions/scp-transfer@main
+        with:
+          host: ${{ env.DEPLOY_HOST || inputs.environment }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          source: '${{ inputs.compose_file }} ./.env'
+          target: ${{ inputs.ssh_target_path || env.SSH_TARGET_PATH || '~/app' }}
+
+      - name: Generate deployment script
+        id: deploy_script
+        uses: justAnArthur/just-github-actions-n-workflows/actions/deploy-compose-remote@main
+        with:
+          target_path: ${{ inputs.ssh_target_path || env.SSH_TARGET_PATH || '~/app' }}
+          registry_username: ${{ secrets.DOCKER_USERNAME }}
+          registry_password: ${{ secrets.DOCKER_PASSWORD }}
+
+      - name: Execute deployment on remote server
+        uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main
+        with:
+          host: ${{ env.DEPLOY_HOST || inputs.environment }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          script: ${{ steps.deploy_script.outputs.script }}

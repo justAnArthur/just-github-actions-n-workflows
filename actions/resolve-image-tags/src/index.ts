@@ -1,6 +1,17 @@
+// ---
+// resolves docker image tags from remote git tags for a list of
+// module components. for each component, looks up the latest stable
+// or prerelease tag and exports the resolved version as a
+// DOCKER_<NAME>_IMAGE_TAG environment variable.
+//
+// components are passed as a JSON array input, or can be auto-discovered
+// from project modules when no explicit components are provided.
+// ---
+
 import { getEnv, getRequiredEnv, log, setEnv } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { execWithTimeout } from "@justanarthur/just-github-actions-n-workflows-lib/exec"
 import { versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
+import { discoverModules } from "@justanarthur/just-github-actions-n-workflows-lib/modules"
 
 interface Component {
   name: string
@@ -115,17 +126,33 @@ function resolveLatestTag(
 // --- entry point ---
 
 const repoUrl = getRequiredEnv("RESOLVE_REPO_URL")
-const componentsRaw = getRequiredEnv("RESOLVE_COMPONENTS")
+const componentsRaw = getEnv("RESOLVE_COMPONENTS", "")
 const token = getEnv("GH_TOKEN", "")
 
 log.group("resolve-docker-image-tags")
 
 let components: Component[]
-try {
-  components = JSON.parse(componentsRaw)
-} catch (err) {
-  log.error(`failed to parse RESOLVE_COMPONENTS: ${err}`)
-  process.exit(1)
+
+if (componentsRaw) {
+  // explicit components list provided
+  try {
+    components = JSON.parse(componentsRaw)
+  } catch (err) {
+    log.error(`failed to parse RESOLVE_COMPONENTS: ${err}`)
+    process.exit(1)
+  }
+} else {
+  // auto-discover from project modules
+  log.info("no explicit components — auto-discovering from project modules...")
+  const modules = await discoverModules(process.cwd())
+  components = modules
+    .filter((m) => m.dockerfilePath)
+    .map((m) => ({
+      name: m.name.replace(/^@/, "").replace(/\//g, "_").toUpperCase(),
+      package: m.name,
+      version: "stable"
+    }))
+  log.info(`auto-discovered ${components.length} module(s) with dockerfiles`)
 }
 
 log.info(`components to resolve: ${components.map((c) => c.name).join(", ")}`)
@@ -168,4 +195,3 @@ for (const comp of components) {
 
 log.info("all image tags resolved")
 log.groupEnd()
-

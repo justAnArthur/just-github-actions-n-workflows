@@ -51,20 +51,11 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Determine tag metadata
+      - name: Resolve tag metadata
         id: meta
-        run: |
-          TAG="${{ inputs.tag || github.ref_name }}"
-          VERSION="${TAG##*@}"
-
-          if echo "$VERSION" | grep -qiE '(canary|alpha|beta|rc)'; then
-            echo "is_prerelease=true" >> $GITHUB_OUTPUT
-          else
-            echo "is_prerelease=false" >> $GITHUB_OUTPUT
-          fi
-
-          echo "tag=$TAG" >> $GITHUB_OUTPUT
-          echo "version=$VERSION" >> $GITHUB_OUTPUT
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-tag-meta@main
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
 
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -95,4 +86,3 @@ jobs:
             ${{ steps.release_notes.outputs.release_notes }}
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-

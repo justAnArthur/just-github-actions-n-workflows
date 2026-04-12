@@ -56,8 +56,7 @@ export default class Init extends Command {
       default: false,
     }),
     ref: Flags.string({
-      description: "Git ref to fetch from (branch, tag, or sha)",
-      default: "main",
+      description: "Git ref to fetch from (tag or sha)",
     }),
   }
 
@@ -68,7 +67,12 @@ export default class Init extends Command {
     // --- list mode ---
 
     if (flags.list) {
-      await this.listWorkflows(flags.ref)
+      const tags = await fetchTags()
+      const ref = flags.ref ?? (tags.length > 0 ? tags[0].tag : null)
+      if (!ref) {
+        this.error("No published versions found. Use --ref to specify a git ref manually.", { exit: 1 })
+      }
+      await this.listWorkflows(ref)
       return
     }
 
@@ -98,19 +102,22 @@ export default class Init extends Command {
   // ── step 1: resolve ref ────────────────────────────────
 
   private async resolveRef(
-    flags: { ref: string; yes: boolean },
+    flags: { ref?: string; yes: boolean },
     positional: string[],
     tags: VersionTag[]
   ): Promise<string> {
-    const latest = tags.length > 0 ? tags[0].tag : "main"
-
-    if (flags.ref !== "main" || positional.length > 0 || flags.yes) {
-      return flags.ref === "main" ? latest : flags.ref
+    if (flags.ref) {
+      return flags.ref
     }
 
     if (tags.length === 0) {
-      this.log(ux.colorize("yellow", "  no published versions found — using main\n"))
-      return "main"
+      this.error("No published versions found. Use --ref to specify a git ref manually.", { exit: 1 })
+    }
+
+    const latest = tags[0].tag
+
+    if (positional.length > 0 || flags.yes) {
+      return latest
     }
 
     this.log(ux.colorize("bold", "  step 1 — select version\n"))

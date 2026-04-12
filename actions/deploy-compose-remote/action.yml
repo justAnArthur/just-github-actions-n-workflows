@@ -1,0 +1,49 @@
+name: Deploy Compose Remote
+description: >
+  Generates a deployment script for docker compose on a remote server.
+  Handles registry login, compose pull, compose up, and cleanup.
+  Outputs the script for use with the ssh-exec action.
+
+inputs:
+  target_path:
+    description: "Remote path where compose files are located"
+    required: true
+  registry_username:
+    description: "Container registry username (optional)"
+    required: false
+    default: ""
+  registry_password:
+    description: "Container registry password (optional)"
+    required: false
+    default: ""
+  registry:
+    description: "Container registry URL"
+    required: false
+    default: "ghcr.io"
+
+outputs:
+  script:
+    description: "Generated deployment script to pass to ssh-exec"
+    value: ${{ steps.run.outputs.script }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run deploy-compose-remote
+      id: run
+      shell: bash
+      env:
+        TARGET_PATH: ${{ inputs.target_path }}
+        REGISTRY_USERNAME: ${{ inputs.registry_username }}
+        REGISTRY_PASSWORD: ${{ inputs.registry_password }}
+        REGISTRY: ${{ inputs.registry }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+

@@ -20,7 +20,8 @@
   },
   "repository": {
     "type": "git",
-    "url": "https://github.com/justAnArthur/just-github-actions-n-workflows"
+    "url": "https://github.com/justAnArthur/just-github-actions-n-workflows",
+    "directory": "cli"
   },
   "dependencies": {
     "@oclif/core": "^4",

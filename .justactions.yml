@@ -1,0 +1,34 @@
+# .justactions.yml
+# ---
+# project settings for just-github-actions-n-workflows.
+# this file configures deploy targets, module overrides, and other
+# workflow settings. place it in the root of any repo that uses
+# the toolkit's workflows.
+#
+# see lib/src/settings/index.ts for the full type definition.
+# ---
+
+# --- example configuration ---
+# uncomment and customize for your project:
+#
+# deploy:
+#   ssh_target_path: ~/my-app
+#   targets:
+#     production:
+#       host: app.example.com
+#       compose_profiles: "@scope/backend,@scope/frontend"
+#       profiles: "prod"
+#       timezone: Europe/Bratislava
+#     staging:
+#       host: staging.example.com
+#       compose_profiles: "@scope/backend"
+#       profiles: "staging"
+#       timezone: UTC
+#
+# modules:
+#   overrides:
+#     - name: "@scope/backend"
+#       docker_compose_service: backend
+#     - name: "@scope/frontend"
+#       docker_compose_service: frontend
+
