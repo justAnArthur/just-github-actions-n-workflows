@@ -1,6 +1,6 @@
 {
   "name": "@justanarthur/just-github-actions-n-workflows-cli",
-  "version": "0.0.0-beta.18",
+  "version": "0.0.0-beta.19",
   "description": "Release automation toolkit — version bumping, npm publishing, docker publishing, VPS deployment via GitHub Actions composite actions",
   "type": "module",
   "bin": {
