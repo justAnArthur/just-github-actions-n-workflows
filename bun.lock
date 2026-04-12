@@ -36,6 +36,13 @@
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
+    "actions/deploy-compose-remote": {
+      "name": "@justanarthur/step-deploy-compose-remote",
+      "version": "0.0.0-beta.6",
+      "dependencies": {
+        "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
+      },
+    },
     "actions/fetch-tags": {
       "name": "@justanarthur/step-git-fetch-and-unshallow",
       "version": "0.0.0-beta.4",
@@ -53,6 +60,13 @@
     "actions/get-dockerfile-path": {
       "name": "@justanarthur/step-resolve-dockerfile-path",
       "version": "0.0.0-beta.4",
+      "dependencies": {
+        "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
+      },
+    },
+    "actions/prepare-docker-meta": {
+      "name": "@justanarthur/step-prepare-docker-meta",
+      "version": "0.0.0-beta.6",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -115,7 +129,7 @@
     },
     "cli": {
       "name": "@justanarthur/just-github-actions-n-workflows-cli",
-      "version": "0.0.0-beta.17",
+      "version": "0.0.0-beta.18",
       "bin": {
         "just-github-actions-n-workflows": "./bin/run.js",
       },
@@ -177,9 +191,13 @@
 
     "@justanarthur/step-create-dotenv": ["@justanarthur/step-create-dotenv@workspace:actions/create-env-file"],
 
+    "@justanarthur/step-deploy-compose-remote": ["@justanarthur/step-deploy-compose-remote@workspace:actions/deploy-compose-remote"],
+
     "@justanarthur/step-generate-release-notes": ["@justanarthur/step-generate-release-notes@workspace:actions/generate-release-notes"],
 
     "@justanarthur/step-git-fetch-and-unshallow": ["@justanarthur/step-git-fetch-and-unshallow@workspace:actions/fetch-tags"],
+
+    "@justanarthur/step-prepare-docker-meta": ["@justanarthur/step-prepare-docker-meta@workspace:actions/prepare-docker-meta"],
 
     "@justanarthur/step-resolve-deploy-config": ["@justanarthur/step-resolve-deploy-config@workspace:actions/resolve-deploy-config"],
 
