@@ -25,7 +25,9 @@
   },
   "dependencies": {
     "@oclif/core": "^4",
-    "@inquirer/prompts": "^7",
+    "@inquirer/prompts": "^7"
+  },
+  "devDependencies": {
     "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*"
   },
   "oclif": {
