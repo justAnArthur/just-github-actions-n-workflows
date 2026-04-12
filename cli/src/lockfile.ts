@@ -83,7 +83,8 @@ export function mergeLockfile(
 }
 
 // --- version comment ---
-// prepends a `# toolkit-ref: <ref>` comment to workflow content.
+// prepends a `# toolkit-ref: <ref>` comment to workflow content
+// and rewrites action `uses:` references to point at the selected ref.
 
 export function injectRefComment(content: string, ref: string): string {
   const marker = "# toolkit-ref:"
@@ -91,21 +92,30 @@ export function injectRefComment(content: string, ref: string): string {
 
   // replace existing marker if present
   if (content.includes(marker)) {
-    return content.replace(/^# toolkit-ref:.*$/m, comment)
+    content = content.replace(/^# toolkit-ref:.*$/m, comment)
+  } else {
+    // prepend before first non-comment, non-empty line
+    const lines = content.split("\n")
+    const insertIdx = lines.findIndex(
+      (l) => l.trim() !== "" && !l.startsWith("#")
+    )
+
+    if (insertIdx >= 0) {
+      lines.splice(insertIdx, 0, comment)
+    } else {
+      lines.push(comment)
+    }
+
+    content = lines.join("\n")
   }
 
-  // prepend before first non-comment, non-empty line
-  const lines = content.split("\n")
-  const insertIdx = lines.findIndex(
-    (l) => l.trim() !== "" && !l.startsWith("#")
+  // rewrite `uses: justAnArthur/just-github-actions-n-workflows/...@<anything>`
+  // to point at the selected ref instead of @main
+  content = content.replace(
+    /(uses:\s+justAnArthur\/just-github-actions-n-workflows\/[^@\s]+)@\S+/g,
+    `$1@${ref}`
   )
 
-  if (insertIdx >= 0) {
-    lines.splice(insertIdx, 0, comment)
-  } else {
-    lines.push(comment)
-  }
-
-  return lines.join("\n")
+  return content
 }
 
