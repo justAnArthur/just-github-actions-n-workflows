@@ -14,6 +14,7 @@ import {
   REPO,
   fetchTags,
   fetchWorkflowContent,
+  resolveRefSha,
 } from "../github.js"
 import {
   injectRefComment,
@@ -128,12 +129,18 @@ export default class Update extends Command {
     let errors = 0
     const updatedEntries: { name: string; file: string }[] = []
 
+    // resolve tag → commit SHA for safe `uses:` refs
+    const sha = await resolveRefSha(targetRef)
+    if (sha !== targetRef) {
+      this.log(ux.colorize("dim", `  resolved ${targetRef} → ${sha.slice(0, 12)}`))
+    }
+
     this.log(ux.colorize("dim", `  fetching from ${REPO} @ ${targetRef}\n`))
 
     for (const entry of outdated) {
       try {
         let content = await fetchWorkflowContent(entry.file, targetRef)
-        content = injectRefComment(content, targetRef)
+        content = injectRefComment(content, targetRef, sha)
         writeFileSync(join(targetDir, entry.file), content, "utf-8")
         this.log(`  ${ux.colorize("green", "update")}  ${entry.file} ${ux.colorize("dim", `(${entry.ref} → ${targetRef})`)}`)
         updatedEntries.push({ name: entry.name, file: entry.file })

@@ -9,6 +9,7 @@ import {
   fetchTags,
   fetchWorkflowContent,
   fetchWorkflowList,
+  resolveRefSha,
   REPO,
   SETTINGS_FILENAME,
   type VersionTag,
@@ -88,7 +89,13 @@ export default class Init extends Command {
       return
     }
 
-    const { created, skipped } = await this.installWorkflows(selected, ref, flags)
+    // resolve tag → commit SHA for safe `uses:` refs
+    const sha = await resolveRefSha(ref)
+    if (sha !== ref) {
+      this.log(ux.colorize("dim", `  resolved ${ref} → ${sha.slice(0, 12)}\n`))
+    }
+
+    const { created, skipped } = await this.installWorkflows(selected, ref, sha, flags)
 
     // --- scaffold .justactions.yml ---
 
@@ -203,6 +210,7 @@ export default class Init extends Command {
   private async installWorkflows(
     selected: WorkflowEntry[],
     ref: string,
+    sha: string,
     flags: { force: boolean; yes: boolean }
   ): Promise<{ created: number; skipped: number }> {
     const targetDir = join(process.cwd(), ".github", "workflows")
@@ -229,7 +237,7 @@ export default class Init extends Command {
 
       try {
         let content = await fetchWorkflowContent(workflow.file, ref)
-        content = injectRefComment(content, ref)
+        content = injectRefComment(content, ref, sha)
         writeFileSync(targetPath, content, "utf-8")
         this.log(`  ${ux.colorize("green", "create")}  .github/workflows/${workflow.file}`)
         installed.push({ name: workflow.name, file: workflow.file })

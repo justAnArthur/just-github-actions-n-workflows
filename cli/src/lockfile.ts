@@ -85,9 +85,11 @@ export function mergeLockfile(
 // --- version comment ---
 // prepends a `# toolkit-ref: <ref>` comment to workflow content
 // and rewrites action `uses:` references to point at the selected ref.
+// when usesRef is provided (e.g. a commit SHA), it's used in `uses:` lines
+// to avoid issues with special characters (@, /) in scoped tag names.
 
 
-export function injectRefComment(content: string, ref: string): string {
+export function injectRefComment(content: string, ref: string, usesRef?: string): string {
   const marker = "# toolkit-ref:"
   const comment = `${marker} ${ref}`
 
@@ -111,10 +113,12 @@ export function injectRefComment(content: string, ref: string): string {
   }
 
   // rewrite `uses: justAnArthur/just-github-actions-n-workflows/...@<anything>`
-  // to point at the selected ref instead of @main
+  // to point at the selected ref. uses usesRef (SHA) when available to avoid
+  // breaking `uses:` syntax with tags containing @ or / characters.
+  const safeRef = usesRef ?? ref
   content = content.replace(
     /(uses:\s+justAnArthur\/just-github-actions-n-workflows\/[^@\s]+)@\S+/g,
-    `$1@${ref}`
+    `$1@${safeRef}`
   )
 
   return content

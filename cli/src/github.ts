@@ -121,7 +121,7 @@ export async function fetchTags(): Promise<VersionTag[]> {
   })
 }
 
-export async function fetchWorkflowList(gitRef: string, log): Promise<WorkflowEntry[]> {
+export async function fetchWorkflowList(gitRef: string): Promise<WorkflowEntry[]> {
   const url = `${API_BASE}/contents/workflows?ref=${gitRef}`
   const res = await fetch(url, { headers: authHeaders() })
 
@@ -164,6 +164,49 @@ export async function enrichWorkflows(workflows: WorkflowEntry[], gitRef: string
   }
 
   return enriched
+}
+
+// --- resolve ref to sha ---
+// resolves a git ref (tag, branch, or sha) to its commit SHA.
+// this is needed because tags like "@scope/pkg@1.0.0" contain
+// "@" and "/" which break the `uses: owner/repo/path@ref` syntax.
+// using the commit SHA as the ref avoids all special-character issues.
+
+export async function resolveRefSha(ref: string): Promise<string> {
+  // if it already looks like a full SHA, return as-is
+  if (/^[0-9a-f]{40}$/i.test(ref)) return ref
+
+  // try resolving as a tag first
+  const tagUrl = `${API_BASE}/git/ref/tags/${encodeURIComponent(ref)}`
+  const tagRes = await fetch(tagUrl, { headers: authHeaders() })
+
+  if (tagRes.ok) {
+    const tagData: any = await tagRes.json()
+
+    // annotated tags point to a tag object, need to dereference to commit
+    if (tagData.object?.type === "tag") {
+      const derefUrl = `${API_BASE}/git/tags/${tagData.object.sha}`
+      const derefRes = await fetch(derefUrl, { headers: authHeaders() })
+      if (derefRes.ok) {
+        const derefData: any = await derefRes.json()
+        return derefData.object?.sha ?? tagData.object.sha
+      }
+    }
+
+    return tagData.object?.sha ?? ref
+  }
+
+  // fall back to resolving as a branch/commit
+  const commitUrl = `${API_BASE}/commits/${encodeURIComponent(ref)}`
+  const commitRes = await fetch(commitUrl, { headers: authHeaders() })
+
+  if (commitRes.ok) {
+    const commitData: any = await commitRes.json()
+    return commitData.sha ?? ref
+  }
+
+  // if all else fails, return the original ref (best effort)
+  return ref
 }
 
 // --- settings template ---
