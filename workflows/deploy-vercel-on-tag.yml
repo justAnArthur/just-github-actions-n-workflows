@@ -1,14 +1,17 @@
 # deploy-vercel-on-tag.yml
 # ---
-# triggers a vercel deployment when a version tag is pushed that has
-# "vercel" in its deploy targets annotation.
+# triggers a vercel deployment via deploy hook when a version tag is
+# pushed that has "vercel" in its deploy targets annotation.
 #
-# uses the vercel CLI to deploy directly — vercel handles the build
-# remotely. stable tags deploy to production, prereleases to preview.
+# uses vercel deploy hooks (HTTP POST) — no CLI, no checkout needed.
+# vercel handles the build remotely from the linked git branch.
 #
 # the tag annotation is written by the bump-version action and contains
 # a JSON object with a `deployTargets` array. this workflow reads the
 # annotation via resolve-tag-meta and skips if "vercel" is not present.
+#
+# setup: create a deploy hook in your vercel project settings
+# (Settings → Git → Deploy Hooks) and store the URL as a secret.
 #
 # copy this file into your repo's `.github/workflows/` and adjust
 # the `push.tags` pattern to match your package naming convention.
@@ -21,16 +24,10 @@
 #       with:
 #         tag: ${{ github.ref_name }}
 #       secrets:
-#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
-#         VERCEL_TOKEN: ${{ secrets.VERCEL_TOKEN }}
-#         VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-#         VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+#         VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
 #
 # required secrets:
-#   GH_TOKEN          — github token with contents:read
-#   VERCEL_TOKEN      — vercel API token
-#   VERCEL_ORG_ID     — vercel organization/team ID
-#   VERCEL_PROJECT_ID — vercel project ID
+#   VERCEL_DEPLOY_HOOK_URL — vercel deploy hook URL (from project settings → git → deploy hooks)
 # ---
 
 name: deploy-vercel-on-tag
@@ -45,34 +42,15 @@ on:
         description: 'tag to deploy (e.g. "@scope/frontend@1.2.3")'
         type: string
         required: true
-      production:
-        description: "Deploy to production (true/false)"
-        type: boolean
-        required: false
-        default: false
   workflow_call:
     inputs:
       tag:
         description: 'tag to deploy (e.g. "@scope/frontend@1.2.3")'
         type: string
         required: true
-      production:
-        description: "Deploy to production"
-        type: boolean
-        required: false
-        default: false
     secrets:
-      GH_TOKEN:
-        description: "github token with contents:read"
-        required: true
-      VERCEL_TOKEN:
-        description: "vercel API token"
-        required: true
-      VERCEL_ORG_ID:
-        description: "vercel organization/team ID"
-        required: true
-      VERCEL_PROJECT_ID:
-        description: "vercel project ID"
+      VERCEL_DEPLOY_HOOK_URL:
+        description: "vercel deploy hook URL"
         required: true
 
 permissions:
@@ -103,29 +81,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
-        uses: actions/checkout@v4
+      - name: Trigger Vercel deploy hook
+        uses: justAnArthur/just-github-actions-n-workflows/actions/trigger-deploy-hook@main
         with:
-          ref: ${{ needs.resolve-meta.outputs.tag }}
-          token: ${{ secrets.GH_TOKEN }}
-
-      - name: Resolve package directory
-        id: pkg
-        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-package-dir@main
-        with:
-          tag_name: ${{ needs.resolve-meta.outputs.tag }}
-
-      - name: Install Vercel CLI
-        run: npm install -g vercel@latest
-
-      - name: Deploy to Vercel
-        working-directory: ${{ steps.pkg.outputs.dir || '.' }}
-        run: |
-          PROD_FLAG=""
-          if [[ "${{ needs.resolve-meta.outputs.is_prerelease }}" != "true" ]] || [[ "${{ inputs.production }}" == "true" ]]; then
-            PROD_FLAG="--prod"
-          fi
-          vercel deploy $PROD_FLAG --token=${{ secrets.VERCEL_TOKEN }}
-        env:
-          VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
-          VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
+          hook_url: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          tag: ${{ needs.resolve-meta.outputs.tag }}

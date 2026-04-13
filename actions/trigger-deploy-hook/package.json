@@ -1,0 +1,16 @@
+{
+  "name": "@justanarthur/step-trigger-deploy-hook",
+  "version": "0.0.0-beta.4",
+  "private": true,
+  "type": "module",
+  "dependencies": {
+    "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*"
+  },
+  "scripts": {
+    "test": "bun test"
+  },
+  "properties": {
+    "gitCommitScopeRelatedNames": "trigger-deploy-hook"
+  }
+}
+

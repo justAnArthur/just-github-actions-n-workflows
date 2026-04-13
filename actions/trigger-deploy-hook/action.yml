@@ -1,0 +1,41 @@
+name: Trigger Deploy Hook
+description: >
+  Sends an HTTP POST request to a deploy hook URL (e.g. Vercel)
+  and validates the response. No CLI or checkout required.
+
+inputs:
+  hook_url:
+    description: "Deploy hook URL to trigger (e.g. Vercel deploy hook)"
+    required: true
+  tag:
+    description: "Tag name being deployed (used for logging)"
+    required: false
+    default: ""
+
+outputs:
+  status:
+    description: "HTTP status code from the deploy hook response"
+    value: ${{ steps.run.outputs.status }}
+  body:
+    description: "Response body from the deploy hook"
+    value: ${{ steps.run.outputs.body }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Trigger deploy hook
+      id: run
+      shell: bash
+      env:
+        DEPLOY_HOOK_URL: ${{ inputs.hook_url }}
+        DEPLOY_TAG: ${{ inputs.tag }}
+      run: bun run ${{ github.action_path }}/src/index.ts
+
