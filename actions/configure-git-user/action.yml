@@ -1,14 +1,40 @@
 name: Setup Git Author
 description: >
   Configures git user.name and user.email for subsequent commits.
-  In "push" mode, extracts the author from the last commit.
-  In any other mode, uses the GitHub actor as the author identity.
+  By default the bot is the committer and the real user becomes a co-author.
+  Outputs the resolved co-author identity for use in commit message trailers.
 
 inputs:
   mode:
     description: 'Author resolution mode — "push" extracts from last commit, anything else uses the GitHub actor'
     required: false
     default: "push"
+  committer_name:
+    description: "Override git user.name (committer). Defaults to github-actions[bot]."
+    required: false
+    default: ""
+  committer_email:
+    description: "Override git user.email (committer). Defaults to the github-actions bot noreply address."
+    required: false
+    default: ""
+  co_author_email:
+    description: "Override the co-author email. Defaults to the resolved user's email."
+    required: false
+    default: ""
+
+outputs:
+  committer_name:
+    description: "The resolved git user.name (committer)"
+    value: ${{ steps.run.outputs.committer_name }}
+  committer_email:
+    description: "The resolved git user.email (committer)"
+    value: ${{ steps.run.outputs.committer_email }}
+  co_author_name:
+    description: "The resolved co-author name (the real user)"
+    value: ${{ steps.run.outputs.co_author_name }}
+  co_author_email:
+    description: "The resolved co-author email (the real user)"
+    value: ${{ steps.run.outputs.co_author_email }}
 
 runs:
   using: composite
@@ -22,8 +48,12 @@ runs:
       working-directory: ${{ github.action_path }}/../..
 
     - name: Run setup-git-author
+      id: run
       shell: bash
       env:
         MODE: ${{ inputs.mode }}
+        COMMITTER_NAME_OVERRIDE: ${{ inputs.committer_name }}
+        COMMITTER_EMAIL_OVERRIDE: ${{ inputs.committer_email }}
+        CO_AUTHOR_EMAIL_OVERRIDE: ${{ inputs.co_author_email }}
       run: bun run ${{ github.action_path }}/src/index.ts
 

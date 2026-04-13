@@ -31,4 +31,9 @@
 #       docker_compose_service: backend
 #     - name: "@scope/frontend"
 #       docker_compose_service: frontend
+#
+# git:
+#   committer_name: "github-actions[bot]"
+#   committer_email: "41898282+github-actions[bot]@users.noreply.github.com"
+#   co_author_email: "your-email@example.com"
 

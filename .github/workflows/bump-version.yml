@@ -108,6 +108,7 @@ jobs:
         uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
 
       - name: Configure git user
+        id: git_user
         uses: justAnArthur/just-github-actions-n-workflows/actions/configure-git-user@main
         with:
           mode: ${{ github.event_name == 'push' && 'push' || 'dispatch' }}
@@ -121,3 +122,5 @@ jobs:
           prerelease_channel: ${{ inputs.bump_prerelease_channel || 'canary' }}
           github_token: ${{ secrets.GH_TOKEN }}
           github_event: ${{ toJson(github.event) }}
+          co_author_name: ${{ steps.git_user.outputs.co_author_name }}
+          co_author_email: ${{ steps.git_user.outputs.co_author_email }}

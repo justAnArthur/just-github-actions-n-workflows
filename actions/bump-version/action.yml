@@ -29,6 +29,14 @@ inputs:
     description: "JSON-encoded GitHub push event (auto-provided in push workflows via toJSON(github.event))"
     required: false
     default: ""
+  co_author_name:
+    description: "Co-author name for the version bump commit (defaults to github-actions[bot])"
+    required: false
+    default: ""
+  co_author_email:
+    description: "Co-author email for the version bump commit (defaults to github-actions bot noreply)"
+    required: false
+    default: ""
 
 runs:
   using: composite
@@ -51,5 +59,7 @@ runs:
         BUMP_PRERELEASE_CHANNEL: ${{ inputs.prerelease_channel }}
         GITHUB_TOKEN: ${{ inputs.github_token }}
         GITHUB_EVENT: ${{ inputs.github_event }}
+        CO_AUTHOR_NAME: ${{ inputs.co_author_name }}
+        CO_AUTHOR_EMAIL: ${{ inputs.co_author_email }}
       run: bun run ${{ github.action_path }}/src/index.ts
 

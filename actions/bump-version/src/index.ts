@@ -13,7 +13,16 @@ import { tagAndPush, type TagAnnotation } from "@justanarthur/just-github-action
 import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n-workflows-lib/git/get-commits-from-the-last-stable"
 import { deletePrereleaseImages, manifestNameToImageName } from "@justanarthur/just-github-actions-n-workflows-lib/ghcr/delete-canary-images"
 import { log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
-import { GITHUB_ACTIONS_BOT, withCoAuthors } from "@justanarthur/just-github-actions-n-workflows-lib/git/co-authors"
+import { GITHUB_ACTIONS_BOT, withCoAuthors, type CoAuthor } from "@justanarthur/just-github-actions-n-workflows-lib/git/co-authors"
+
+// --- resolve co-author identity ---
+// when configure-git-user sets the bot as committer, the real user
+// is passed here as co-author via env vars.
+
+const coAuthor: CoAuthor = {
+  name: process.env.CO_AUTHOR_NAME || GITHUB_ACTIONS_BOT.name,
+  email: process.env.CO_AUTHOR_EMAIL || GITHUB_ACTIONS_BOT.email,
+}
 
 // --- discover manifests ---
 
@@ -183,7 +192,7 @@ if (manifestNextVersions.length !== 0) {
     withCoAuthors(
       "chore[skip bump]: bumping stable release versions for " +
       manifestNextVersions.map(([m]) => m.name).join(", "),
-      [GITHUB_ACTIONS_BOT]
+      [coAuthor]
     )
   )
   log.info("committed and pushed version bump")
@@ -219,7 +228,7 @@ if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
     withCoAuthors(
       `chore[skip bump]: bumping ${prereleaseChannel} versions after stable release for ` +
       prereleaseNextVersions.map(([m]) => m.name).join(", "),
-      [GITHUB_ACTIONS_BOT]
+      [coAuthor]
     )
   )
 

@@ -55,9 +55,16 @@ export interface ModuleSettings {
   overrides?: ModuleOverride[];
 }
 
+export interface GitSettings {
+  committer_name?: string;
+  committer_email?: string;
+  co_author_email?: string;
+}
+
 export interface Settings {
   deploy?: DeploySettings;
   modules?: ModuleSettings;
+  git?: GitSettings;
 }
 
 // --- constants ---
@@ -213,6 +220,14 @@ function parseSettingsYaml(content: string): Settings {
   if (raw.modules) {
     settings.modules = {
       overrides: raw.modules.overrides ?? []
+    }
+  }
+
+  if (raw.git) {
+    settings.git = {
+      committer_name: raw.git.committer_name,
+      committer_email: raw.git.committer_email,
+      co_author_email: raw.git.co_author_email,
     }
   }
 

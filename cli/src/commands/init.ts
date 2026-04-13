@@ -300,6 +300,9 @@ export default class Init extends Command {
         "#   overrides:",
         "#     - name: \"@scope/backend\"",
         "#       docker_compose_service: backend",
+        "",
+        "# git:",
+        "#   co_author_email: your-email@example.com",
         ""
       ].join("\n")
 
