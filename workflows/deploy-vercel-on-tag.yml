@@ -79,9 +79,15 @@ permissions:
   contents: read
 
 jobs:
-  deploy-vercel:
+  resolve-meta:
     runs-on: ubuntu-latest
-
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      pkg_name: ${{ steps.meta.outputs.pkg_name }}
+      version: ${{ steps.meta.outputs.version }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      has_annotation: ${{ steps.meta.outputs.has_annotation }}
+      publish_vercel: ${{ steps.meta.outputs.publish_vercel }}
     steps:
       - name: Resolve tag metadata
         id: meta
@@ -89,29 +95,34 @@ jobs:
         with:
           tag: ${{ inputs.tag || github.ref_name }}
 
-      - name: Skip if vercel is not a deploy target
-        if: steps.meta.outputs.has_annotation == 'true' && steps.meta.outputs.publish_vercel != 'true'
-        run: |
-          echo "tag annotation does not include 'vercel' deploy target — skipping"
-          echo "SKIP_VERCEL=true" >> "$GITHUB_ENV"
+  deploy-vercel:
+    needs: resolve-meta
+    if: >-
+      needs.resolve-meta.outputs.has_annotation != 'true' ||
+      needs.resolve-meta.outputs.publish_vercel == 'true'
+    runs-on: ubuntu-latest
 
+    steps:
       - name: Checkout repo
-        if: env.SKIP_VERCEL != 'true'
         uses: actions/checkout@v4
         with:
-          ref: ${{ steps.meta.outputs.tag }}
+          ref: ${{ needs.resolve-meta.outputs.tag }}
           token: ${{ secrets.GH_TOKEN }}
 
+      - name: Resolve package directory
+        id: pkg
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-package-dir@main
+        with:
+          tag_name: ${{ needs.resolve-meta.outputs.tag }}
+
       - name: Install Vercel CLI
-        if: env.SKIP_VERCEL != 'true'
         run: npm install -g vercel@latest
 
       - name: Deploy to Vercel
-        if: env.SKIP_VERCEL != 'true'
         working-directory: ${{ steps.pkg.outputs.dir || '.' }}
         run: |
           PROD_FLAG=""
-          if [[ "${{ steps.meta.outputs.is_prerelease }}" != "true" ]] || [[ "${{ inputs.production }}" == "true" ]]; then
+          if [[ "${{ needs.resolve-meta.outputs.is_prerelease }}" != "true" ]] || [[ "${{ inputs.production }}" == "true" ]]; then
             PROD_FLAG="--prod"
           fi
           vercel deploy $PROD_FLAG --token=${{ secrets.VERCEL_TOKEN }}
