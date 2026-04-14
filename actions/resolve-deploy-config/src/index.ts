@@ -51,6 +51,12 @@ setEnv("COMPOSE_PROFILES", config.compose_profiles ?? "")
 setEnv("PROFILES", config.profiles ?? "")
 setEnv("APP_TZ", config.timezone ?? "UTC")
 
+const composeFile = config.compose_file ?? settings.deploy?.compose_file ?? ""
+if (composeFile) {
+  setEnv("COMPOSE_FILE", composeFile)
+  log.info(`COMPOSE_FILE=${composeFile}`)
+}
+
 if (settings.deploy?.ssh_target_path) {
   setEnv("SSH_TARGET_PATH", settings.deploy.ssh_target_path)
   log.info(`SSH_TARGET_PATH=${settings.deploy.ssh_target_path}`)

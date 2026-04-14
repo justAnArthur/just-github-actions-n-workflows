@@ -31,6 +31,8 @@ export type Module = {
   manifestType: ManifestType;
   /** relative or absolute path to the Dockerfile, if declared */
   dockerfilePath: string | undefined;
+  /** override for the Docker build context directory (relative to module dir) */
+  dockerContext: string | undefined;
   /** deployment targets inferred from the manifest (e.g. ["npm", "docker", "vercel"]) */
   deployTargets: string[];
   /** commit scope aliases for this module */
@@ -68,6 +70,7 @@ export async function discoverModules(
     manifestPath: m.path,
     manifestType: detectManifestType(m.path),
     dockerfilePath: m.dockerfilePath,
+    dockerContext: m.dockerContext,
     deployTargets: m.deployTargets ?? [],
     scopeAliases: m.scopeAliases ?? [],
     priority: m.priority,

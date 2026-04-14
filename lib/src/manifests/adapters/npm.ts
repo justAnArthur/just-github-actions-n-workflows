@@ -37,6 +37,7 @@ const npmAdapter: ManifestAdapter = {
       version: pkg.version,
       priority: props.priority,
       dockerfilePath: props.DockerfilePath ?? props.dockerfilePath,
+      dockerContext: props.dockerContext,
       scopeAliases,
       deployTargets: explicitTargets ?? deployTargets,
       gitCommitScopeRelatedNames: scopeAliases.length > 0 ? scopeAliases : undefined

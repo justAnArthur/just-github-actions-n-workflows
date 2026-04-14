@@ -8,6 +8,7 @@
 // ```yaml
 // deploy:
 //   ssh_target_path: ~/my-app
+//   compose_file: ./docker-compose.yml
 //   targets:
 //     production:
 //       host: app.example.com
@@ -17,6 +18,7 @@
 //     staging:
 //       host: staging.example.com
 //       compose_profiles: "@scope/backend"
+//       compose_file: ./docker-compose.staging.yml
 //       profiles: "staging"
 //       timezone: UTC
 //
@@ -39,10 +41,14 @@ export interface DeployTarget {
   compose_profiles?: string;
   profiles?: string;
   timezone?: string;
+  /** path to docker-compose file (overrides deploy-level compose_file) */
+  compose_file?: string;
 }
 
 export interface DeploySettings {
   ssh_target_path?: string;
+  /** default path to docker-compose file for all targets */
+  compose_file?: string;
   targets: Record<string, DeployTarget>;
 }
 
@@ -81,7 +87,6 @@ function parseSimpleYaml(content: string): any {
   const result: any = {}
   const stack: { obj: any; indent: number }[] = [{ obj: result, indent: -1 }]
   let currentArray: any[] | null = null
-  let currentArrayKey = ""
   let currentArrayParent: any = null
 
   for (const rawLine of lines) {
@@ -104,21 +109,22 @@ function parseSimpleYaml(content: string): any {
       const value = trimmed.slice(2).trim()
 
       if (currentArray && currentArrayParent === parent) {
+        const arr = currentArray as any[]
         // check if it's a key: value pair within array
         const colonIdx = value.indexOf(":")
         if (colonIdx > 0) {
           const k = value.slice(0, colonIdx).trim()
           const v = value.slice(colonIdx + 1).trim()
           // start a new array object or add to last
-          if (k === "name" || !currentArray.length || currentArray[currentArray.length - 1][k] !== undefined) {
+          if (k === "name" || !arr.length || arr[arr.length - 1][k] !== undefined) {
             const item: any = {}
             item[k] = unquote(v)
-            currentArray.push(item)
+            arr.push(item)
           } else {
-            currentArray[currentArray.length - 1][k] = unquote(v)
+            arr[arr.length - 1][k] = unquote(v)
           }
         } else {
-          currentArray.push(unquote(value))
+          arr.push(unquote(value))
         }
         continue
       }
@@ -144,7 +150,7 @@ function parseSimpleYaml(content: string): any {
     }
 
     // standalone array marker
-    if (trimmed === "-") continue
+    if (trimmed === "-") { /* skip */ }
   }
 
   // second pass: detect arrays by re-parsing
@@ -198,6 +204,7 @@ function parseSettingsYaml(content: string): Settings {
   if (raw.deploy) {
     const deploy: DeploySettings = {
       ssh_target_path: raw.deploy.ssh_target_path,
+      compose_file: raw.deploy.compose_file,
       targets: {}
     }
 
@@ -209,7 +216,8 @@ function parseSettingsYaml(content: string): Settings {
           host: config.host ?? envName,
           compose_profiles: config.compose_profiles,
           profiles: config.profiles,
-          timezone: config.timezone ?? "UTC"
+          timezone: config.timezone ?? "UTC",
+          compose_file: config.compose_file
         }
       }
     }

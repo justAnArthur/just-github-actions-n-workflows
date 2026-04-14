@@ -80,10 +80,6 @@ on:
         type: string
         required: false
         default: ""
-      compose_file:
-        type: string
-        required: false
-        default: "./docker-compose.yml"
     secrets:
       GH_TOKEN:
         description: "github token with contents:read and packages:read"
@@ -144,7 +140,7 @@ jobs:
         with:
           host: ${{ env.DEPLOY_HOST || inputs.environment }}
           username: ${{ secrets.SERVER_USERNAME }}
-          source: '${{ inputs.compose_file }} ./.env'
+          source: '${{ env.COMPOSE_FILE || './docker-compose.yml' }} ./.env'
           target: ${{ inputs.ssh_target_path || env.SSH_TARGET_PATH || '~/app' }}
 
       - name: Generate deployment script

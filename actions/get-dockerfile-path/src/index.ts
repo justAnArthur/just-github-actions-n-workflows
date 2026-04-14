@@ -6,6 +6,7 @@ import { discoverModules, findModuleByScope } from "@justanarthur/just-github-ac
 log.group("get-dockerfile-path")
 
 const tagName = getRequiredEnv("TAG_NAME")
+const contextOverride = process.env.CONTEXT_OVERRIDE?.trim() || ""
 log.info(`tag: ${tagName}`)
 
 const excludes = new Set(["node_modules", "dist", ".git", ".github"])
@@ -37,8 +38,21 @@ if (!dockerfilePath) {
 log.info(`resolved dockerfile: ${dockerfilePath}`)
 setOutput("dockerfile", dockerfilePath)
 
-const contextDir = path.dirname(dockerfilePath)
-log.info(`context directory: ${contextDir}`)
+// --- resolve context directory ---
+// priority: input override > manifest dockerContext > dirname(dockerfilePath)
+
+let contextDir: string
+if (contextOverride) {
+  contextDir = path.resolve(process.cwd(), contextOverride)
+  log.info(`context directory (input override): ${contextDir}`)
+} else if (mod.dockerContext) {
+  contextDir = path.resolve(mod.dir, mod.dockerContext)
+  log.info(`context directory (manifest dockerContext): ${contextDir}`)
+} else {
+  contextDir = path.dirname(dockerfilePath)
+  log.info(`context directory (dockerfile parent): ${contextDir}`)
+}
+
 setOutput("context", contextDir)
 
 log.groupEnd()

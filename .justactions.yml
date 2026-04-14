@@ -13,6 +13,7 @@
 #
 # deploy:
 #   ssh_target_path: ~/my-app
+#   compose_file: ./docker-compose.yml
 #   targets:
 #     production:
 #       host: app.example.com
@@ -22,6 +23,7 @@
 #     staging:
 #       host: staging.example.com
 #       compose_profiles: "@scope/backend"
+#       compose_file: ./docker-compose.staging.yml
 #       profiles: "staging"
 #       timezone: UTC
 #

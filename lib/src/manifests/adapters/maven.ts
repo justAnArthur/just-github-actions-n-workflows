@@ -66,6 +66,7 @@ const mavenAdapter: ManifestAdapter = {
 
     // --- infer deploy targets ---
     const dockerfilePath = findTagValue(props, "DockerfilePath") ?? findTagValue(props, "dockerfilePath")
+    const dockerContext = findTagValue(props, "dockerContext")
     const deployTargets: string[] = []
     if (dockerfilePath) deployTargets.push("docker")
     if (findTagValue(props, "vercelProjectId")) deployTargets.push("vercel")
@@ -81,6 +82,7 @@ const mavenAdapter: ManifestAdapter = {
       version,
       priority: priorityStr ? parseInt(priorityStr, 10) : undefined,
       dockerfilePath,
+      dockerContext,
       scopeAliases,
       deployTargets: explicitTargets ?? deployTargets,
       gitCommitScopeRelatedNames: scopeAliases.length > 0 ? scopeAliases : undefined

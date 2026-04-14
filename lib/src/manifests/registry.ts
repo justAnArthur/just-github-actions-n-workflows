@@ -14,6 +14,8 @@ export type Manifest = {
   version: string;
   priority: number | undefined;
   dockerfilePath: string | undefined;
+  /** override for the Docker build context directory (relative to manifest dir) */
+  dockerContext: string | undefined;
   scopeAliases: string[];
   /** deployment targets inferred from the manifest (e.g. ["npm", "docker", "vercel"]) */
   deployTargets: DeployTarget[];

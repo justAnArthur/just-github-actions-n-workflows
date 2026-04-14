@@ -8,6 +8,10 @@ inputs:
   tag_name:
     description: "Git tag to resolve the Dockerfile for (e.g. '@scope/pkg@1.2.3')"
     required: true
+  context_override:
+    description: "Optional override for the Docker build context directory (absolute or relative to workspace root)"
+    required: false
+    default: ""
 
 outputs:
   dockerfile:
@@ -33,5 +37,6 @@ runs:
       shell: bash
       env:
         TAG_NAME: ${{ inputs.tag_name }}
+        CONTEXT_OVERRIDE: ${{ inputs.context_override }}
       run: bun run ${{ github.action_path }}/src/index.ts
 
