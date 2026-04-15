@@ -4,7 +4,7 @@
 // no hardcoded defaults — all config comes from the project.
 // ---
 
-import { getEnv, getRequiredEnv, log, setEnv } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { getEnv, getRequiredEnv, log, setEnv, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { loadSettings, resolveDeployTarget, type DeployTarget } from "@justanarthur/just-github-actions-n-workflows-lib/settings"
 
 const environment = getRequiredEnv("DEPLOY_ENVIRONMENT")
@@ -68,3 +68,10 @@ log.info(`PROFILES=${config.profiles ?? ""}`)
 log.info(`APP_TZ=${config.timezone ?? "UTC"}`)
 
 log.groupEnd()
+
+setOutput("host", config.host ?? environment)
+setOutput("compose_profiles", config.compose_profiles ?? "")
+setOutput("profiles", config.profiles ?? "")
+setOutput("app_tz", config.timezone ?? "UTC")
+if (composeFile) setOutput("compose_file", composeFile)
+if (settings.deploy?.ssh_target_path) setOutput("ssh_target_path", settings.deploy.ssh_target_path)
