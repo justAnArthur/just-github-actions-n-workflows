@@ -109,6 +109,7 @@ jobs:
           lfs: true
 
       - name: Resolve deploy config from settings
+        id: deploy_config
         uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-deploy-config@main
         with:
           environment: ${{ inputs.environment }}
@@ -117,7 +118,7 @@ jobs:
         uses: justAnArthur/just-github-actions-n-workflows/actions/setup-ssh@main
         with:
           private_key: ${{ secrets.SSH_PRIVATE_KEY }}
-          host: ${{ env.DEPLOY_HOST || inputs.environment }}
+          host: ${{ steps.deploy_config.outputs.host }}
 
       - name: Resolve image tags
         uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-image-tags@main
@@ -138,7 +139,7 @@ jobs:
       - name: Transfer compose and env files to server
         uses: justAnArthur/just-github-actions-n-workflows/actions/scp-transfer@main
         with:
-          host: ${{ env.DEPLOY_HOST || inputs.environment }}
+          host: ${{ steps.deploy_config.outputs.host }}
           username: ${{ secrets.SERVER_USERNAME }}
           source: "${{ env.COMPOSE_FILE || './docker-compose.yml' }} ./.env"
           target: ${{ inputs.ssh_target_path || env.SSH_TARGET_PATH || '~/app' }}
@@ -154,6 +155,6 @@ jobs:
       - name: Execute deployment on remote server
         uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main
         with:
-          host: ${{ env.DEPLOY_HOST || inputs.environment }}
+          host: ${{ steps.deploy_config.outputs.host }}
           username: ${{ secrets.SERVER_USERNAME }}
           script: ${{ steps.deploy_script.outputs.script }}
