@@ -45,6 +45,7 @@ runs:
       working-directory: ${{ github.action_path }}/../..
 
     - name: Run resolve-deploy-config
+      id: run
       shell: bash
       env:
         DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
