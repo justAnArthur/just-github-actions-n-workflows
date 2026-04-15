@@ -13,6 +13,26 @@ inputs:
     required: false
     default: ""
 
+outputs:
+  host:
+    description: "Resolved deploy host"
+    value: ${{ steps.run.outputs.host }}
+  compose_profiles:
+    description: "Resolved compose profiles"
+    value: ${{ steps.run.outputs.compose_profiles }}
+  profiles:
+    description: "Resolved profiles"
+    value: ${{ steps.run.outputs.profiles }}
+  app_tz:
+    description: "Resolved timezone"
+    value: ${{ steps.run.outputs.app_tz }}
+  compose_file:
+    description: "Resolved compose file"
+    value: ${{ steps.run.outputs.compose_file }}
+  ssh_target_path:
+    description: "Resolved SSH target path"
+    value: ${{ steps.run.outputs.ssh_target_path }}
+
 runs:
   using: composite
   steps:
