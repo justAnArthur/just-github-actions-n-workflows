@@ -93,6 +93,14 @@ function sortKey(t: ParsedTag): string {
   ].join(".")
 }
 
+function sanitizeEnvKeySegment(value: string): string {
+  return value
+    .toUpperCase()
+    .replace(/[^A-Z0-9_]/g, "_")
+    .replace(/_+/g, "_")
+    .replace(/^_+|_+$/g, "")
+}
+
 function resolveLatestTag(
   allTags: string[],
   packageName: string,
@@ -168,7 +176,18 @@ if (allTags.length === 0) {
 const resolvedEnvLines: string[] = []
 
 for (const comp of components) {
-  const envKey = `DOCKER_${comp.name.toUpperCase()}_IMAGE_TAG`
+  const sanitizedName = sanitizeEnvKeySegment(comp.name)
+
+  if (!sanitizedName) {
+    log.error(`invalid component name for env key generation: ${comp.name}`)
+    process.exit(1)
+  }
+
+  const envKey = `DOCKER_${sanitizedName}_IMAGE_TAG`
+
+  if (sanitizedName !== comp.name.toUpperCase()) {
+    log.info(`normalized env key name: ${comp.name} -> ${sanitizedName}`)
+  }
 
   let resolvedTag: string
 
