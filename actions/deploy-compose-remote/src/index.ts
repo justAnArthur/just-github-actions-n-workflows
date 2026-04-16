@@ -31,22 +31,22 @@ const scriptLines: string[] = [
 if (registryUsername && registryPassword) {
   scriptLines.push(
     `echo "Logging in to container registry (${registry})"`,
-    `echo "${registryPassword}" | docker login ${registry} -u "${registryUsername}" --password-stdin || true`,
+    `echo "${registryPassword}" | sudo docker login ${registry} -u "${registryUsername}" --password-stdin || true`,
     ""
   )
 }
 
 // compose command detection + deploy
 scriptLines.push(
-  'if command -v docker >/dev/null 2>&1 && docker compose version >/dev/null 2>&1; then',
-  '  DOCKER_COMPOSE_CMD="docker compose"',
+  'if command -v docker >/dev/null 2>&1 && sudo docker compose version >/dev/null 2>&1; then',
+  '  DOCKER_COMPOSE_CMD="sudo docker compose"',
   'else',
-  '  DOCKER_COMPOSE_CMD="docker-compose"',
+  '  DOCKER_COMPOSE_CMD="sudo docker-compose"',
   'fi',
   '',
   'echo "Using compose command: $DOCKER_COMPOSE_CMD"',
   'echo "Pulling images..."',
-  '$DOCKER_COMPOSE_CMD pull --ignore-pull-failures --parallel || true',
+  '$DOCKER_COMPOSE_CMD pull --ignore-pull-failures || true',
   '',
   'echo "Bringing up services..."',
   '$DOCKER_COMPOSE_CMD up -d --remove-orphans --force-recreate',
@@ -55,7 +55,7 @@ scriptLines.push(
   '$DOCKER_COMPOSE_CMD ps',
   '',
   'echo "Cleaning up unused Docker objects..."',
-  'docker system prune -f --volumes',
+  'sudo docker system prune -f --volumes',
   '',
   'echo "Deployment finished."'
 )
