@@ -2,6 +2,7 @@ name: SCP Upload
 description: >
   Uploads files to a remote host via SCP.
   Transfers one or more space-separated source files to a target directory on the remote server.
+  If a source includes docker-compose.yml (or .yaml), a sibling docker/ directory is uploaded too when present.
 
 inputs:
   host:
@@ -11,7 +12,7 @@ inputs:
     description: "SSH username for the remote host"
     required: true
   source:
-    description: "Space-separated list of local file paths to upload"
+    description: "Space-separated list of local file/directory paths to upload"
     required: true
   target:
     description: "Remote directory path to upload files to"
