@@ -8,7 +8,7 @@
 // from project modules when no explicit components are provided.
 // ---
 
-import { getEnv, getRequiredEnv, log, setEnv } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { getEnv, getRequiredEnv, log, setEnv, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { execWithTimeout } from "@justanarthur/just-github-actions-n-workflows-lib/exec"
 import { versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 import { discoverModules } from "@justanarthur/just-github-actions-n-workflows-lib/modules"
@@ -165,6 +165,8 @@ if (allTags.length === 0) {
   process.exit(1)
 }
 
+const resolvedEnvLines: string[] = []
+
 for (const comp of components) {
   const envKey = `DOCKER_${comp.name.toUpperCase()}_IMAGE_TAG`
 
@@ -190,8 +192,11 @@ for (const comp of components) {
   }
 
   setEnv(envKey, version)
+  resolvedEnvLines.push(`${envKey}=${version}`)
   log.info(`${comp.name}: ${comp.version} → ${version}`)
 }
+
+setOutput("resolved_env_lines", resolvedEnvLines.join("\n"))
 
 log.info("all image tags resolved")
 log.groupEnd()

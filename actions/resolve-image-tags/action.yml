@@ -18,6 +18,11 @@ inputs:
     required: false
     default: ""
 
+outputs:
+  resolved_env_lines:
+    description: "Resolved image tag env lines in KEY=VALUE format (one per line)"
+    value: ${{ steps.resolve.outputs.resolved_env_lines }}
+
 runs:
   using: composite
   steps:
@@ -30,6 +35,7 @@ runs:
       working-directory: ${{ github.action_path }}/../..
 
     - name: Run resolve-docker-image-tags
+      id: resolve
       shell: bash
       env:
         RESOLVE_REPO_URL: ${{ inputs.repo_url }}

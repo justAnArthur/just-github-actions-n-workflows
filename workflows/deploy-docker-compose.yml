@@ -121,6 +121,7 @@ jobs:
           host: ${{ steps.deploy_config.outputs.host }}
 
       - name: Resolve image tags
+        id: resolve_image_tags
         uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-image-tags@main
         with:
           repo_url: https://github.com/${{ github.repository }}.git
@@ -135,6 +136,7 @@ jobs:
             COMPOSE_PROFILES=${{ env.COMPOSE_PROFILES }}
             PROFILES=${{ env.PROFILES }}
             APP_TZ=${{ env.APP_TZ }}
+            ${{ steps.resolve_image_tags.outputs.resolved_env_lines }}
 
       - name: Transfer compose and env files to server
         uses: justAnArthur/just-github-actions-n-workflows/actions/scp-transfer@main
