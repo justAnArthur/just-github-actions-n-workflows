@@ -1,4 +1,4 @@
-import { getEnv, getRequiredEnv, log } from "@justanarthur/just-github-actions-n-workflows-lib":/github"
+import { getEnv, getRequiredEnv, log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { exec } from "@justanarthur/just-github-actions-n-workflows-lib/exec"
 
 log.group("ssh-remote-exec")
