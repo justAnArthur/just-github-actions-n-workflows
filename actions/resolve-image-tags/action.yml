@@ -10,7 +10,11 @@ inputs:
     description: "Git repository URL to fetch tags from"
     required: true
   components:
-    description: 'JSON array of components to resolve, each with "name", "package", and "version" fields. Leave empty to auto-discover from project modules.'
+    description: >
+      JSON format for components to resolve. Can be either:
+      1. Array format: [{"name":"MY_PKG","package":"@scope/pkg","version":"stable"}]
+      2. Object format: {"@scope/pkg":"stable","@scope/other":"1.2.3"}
+      Leave empty to auto-discover from project modules.
     required: false
     default: ""
   gh_token:

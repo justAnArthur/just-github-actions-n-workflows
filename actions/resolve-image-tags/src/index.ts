@@ -144,7 +144,22 @@ let components: Component[]
 if (componentsRaw) {
   // explicit components list provided
   try {
-    components = JSON.parse(componentsRaw)
+    const parsed = JSON.parse(componentsRaw)
+
+    // Handle both array format and object format
+    if (Array.isArray(parsed)) {
+      // Already in array format
+      components = parsed
+    } else if (typeof parsed === "object" && parsed !== null) {
+      // Convert object format { "package-name": "version" } to array format
+      components = Object.entries(parsed).map(([pkg, version]) => ({
+        name: pkg.replace(/^@/, "").replace(/\//g, "_").toUpperCase(),
+        package: pkg,
+        version: String(version)
+      }))
+    } else {
+      throw new Error("expected JSON array or object")
+    }
   } catch (err) {
     log.error(`failed to parse RESOLVE_COMPONENTS: ${err}`)
     process.exit(1)
