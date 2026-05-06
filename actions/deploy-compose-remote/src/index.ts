@@ -24,6 +24,17 @@ const scriptLines: string[] = [
   "",
   `echo "Changing to target directory: ${targetPath}"`,
   `cd "${targetPath}"`,
+  "",
+  '# Detect whether Docker is available directly or via passwordless sudo.',
+  'if command -v docker >/dev/null 2>&1 && docker info >/dev/null 2>&1; then',
+  '  DOCKER_BIN="docker"',
+  'elif command -v sudo >/dev/null 2>&1 && command -v docker >/dev/null 2>&1 && sudo -n docker info >/dev/null 2>&1; then',
+  '  DOCKER_BIN="sudo docker"',
+  'else',
+  '  echo "ERROR: Docker is not accessible for this user and passwordless sudo is not configured."',
+  '  echo "Hint: add the deploy user to the docker group, or allow passwordless sudo for docker commands."',
+  '  exit 1',
+  'fi',
   ""
 ]
 
@@ -31,17 +42,24 @@ const scriptLines: string[] = [
 if (registryUsername && registryPassword) {
   scriptLines.push(
     `echo "Logging in to container registry (${registry})"`,
-    `echo "${registryPassword}" | sudo docker login ${registry} -u "${registryUsername}" --password-stdin || true`,
+    `echo "${registryPassword}" | $DOCKER_BIN login ${registry} -u "${registryUsername}" --password-stdin || true`,
     ""
   )
 }
 
 // compose command detection + deploy
 scriptLines.push(
-  'if command -v docker >/dev/null 2>&1 && sudo docker compose version >/dev/null 2>&1; then',
-  '  DOCKER_COMPOSE_CMD="sudo docker compose"',
+  'if $DOCKER_BIN compose version >/dev/null 2>&1; then',
+  '  DOCKER_COMPOSE_CMD="$DOCKER_BIN compose"',
+  'elif command -v docker-compose >/dev/null 2>&1; then',
+  '  if [ "$DOCKER_BIN" = "docker" ]; then',
+  '    DOCKER_COMPOSE_CMD="docker-compose"',
+  '  else',
+  '    DOCKER_COMPOSE_CMD="sudo docker-compose"',
+  '  fi',
   'else',
-  '  DOCKER_COMPOSE_CMD="sudo docker-compose"',
+  '  echo "ERROR: Neither \`docker compose\` nor \`docker-compose\` is available on target host."',
+  '  exit 1',
   'fi',
   '',
   'echo "Using compose command: $DOCKER_COMPOSE_CMD"',
@@ -55,7 +73,7 @@ scriptLines.push(
   '$DOCKER_COMPOSE_CMD ps',
   '',
   'echo "Cleaning up unused Docker objects..."',
-  'sudo docker system prune -f --volumes',
+  '$DOCKER_BIN system prune -f --volumes',
   '',
   'echo "Deployment finished."'
 )
