@@ -324,6 +324,7 @@ each action is a composite GitHub Action in `actions/` with its own `action.yml`
 | `actions/fetch-tags`             | fetch all tags + unshallow if needed              | —                                                             |
 | `actions/generate-release-notes` | markdown release notes between tags               | `tag_name`, `root_dir`                                        |
 | `actions/get-dockerfile-path`    | resolve dockerfile from module metadata           | `tag_name`                                                    |
+| `actions/pin-workspace-versions` | rewrite `workspace:` deps to sibling versions     | `dir`                                                         |
 | `actions/prepare-docker-meta`    | prepare docker image metadata from a git tag      | `tag_name`, `dockerfile`, `context`                           |
 | `actions/resolve-deploy-config`  | resolve deploy config from `.justactions.yml`     | `environment`                                                 |
 | `actions/resolve-image-tags`     | resolve docker image tags from git tags           | `repo_url`, `components`, `gh_token`                          |
@@ -417,6 +418,7 @@ ready-to-copy workflow files in `workflows/`:
 │   ├── fetch-tags/
 │   ├── generate-release-notes/
 │   ├── get-dockerfile-path/
+│   ├── pin-workspace-versions/
 │   ├── prepare-docker-meta/
 │   ├── resolve-deploy-config/
 │   ├── resolve-image-tags/

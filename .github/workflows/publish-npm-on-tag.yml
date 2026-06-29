@@ -111,6 +111,12 @@ jobs:
         working-directory: ${{ steps.pkg.outputs.dir }}
         run: bun run --silent build 2>/dev/null || echo "no build script, skipping"
 
+      - name: Pin workspace dependency versions
+        if: steps.gate.outputs.skip != 'true'
+        uses: justAnArthur/just-github-actions-n-workflows/actions/pin-workspace-versions@main
+        with:
+          dir: ${{ steps.pkg.outputs.dir }}
+
       - name: Publish to npm
         if: steps.gate.outputs.skip != 'true'
         working-directory: ${{ steps.pkg.outputs.dir }}
