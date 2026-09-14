@@ -1,10 +1,3 @@
-// trigger-deploy-hook/src/index.ts
-// ---
-// sends an HTTP POST to a deploy hook URL and validates the response.
-// used for triggering external deployments (e.g. Vercel deploy hooks)
-// without needing CLI tools or repository checkout.
-// ---
-
 import { getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 log.group("trigger-deploy-hook")

@@ -1,10 +1,3 @@
-// resolve-tag-meta/src/index.ts
-// ---
-// parses a git tag into structured metadata for publishing workflows.
-// extracts package name, version, npm dist-tag, prerelease status,
-// and deployment targets from the tag annotation.
-// ---
-
 import { getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { cleanTagRef, isPrerelease, prereleaseChannel, moduleFromTag, versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 import { readTagAnnotation } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
@@ -33,8 +26,6 @@ setOutput("version", version)
 setOutput("npm_tag", npmTag)
 setOutput("is_prerelease", String(prerelease))
 setOutput("prerelease_channel", channel ?? "")
-
-// --- read deploy targets from tag annotation ---
 
 const annotation = await readTagAnnotation(tag)
 const deployTargets = annotation?.deployTargets ?? []

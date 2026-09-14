@@ -7,8 +7,6 @@ import { discoverModules, findModuleByScope } from "@justanarthur/just-github-ac
 import type { ParsedVersion } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 import { parseSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 
-// --- core ---
-
 async function generateReleaseNotes(
   tagName: string,
   rootDir: string
@@ -144,8 +142,6 @@ async function generateReleaseNotes(
 
   return body
 }
-
-// --- entry point ---
 
 const tagName = getRequiredEnv("TAG_NAME")
 const rootDir = getEnv("ROOT_DIR", process.cwd())

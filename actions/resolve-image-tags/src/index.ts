@@ -1,13 +1,3 @@
-// ---
-// resolves docker image tags from remote git tags for a list of
-// module components. for each component, looks up the latest stable
-// or prerelease tag and exports the resolved version as a
-// DOCKER_<NAME>_IMAGE_TAG environment variable.
-//
-// components are passed as a JSON array input, or can be auto-discovered
-// from project modules when no explicit components are provided.
-// ---
-
 import { getEnv, getRequiredEnv, log, setEnv, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { execWithTimeout } from "@justanarthur/just-github-actions-n-workflows-lib/exec"
 import { versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
@@ -131,8 +121,6 @@ function resolveLatestTag(
   return parsed[0]?.raw ?? ""
 }
 
-// --- entry point ---
-
 const repoUrl = getRequiredEnv("RESOLVE_REPO_URL")
 const componentsRaw = getEnv("RESOLVE_COMPONENTS", "")
 const token = getEnv("GH_TOKEN", "")
@@ -142,16 +130,12 @@ log.group("resolve-docker-image-tags")
 let components: Component[]
 
 if (componentsRaw) {
-  // explicit components list provided
   try {
     const parsed = JSON.parse(componentsRaw)
 
-    // Handle both array format and object format
     if (Array.isArray(parsed)) {
-      // Already in array format
       components = parsed
     } else if (typeof parsed === "object" && parsed !== null) {
-      // Convert object format { "package-name": "version" } to array format
       components = Object.entries(parsed).map(([pkg, version]) => ({
         name: pkg.replace(/^@/, "").replace(/\//g, "_").toUpperCase(),
         package: pkg,
@@ -165,7 +149,6 @@ if (componentsRaw) {
     process.exit(1)
   }
 } else {
-  // auto-discover from project modules
   log.info("no explicit components — auto-discovering from project modules...")
   const modules = await discoverModules(process.cwd())
   components = modules
