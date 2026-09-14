@@ -70,7 +70,7 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 - **Language**: TypeScript, ESM (`"type": "module"` everywhere).
 - **No compilation step**: Actions run directly via `bun run src/index.ts` — no build/bundle needed.
 - **Imports**: Use subpath imports from the lib, e.g. `@justanarthur/just-github-actions-n-workflows-lib/modules`, not deep relative paths or cross-action imports.
-- **Comments**: Use the `// --- section ---` comment style for file sections. Each file starts with a header comment block explaining its purpose.
+- **Comments**: Minimum. No banner dividers, no docblocks on non-public exports, no file-header summary blocks. The only comments kept are non-obvious "why" notes a senior reader can't derive from the code. Lowercase when kept.
 - **No code duplication**: All shared logic must live in `lib/`. Actions import from lib. Never copy code between actions or import from one action to another.
 
 ### Shared library (`lib/`)
