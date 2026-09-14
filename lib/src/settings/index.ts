@@ -1,36 +1,3 @@
-// settings/index.ts
-// ---
-// project settings file loader.
-// reads `.justactions.yml` from the project root to configure
-// deploy targets, module overrides, and other workflow settings.
-//
-// example `.justactions.yml`:
-// ```yaml
-// deploy:
-//   ssh_target_path: ~/my-app
-//   compose_file: ./docker-compose.yml
-//   targets:
-//     production:
-//       host: app.example.com
-//       compose_profiles: "@scope/backend,@scope/frontend"
-//       profiles: "prod"
-//       timezone: Europe/Bratislava
-//     staging:
-//       host: staging.example.com
-//       compose_profiles: "@scope/backend"
-//       compose_file: ./docker-compose.staging.yml
-//       profiles: "staging"
-//       timezone: UTC
-//
-// modules:
-//   overrides:
-//     - name: "@scope/backend"
-//       docker_compose_service: backend
-//     - name: "@scope/frontend"
-//       docker_compose_service: frontend
-// ```
-// ---
-
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
@@ -73,14 +40,7 @@ export interface Settings {
   git?: GitSettings;
 }
 
-// --- constants ---
-
 const SETTINGS_FILENAME = ".justactions.yml"
-
-// --- simple yaml parser ---
-// minimal parser for the subset of yaml we need.
-// avoids adding a full yaml dependency. supports flat keys,
-// nested objects (2-space indent), and arrays with `-` prefix.
 
 function parseSimpleYaml(content: string): any {
   const lines = content.split("\n")
@@ -148,13 +108,10 @@ function parseSimpleYaml(content: string): any {
       // check if next lines are array items for this key
       continue
     }
-
-    // standalone array marker
-    if (trimmed === "-") { /* skip */ }
   }
 
   // second pass: detect arrays by re-parsing
-  return deepParseArrays(result, content)
+  return result
 }
 
 function unquote(s: string): string {
@@ -163,16 +120,6 @@ function unquote(s: string): string {
   }
   return s
 }
-
-function deepParseArrays(obj: any, _raw: string): any {
-  // basic approach: leave as-is since our simple parser handles the flat case
-  return obj
-}
-
-// --- loader ---
-// searches for `.justactions.yml` starting from `dir`, walking up
-// to the filesystem root. returns the parsed settings or an empty
-// default if no file is found.
 
 export async function loadSettings(dir: string): Promise<Settings> {
   let current = path.resolve(dir)
@@ -193,9 +140,6 @@ export async function loadSettings(dir: string): Promise<Settings> {
 
   return {}
 }
-
-// --- yaml → settings ---
-// parses the yaml content into a typed Settings object.
 
 function parseSettingsYaml(content: string): Settings {
   const raw = parseSimpleYaml(content)
@@ -242,14 +186,9 @@ function parseSettingsYaml(content: string): Settings {
   return settings
 }
 
-// --- deploy target resolution ---
-// resolves a deploy target by environment name from settings.
-// falls back to a JSON-encoded DEPLOY_CONFIG env var override.
-
 export function resolveDeployTarget(
   settings: Settings,
   environment: string
 ): DeployTarget | undefined {
   return settings.deploy?.targets?.[environment]
 }
-

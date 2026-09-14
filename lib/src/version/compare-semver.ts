@@ -1,13 +1,5 @@
-// compare-semver.ts
-// ---
-// semver comparison utility for sorting parsed versions.
-// compares two ParsedVersion objects by major.minor.patch,
-// then by prerelease identifiers (numeric or lexicographic).
-// ---
-
 import type { ParsedVersion } from "./parse-semver"
 
-// --- compare ---
 // returns negative if a < b, positive if a > b, 0 if equal.
 // stable versions sort higher than prereleases of the same base.
 
@@ -30,8 +22,8 @@ export function compareSemver(a: ParsedVersion, b: ParsedVersion): number {
     if (ap === undefined) return -1
     if (bp === undefined) return 1
 
-    const aNum = /^\d+$/.test(ap) ? parseInt(ap, 10) : NaN
-    const bNum = /^\d+$/.test(bp) ? parseInt(bp, 10) : NaN
+    const aNum = /^\d+$/.test(ap) ? Number(ap) : NaN
+    const bNum = /^\d+$/.test(bp) ? Number(bp) : NaN
 
     if (!isNaN(aNum) && !isNaN(bNum)) {
       if (aNum !== bNum) return aNum - bNum
@@ -43,4 +35,3 @@ export function compareSemver(a: ParsedVersion, b: ParsedVersion): number {
 
   return 0
 }
-

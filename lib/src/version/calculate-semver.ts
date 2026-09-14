@@ -1,20 +1,7 @@
-// calculate-semver.ts
-// ---
-// semver bump logic.
-// given a current version string, a bump level (patch/minor/major),
-// and a release channel (stable or any prerelease label like canary,
-// beta, alpha, rc …), produces the next version.
-//
-// conventional commit types are mapped to semver levels via
-// `CONVENTIONAL_TO_SEMVER` so callers don't need to handle the mapping.
-// ---
-
 import type { ParsedVersion } from "./parse-semver"
 import { formatSemver, parseSemver } from "./parse-semver"
 
 export type { ParsedVersion }
-
-// --- semver bump levels ---
 
 export const SEMVER = {
   PATCH: 0,
@@ -24,7 +11,6 @@ export const SEMVER = {
 
 export type SEMVER = (typeof SEMVER)[keyof typeof SEMVER] | number;
 
-// --- well-known prerelease channels (in precedence order) ---
 // used to detect the channel from an existing prerelease identifier.
 
 export const PRERELEASE_CHANNELS = [
@@ -34,7 +20,6 @@ export const PRERELEASE_CHANNELS = [
   "canary"
 ] as const
 
-// --- conventional commit → semver mapping ---
 // maps each conventional commit type to its default bump level.
 // breaking changes always produce a major bump.
 
@@ -77,15 +62,11 @@ function incrementPrerelease(
   if (lastNumIndex === -1) {
     parts.push("1")
   } else {
-    parts[lastNumIndex] = String(parseInt(parts[lastNumIndex], 10) + 1)
+    parts[lastNumIndex] = String(Number(parts[lastNumIndex]) + 1)
   }
 
   return parts.join(".")
 }
-
-// --- detect channel from prerelease ---
-// inspects the prerelease string and returns the channel label if it
-// matches a well-known channel or any leading alphabetic identifier.
 
 export function detectChannel(prerelease: string | null): string | null {
   if (!prerelease) return null
@@ -97,7 +78,6 @@ export function detectChannel(prerelease: string | null): string | null {
 
 function bumpPrerelease(
   version: ParsedVersion,
-  _semver: SEMVER | undefined,
   channel: string = "canary"
 ) {
   version.prerelease = incrementPrerelease(version.prerelease, channel)
@@ -123,7 +103,6 @@ function bumpStable(version: ParsedVersion, semver: SEMVER | undefined) {
   }
 }
 
-// --- public api ---
 // calculates the next version from a version string.
 //
 // `channel` accepts:
@@ -144,12 +123,12 @@ export function calculateNextSemver(
   if (channel === "stable") {
     bumpStable(parsed, semver)
   } else if (channel) {
-    bumpPrerelease(parsed, semver, channel)
+    bumpPrerelease(parsed, channel)
   } else {
     // auto-detect channel from the current version
     if (parsed.prerelease) {
       const detected = detectChannel(parsed.prerelease) ?? "canary"
-      bumpPrerelease(parsed, semver, detected)
+      bumpPrerelease(parsed, detected)
     } else {
       bumpStable(parsed, semver)
     }
@@ -157,4 +136,3 @@ export function calculateNextSemver(
 
   return formatSemver(parsed)
 }
-
