@@ -7,6 +7,186 @@ built as **composite GitHub Actions** powered by [Bun](https://bun.sh).
 
 > **v1 limitation.** the CLI (`@justanarthur/just-github-actions-n-workflows-cli`) depends on the private library `@justanarthur/just-github-actions-n-workflows-lib`. as a result, `npm install -g @justanarthur/just-github-actions-n-workflows-cli@1.0.0` is **not yet resolvable from the registry** — `bun publish` substitutes the workspace dep from the lockfile, but lib itself is unpublished. the CLI ships on npm for tagging purposes and is fully usable from source via `bun run cli/`. resolving this is tracked for v1.x.
 
+## use this in your repo
+
+pick the path that matches how much you want to take:
+
+### path A — copy workflow files (works today, no CLI)
+
+the most reliable option right now. each workflow file in `workflows/` is self-contained: it has `push` / `workflow_dispatch` / `workflow_call` triggers and a header comment explaining how to use it.
+
+1. **copy the files you want** into `.github/workflows/` of your repo:
+
+   ```bash
+   mkdir -p .github/workflows
+   curl -fsSL https://raw.githubusercontent.com/justAnArthur/just-github-actions-n-workflows/v1.0.0/workflows/bump-version.yml       > .github/workflows/bump-version.yml
+   curl -fsSL https://raw.githubusercontent.com/justAnArthur/just-github-actions-n-workflows/v1.0.0/workflows/publish-npm-on-tag.yml > .github/workflows/publish-npm-on-tag.yml
+   # add any other workflows from https://github.com/justAnArthur/just-github-actions-n-workflows/tree/main/workflows
+   ```
+
+2. **add the required secrets** under your repo → Settings → Secrets → Actions. the workflows read these as `${{ secrets.<NAME> }}`:
+
+   | workflow                          | secrets                                                     |
+   |-----------------------------------|-------------------------------------------------------------|
+   | `bump-version.yml`                | `GH_TOKEN` (or rely on auto-provided `GITHUB_TOKEN`)        |
+   | `publish-npm-on-tag.yml`          | `GH_TOKEN`, `NPM_TOKEN`                                     |
+   | `publish-docker-on-tag.yml`       | `GH_TOKEN`, (optional `DOCKER_USERNAME`/`DOCKER_PASSWORD`)  |
+   | `deploy-vercel-on-tag.yml`        | `GH_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` |
+   | `release-on-tag.yml`              | `GH_TOKEN`                                                  |
+   | `deploy-docker-compose.yml`       | `GH_TOKEN`, `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` |
+
+3. **configure each package's manifest** with a `properties` block so the bump-version workflow knows which package to bump on which commit scope. see [manifest configuration](#manifest-configuration) for the schema.
+
+4. **commit and push**:
+
+   ```bash
+   git add .github/ && git commit -m "ci: add release workflows" && git push
+   ```
+
+5. **release your first version**:
+
+   ```bash
+   # push a tag manually the first time. after this, every push to main
+   # will auto-bump the matching package based on conventional commits.
+   git tag @scope/my-package@1.0.0    # adjust scope + name + version
+   git push origin @scope/my-package@1.0.0
+   ```
+
+### path B — reference actions directly (modular)
+
+if you only want a couple of pieces (e.g. just `setup-ssh` + `scp-transfer`), reference individual actions in your own workflows:
+
+```yaml
+# .github/workflows/deploy.yml
+name: deploy
+
+on:
+  push:
+    branches: [ main ]
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: justAnArthur/just-github-actions-n-workflows/actions/setup-ssh@main
+        with:
+          private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: my-server.com
+
+      - uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main
+        with:
+          host: my-server.com
+          username: ${{ secrets.SERVER_USERNAME }}
+          script: |
+            cd ~/my-app
+            docker compose pull
+            docker compose up -d
+```
+
+pin to `@v1` for major-version stability once we cut a `v1.0.0` repo-level tag (currently we ship per-package tags — see [available actions](#available-actions) for the full list).
+
+### path C — CLI install (best UX, broken for npm install in v1)
+
+the CLI scaffolds workflows into your repo, tracks installed versions in a lock file, and lets you update with one command. it is the best long-term path but **is not currently usable via npm install** — see the v1 limitation callout at the top. workarounds:
+
+- **run from a local clone of this repo**:
+
+  ```bash
+  git clone https://github.com/justAnArthur/just-github-actions-n-workflows.git
+  cd just-github-actions-n-workflows
+  bun install
+  bun run cli/ <command>             # see "cli" section below
+  ```
+
+- **wait for v1.x**: making the lib package publishable is tracked. once shipped, `npm install -g @justanarthur/just-github-actions-n-workflows-cli` will work as documented below.
+
+## end-to-end example: ship a 3-package monorepo to npm + docker
+
+concrete walkthrough of what a release cycle looks like with this toolkit installed.
+
+**repo shape** (the `packages/api`, `packages/web`, `packages/shared` layout):
+
+```
+my-monorepo/
+├── package.json                     # workspace root, name: "my-monorepo"
+├── packages/
+│   ├── shared/
+│   │   ├── package.json             # name: "@myorg/shared"
+│   │   └── src/index.ts
+│   ├── api/
+│   │   ├── package.json             # name: "@myorg/api", properties.dockerfilePath
+│   │   ├── Dockerfile
+│   │   └── src/server.ts
+│   └── web/
+│       ├── package.json             # name: "@myorg/web"
+│       └── src/app.tsx
+└── .github/workflows/
+    ├── bump-version.yml             # copied from this repo
+    └── publish-npm-on-tag.yml       # copied from this repo
+```
+
+**step 1 — declare what each package bumps on**. open each `package.json`, add the `properties` block:
+
+```jsonc
+// packages/shared/package.json
+{
+  "name": "@myorg/shared",
+  "version": "0.1.0",
+  "properties": {
+    "gitCommitScopeRelatedNames": "shared,lib"
+  }
+}
+```
+
+```jsonc
+// packages/api/package.json
+{
+  "name": "@myorg/api",
+  "version": "0.1.0",
+  "properties": {
+    "gitCommitScopeRelatedNames": "api,backend",
+    "dockerfilePath": "./Dockerfile"     // enables "docker" deploy target
+  }
+}
+```
+
+```jsonc
+// packages/web/package.json
+{
+  "name": "@myorg/web",
+  "version": "0.1.0",
+  "properties": {
+    "gitCommitScopeRelatedNames": "web,frontend"
+  }
+}
+```
+
+**step 2 — set secrets** in your GitHub repo: `GH_TOKEN`, `NPM_TOKEN`.
+
+**step 3 — write code with conventional commits**. the commit scope determines which package gets bumped:
+
+```bash
+git commit -m "feat(api): add /healthz endpoint"      # bumps @myorg/api only
+git commit -m "fix(shared): correct date formatting"  # bumps @myorg/shared only
+git commit -m "feat(frontend): redesign dashboard"    # bumps @myorg/web only
+git push                                              # bump-version.yml auto-bumps on push to main
+```
+
+**step 4 — release**. the bump-version workflow pushes annotated tags like `@myorg/api@0.2.0` with a JSON annotation listing the deploy targets. the publish-npm workflow picks each tag up and:
+- for `npm`-tagged packages → publishes to npm at the new version
+- for non-npm-tagged packages (private, lib, etc.) → skips
+- creates a GitHub release with conventional-commit-derived notes
+
+if you also want docker images built and pushed to ghcr.io, copy `publish-docker-on-tag.yml` as well.
+
+**step 5 — keep things updated**. when a new toolkit release lands, either re-run `init` (when CLI install is fixed) or re-curl the workflow files:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/justAnArthur/just-github-actions-n-workflows/v1.2.0/workflows/bump-version.yml > .github/workflows/bump-version.yml
+git diff .github/workflows/bump-version.yml           # review what changed
+git add . && git commit -m "ci: bump toolkit to v1.2.0" && git push
+```
+
 ## overview
 
 this is a repo of **generic, installable/updatable workflows** for project release automation.
@@ -20,74 +200,24 @@ each workflow works with project **modules** — independent packages within a m
 - **deploy targets** — deployment types inferred from the manifest (`npm`, `docker`, `vercel`) and embedded in git tag annotations
 - **settings file** (`.justactions.yml`) — per-project config for deploy targets, module overrides, etc.
 
-## quick start
-
-from any repo, scaffold the workflow files:
-
-```bash
-npx @justanarthur/just-github-actions-n-workflows-cli init
-```
-
-```
-$ npx @justanarthur/just-github-actions-n-workflows-cli init
-
-  just-github-actions-n-workflows
-  release automation toolkit
-
-  step 1 — select version
-
-? Pick a version
-❯ 0.0.0-beta.11 (latest tag)
-  0.0.0-beta.8
-  0.0.0-beta.6
-
-  step 2 — select workflows
-
-? Select workflows to install
-  bump-version               auto-bump module versions on push
-  publish-npm-on-tag         publish to npm + github release
-  publish-docker-on-tag      build + publish docker image
-  deploy-vercel-on-tag       deploy to vercel on tag push
-  release-on-tag             create github release with notes
-  deploy-docker-compose      deploy docker compose to remote server
-
-  step 3 — install
-
-  create  .github/workflows/bump-version.yml
-  create  .github/workflows/publish-npm-on-tag.yml
-  create  .justactions.yml
-
-  lock file written → .github/workflows/.toolkit-lock.json
-
-done — 2 created, 0 skipped
-
-  required secrets:
-
-  • GH_TOKEN           github token with contents:write
-  • NPM_TOKEN          npm registry publish token
-
-  set these in your repo → Settings → Secrets → Actions
-
-  next steps:
-
-  1. set the secrets listed above
-  2. adjust push.branches / push.tags triggers for your repo
-  3. configure .justactions.yml with your deploy targets (if using deploy workflow)
-  4. commit and push:
-     git add .github/ .justactions.yml && git commit -m "ci: add workflows" && git push
-```
-
 ## cli
 
-### install
+the CLI is `cli/` in this repo. it ships on npm at `@justanarthur/just-github-actions-n-workflows-cli` (see the v1 limitation callout at the top for why `npm install` doesn't yet work).
+
+### install (from source, current workaround)
+
+```bash
+git clone https://github.com/justAnArthur/just-github-actions-n-workflows.git
+cd just-github-actions-n-workflows
+bun install
+bun run cli/ <command>
+```
+
+### install (when v1.x ships the lib fix)
 
 ```bash
 npm install -g @justanarthur/just-github-actions-n-workflows-cli
-```
-
-or run directly without installing:
-
-```bash
+# or
 npx @justanarthur/just-github-actions-n-workflows-cli <command>
 ```
 
@@ -133,6 +263,55 @@ the `init` command:
 4. scaffolds a `.justactions.yml` settings template
 5. writes a `.toolkit-lock.json` lock file tracking installed versions
 
+```
+$ just-github-actions-n-workflows init
+
+  just-github-actions-n-workflows
+  release automation toolkit
+
+  step 1 — select version
+
+? Pick a version
+❯ 1.0.0 (latest stable)
+  0.0.0-beta.11
+  0.0.0-beta.8
+
+  step 2 — select workflows
+
+? Select workflows to install
+  bump-version               auto-bump module versions on push
+  publish-npm-on-tag         publish to npm + github release
+  publish-docker-on-tag      build + publish docker image
+  deploy-vercel-on-tag       deploy to vercel on tag push
+  release-on-tag             create github release with notes
+  deploy-docker-compose      deploy docker compose to remote server
+
+  step 3 — install
+
+  create  .github/workflows/bump-version.yml
+  create  .github/workflows/publish-npm-on-tag.yml
+  create  .justactions.yml
+
+  lock file written → .github/workflows/.toolkit-lock.json
+
+done — 2 created, 0 skipped
+
+  required secrets:
+
+  • GH_TOKEN           github token with contents:write
+  • NPM_TOKEN          npm registry publish token
+
+  set these in your repo → Settings → Secrets → Actions
+
+  next steps:
+
+  1. set the secrets listed above
+  2. adjust push.branches / push.tags triggers for your repo
+  3. configure .justactions.yml with your deploy targets (if using deploy workflow)
+  4. commit and push:
+     git add .github/ .justactions.yml && git commit -m "ci: add workflows" && git push
+```
+
 #### `update` — update installed workflows
 
 ```bash
@@ -162,7 +341,7 @@ shows which workflows are up to date and which can be updated.
 
 ## settings file
 
-create a `.justactions.yml` in your repo root to configure deploy targets and module overrides. the `init` command scaffolds this file automatically.
+create a `.justactions.yml` in your repo root to configure deploy targets and module overrides. the `init` command scaffolds this file automatically. only needed if you use one of the deploy workflows (`deploy-docker-compose.yml`, `deploy-vercel-on-tag.yml`).
 
 ```yaml
 # .justactions.yml
@@ -316,7 +495,7 @@ the `parseManifest` function must return a `Manifest` object with `deployTargets
 
 ## available actions
 
-each action is a composite GitHub Action in `actions/` with its own `action.yml`.
+each action is a composite GitHub Action in `actions/` with its own `action.yml`. use any action directly in your workflow steps (path B above).
 
 | action                           | description                                       | key inputs                                                    |
 |----------------------------------|---------------------------------------------------|---------------------------------------------------------------|
@@ -378,6 +557,48 @@ ready-to-copy workflow files in `workflows/`:
 | `deploy-vercel-on-tag.yml`       | deploy to vercel (production or preview)       | tag push, dispatch, call |
 | `release-on-tag.yml`             | create github release with notes               | tag push, dispatch, call |
 | `deploy-docker-compose.yml`      | deploy docker compose to remote server         | dispatch, call           |
+
+## how it works
+
+1. **modules** are discovered by scanning the repo for manifest files (`package.json`,
+   `pom.xml`, …). each manifest is parsed by its adapter into a unified `Module` object
+   with name, version, directory, deploy targets, and metadata.
+
+2. **deploy targets** (`npm`, `docker`, `vercel`) are inferred from manifest properties
+   and embedded in annotated git tags as JSON. this lets downstream workflows skip
+   irrelevant jobs immediately via `if:` conditions — no runtime detection needed.
+
+3. **composite actions** in `actions/` are standalone typescript programs that
+   read inputs from environment variables and write outputs to `$GITHUB_OUTPUT`.
+   each has an `action.yml` that sets up Bun, installs dependencies, and runs
+   the action via `bun run`.
+
+4. **workflows** in `workflows/` orchestrate multiple actions into complete
+   CI/CD pipelines. each is self-contained with `push`, `workflow_dispatch`,
+   and `workflow_call` triggers — copy into your repo or call as reusable.
+
+5. **settings** (`.justactions.yml`) configure per-project deploy targets,
+   module overrides, and other workflow behavior without hardcoding values.
+
+6. **`init` cli** scaffolds the workflow files into any repo so you don't
+   have to copy YAML by hand. tracks installed versions in a lock file.
+
+7. **pre-commit hook** keeps `.github/workflows/` in sync with `workflows/`
+   automatically — edit the template once, the hook copies it on commit.
+
+## secrets required
+
+| secret             | used by                                             |
+|--------------------|-----------------------------------------------------|
+| `GH_TOKEN`         | all workflows (github api + push access)            |
+| `NPM_TOKEN`        | publish-npm, publish-docker (npm registry)          |
+| `SSH_PRIVATE_KEY`  | deploy-docker-compose (ssh authentication)          |
+| `SERVER_USERNAME`  | deploy-docker-compose (ssh/scp username)            |
+| `DOCKER_USERNAME`  | deploy-docker-compose (ghcr login)                  |
+| `DOCKER_PASSWORD`  | deploy-docker-compose (ghcr login)                  |
+| `VERCEL_TOKEN`     | deploy-vercel-on-tag (vercel api token)             |
+| `VERCEL_ORG_ID`    | deploy-vercel-on-tag (vercel organization id)       |
+| `VERCEL_PROJECT_ID`| deploy-vercel-on-tag (vercel project id)            |
 
 ## project structure
 
@@ -453,48 +674,6 @@ ready-to-copy workflow files in `workflows/`:
 │
 └── .github/workflows/            # auto-synced by pre-commit hook
 ```
-
-## how it works
-
-1. **modules** are discovered by scanning the repo for manifest files (`package.json`,
-   `pom.xml`, …). each manifest is parsed by its adapter into a unified `Module` object
-   with name, version, directory, deploy targets, and metadata.
-
-2. **deploy targets** (`npm`, `docker`, `vercel`) are inferred from manifest properties
-   and embedded in annotated git tags as JSON. this lets downstream workflows skip
-   irrelevant jobs immediately via `if:` conditions — no runtime detection needed.
-
-3. **composite actions** in `actions/` are standalone typescript programs that
-   read inputs from environment variables and write outputs to `$GITHUB_OUTPUT`.
-   each has an `action.yml` that sets up Bun, installs dependencies, and runs
-   the action via `bun run`.
-
-4. **workflows** in `workflows/` orchestrate multiple actions into complete
-   CI/CD pipelines. each is self-contained with `push`, `workflow_dispatch`,
-   and `workflow_call` triggers — copy into your repo or call as reusable.
-
-5. **settings** (`.justactions.yml`) configure per-project deploy targets,
-   module overrides, and other workflow behavior without hardcoding values.
-
-6. **`init` cli** scaffolds the workflow files into any repo so you don't
-   have to copy YAML by hand. tracks installed versions in a lock file.
-
-7. **pre-commit hook** keeps `.github/workflows/` in sync with `workflows/`
-   automatically — edit the template once, the hook copies it on commit.
-
-## secrets required
-
-| secret             | used by                                             |
-|--------------------|-----------------------------------------------------|
-| `GH_TOKEN`         | all workflows (github api + push access)            |
-| `NPM_TOKEN`        | publish-npm, publish-docker (npm registry)          |
-| `SSH_PRIVATE_KEY`  | deploy-docker-compose (ssh authentication)          |
-| `SERVER_USERNAME`  | deploy-docker-compose (ssh/scp username)            |
-| `DOCKER_USERNAME`  | deploy-docker-compose (ghcr login)                  |
-| `DOCKER_PASSWORD`  | deploy-docker-compose (ghcr login)                  |
-| `VERCEL_TOKEN`     | deploy-vercel-on-tag (vercel api token)             |
-| `VERCEL_ORG_ID`    | deploy-vercel-on-tag (vercel organization id)       |
-| `VERCEL_PROJECT_ID`| deploy-vercel-on-tag (vercel project id)            |
 
 ## development
 
