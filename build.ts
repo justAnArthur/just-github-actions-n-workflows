@@ -1,8 +1,3 @@
-// build.ts
-// ---
-// validates that every action package has the required files.
-// there is nothing to compile — actions run via `bun run` in composite actions.
-//
 import { existsSync } from "node:fs"
 import { join } from "node:path"
 import { Glob } from "bun"
