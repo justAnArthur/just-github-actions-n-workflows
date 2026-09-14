@@ -26,7 +26,6 @@
 #               create-env-file, scp-transfer, deploy-compose-remote, ssh-exec
 #
 # required secrets:
-#   GH_TOKEN         — github token with contents:read and packages:read
 #   SSH_PRIVATE_KEY  — ssh private key for server access
 #   SERVER_USERNAME  — ssh username on the target server
 #   DOCKER_USERNAME  — container registry username
@@ -81,9 +80,6 @@ on:
         required: false
         default: ""
     secrets:
-      GH_TOKEN:
-        description: "github token with contents:read and packages:read"
-        required: true
       SSH_PRIVATE_KEY:
         description: "ssh private key for server access"
         required: true
@@ -105,7 +101,6 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GH_TOKEN }}
           lfs: true
 
       - name: Resolve deploy config from settings
@@ -125,7 +120,7 @@ jobs:
         uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-image-tags@main
         with:
           repo_url: https://github.com/${{ github.repository }}.git
-          gh_token: ${{ secrets.GH_TOKEN }}
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
           components: ${{ inputs.module_versions }}
 
       - name: Create .env file for Docker Compose

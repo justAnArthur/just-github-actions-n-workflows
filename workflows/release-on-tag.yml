@@ -13,11 +13,9 @@
 #       uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/release-on-tag.yml@main
 #       with:
 #         tag: ${{ github.ref_name }}
-#       secrets:
-#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
 #
 # required secrets:
-#   GH_TOKEN — github token with contents:write
+#   (none — uses the auto-provided GITHUB_TOKEN)
 # ---
 
 name: release-on-tag
@@ -37,10 +35,6 @@ on:
       tag:
         description: 'tag to release (e.g. "my-package@1.2.3")'
         type: string
-        required: true
-    secrets:
-      GH_TOKEN:
-        description: "github token with contents:write"
         required: true
 
 permissions:
@@ -62,7 +56,6 @@ jobs:
         with:
           ref: ${{ steps.meta.outputs.tag }}
           fetch-depth: 0
-          token: ${{ secrets.GH_TOKEN }}
 
       - name: Fetch all tags
         uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
@@ -85,5 +78,5 @@ jobs:
 
             ${{ steps.release_notes.outputs.release_notes }}
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 

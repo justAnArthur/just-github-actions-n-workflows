@@ -18,11 +18,9 @@
 #       with:
 #         tag: ${{ github.ref_name }}
 #       secrets:
-#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
 #         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 #
 # required secrets:
-#   GH_TOKEN  — github token with contents:write
 #   NPM_TOKEN — npm registry publish token
 # ---
 
@@ -45,9 +43,6 @@ on:
         type: string
         required: true
     secrets:
-      GH_TOKEN:
-        description: "github token with contents:write"
-        required: true
       NPM_TOKEN:
         description: "npm registry publish token"
         required: true
@@ -147,5 +142,5 @@ jobs:
             npm install ${{ needs.resolve-meta.outputs.pkg_name }}@${{ needs.resolve-meta.outputs.version }}
             ```
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
