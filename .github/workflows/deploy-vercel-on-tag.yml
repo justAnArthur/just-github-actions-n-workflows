@@ -1,0 +1,88 @@
+# deploy-vercel-on-tag.yml
+# ---
+# triggers a vercel deployment via deploy hook when a version tag is
+# pushed that has "vercel" in its deploy targets annotation.
+#
+# uses vercel deploy hooks (HTTP POST) — no CLI, no checkout needed.
+# vercel handles the build remotely from the linked git branch.
+#
+# the tag annotation is written by the bump-version action and contains
+# a JSON object with a `deployTargets` array. this workflow reads the
+# annotation via resolve-tag-meta and skips if "vercel" is not present.
+#
+# setup: create a deploy hook in your vercel project settings
+# (Settings → Git → Deploy Hooks) and store the URL as a secret.
+#
+# copy this file into your repo's `.github/workflows/` and adjust
+# the `push.tags` pattern to match your package naming convention.
+#
+# can also be called as a reusable workflow:
+#
+#   jobs:
+#     deploy:
+#       uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/deploy-vercel-on-tag.yml@main
+#       with:
+#         tag: ${{ github.ref_name }}
+#       secrets:
+#         VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+#
+# required secrets:
+#   VERCEL_DEPLOY_HOOK_URL — vercel deploy hook URL (from project settings → git → deploy hooks)
+# ---
+
+name: deploy-vercel-on-tag
+run-name: "deploy-vercel — ${{ inputs.tag || github.ref_name }}"
+
+on:
+  push:
+    tags: [ "**@*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'tag to deploy (e.g. "@scope/frontend@1.2.3")'
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      tag:
+        description: 'tag to deploy (e.g. "@scope/frontend@1.2.3")'
+        type: string
+        required: true
+    secrets:
+      VERCEL_DEPLOY_HOOK_URL:
+        description: "vercel deploy hook URL"
+        required: true
+
+permissions:
+  contents: read
+
+jobs:
+  resolve-meta:
+    runs-on: ubuntu-latest
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+      pkg_name: ${{ steps.meta.outputs.pkg_name }}
+      version: ${{ steps.meta.outputs.version }}
+      is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      has_annotation: ${{ steps.meta.outputs.has_annotation }}
+      publish_vercel: ${{ steps.meta.outputs.publish_vercel }}
+    steps:
+      - name: Resolve tag metadata
+        id: meta
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-tag-meta@main
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+
+  deploy-vercel:
+    needs: resolve-meta
+    if: >-
+      needs.resolve-meta.outputs.has_annotation != 'true' ||
+      needs.resolve-meta.outputs.publish_vercel == 'true'
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Trigger Vercel deploy hook
+        uses: justAnArthur/just-github-actions-n-workflows/actions/trigger-deploy-hook@main
+        with:
+          hook_url: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+          tag: ${{ needs.resolve-meta.outputs.tag }}
