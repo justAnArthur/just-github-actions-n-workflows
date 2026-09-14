@@ -1,10 +1,3 @@
-// cli/src/commands/update.ts
-// ---
-// updates previously installed workflows to a newer version.
-// reads .toolkit-lock.json to find installed workflows, then
-// re-fetches them from the specified (or latest) git ref.
-// ---
-
 import { Command, Flags, ux } from "@oclif/core"
 import { confirm } from "@inquirer/prompts"
 import { writeFileSync } from "node:fs"
@@ -47,8 +40,6 @@ export default class Update extends Command {
   async run(): Promise<void> {
     const { flags } = await this.parse(Update)
 
-    // --- read lock file ---
-
     const lock = readLockfile()
 
     if (!lock || Object.keys(lock.workflows).length === 0) {
@@ -57,8 +48,6 @@ export default class Update extends Command {
         { exit: 1 }
       )
     }
-
-    // --- resolve target ref ---
 
     const tags = await fetchTags()
     const targetRef = flags.ref ?? (tags.length > 0 ? tags[0].tag : null)
@@ -73,8 +62,6 @@ export default class Update extends Command {
     this.log(ux.colorize("bold", "  workflow update check"))
     this.log(ux.colorize("dim", `  target: ${targetRef}\n`))
 
-    // --- compare versions ---
-
     const outdated: LockEntry[] = []
     const upToDate: LockEntry[] = []
 
@@ -85,8 +72,6 @@ export default class Update extends Command {
         outdated.push(entry)
       }
     }
-
-    // --- print status table ---
 
     for (const entry of entries) {
       const current = entry.ref === targetRef
@@ -105,9 +90,6 @@ export default class Update extends Command {
       return
     }
 
-
-    // --- confirm ---
-
     if (!flags.yes) {
       const proceed = await confirm({
         message: `Update ${outdated.length} workflow(s) to ${targetRef}?`,
@@ -122,14 +104,11 @@ export default class Update extends Command {
       this.log()
     }
 
-    // --- update files ---
-
     const targetDir = join(process.cwd(), ".github", "workflows")
     let updated = 0
     let errors = 0
     const updatedEntries: { name: string; file: string }[] = []
 
-    // resolve tag → commit SHA for safe `uses:` refs
     const sha = await resolveRefSha(targetRef)
     if (sha !== targetRef) {
       this.log(ux.colorize("dim", `  resolved ${targetRef} → ${sha.slice(0, 12)}`))
@@ -150,8 +129,6 @@ export default class Update extends Command {
         errors++
       }
     }
-
-    // --- update lock file ---
 
     if (updatedEntries.length > 0) {
       const updatedLock = mergeLockfile(lock, targetRef, updatedEntries)
