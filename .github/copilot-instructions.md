@@ -132,7 +132,7 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 - All workspace packages share the same version (set in each `package.json`).
 - Versions are bumped automatically by the `bump-version` workflow based on conventional commit messages.
 - Commit messages are parsed by `lib/src/git/conventional-commit-parser.ts`.
-- See `.github/copilot-commit-message-instructions.md` for the commit message format.
+- See `.github/git-commit-instructions.md` for the commit message format.
 
 ### Manifests
 - Version bumps target **manifest files** (`package.json`, `pom.xml`, …).
@@ -194,5 +194,5 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 | `actions/bump-version/src/index.ts` | Main version bump orchestrator |
 | `.justactions.yml` | Project settings file (deploy targets, module overrides) |
 | `.githooks/pre-commit` | Workflow sync hook |
-| `.github/copilot-commit-message-instructions.md` | Commit message format rules |
+| `.github/git-commit-instructions.md` | Commit message format rules |
 

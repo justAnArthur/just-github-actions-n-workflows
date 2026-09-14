@@ -24,16 +24,16 @@ the most reliable option right now. each workflow file in `workflows/` is self-c
    # add any other workflows from https://github.com/justAnArthur/just-github-actions-n-workflows/tree/main/workflows
    ```
 
-2. **add the required secrets** under your repo → Settings → Secrets → Actions. the workflows read these as `${{ secrets.<NAME> }}`:
+2. **add the required secrets** under your repo → Settings → Secrets → Actions. the workflows read these as `${{ secrets.<NAME> }}`. all workflows use the auto-provided `GITHUB_TOKEN` for github api calls — no PAT required unless you have a specific reason to set one.
 
-   | workflow                          | secrets                                                     |
+   | workflow                          | secrets (in addition to auto `GITHUB_TOKEN`)               |
    |-----------------------------------|-------------------------------------------------------------|
-   | `bump-version.yml`                | `GH_TOKEN` (or rely on auto-provided `GITHUB_TOKEN`)        |
-   | `publish-npm-on-tag.yml`          | `GH_TOKEN`, `NPM_TOKEN`                                     |
-   | `publish-docker-on-tag.yml`       | `GH_TOKEN`, (optional `DOCKER_USERNAME`/`DOCKER_PASSWORD`)  |
-   | `deploy-vercel-on-tag.yml`        | `GH_TOKEN`, `VERCEL_TOKEN`, `VERCEL_ORG_ID`, `VERCEL_PROJECT_ID` |
-   | `release-on-tag.yml`              | `GH_TOKEN`                                                  |
-   | `deploy-docker-compose.yml`       | `GH_TOKEN`, `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` |
+   | `bump-version.yml`                | (none)                                                      |
+   | `publish-npm-on-tag.yml`          | `NPM_TOKEN`                                                 |
+   | `publish-docker-on-tag.yml`       | (optional `NPM_TOKEN` build-arg)                            |
+   | `deploy-vercel-on-tag.yml`        | `VERCEL_DEPLOY_HOOK_URL`                                    |
+   | `release-on-tag.yml`              | (none)                                                      |
+   | `deploy-docker-compose.yml`       | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` |
 
 3. **configure each package's manifest** with a `properties` block so the bump-version workflow knows which package to bump on which commit scope. see [manifest configuration](#manifest-configuration) for the schema.
 
@@ -244,9 +244,14 @@ just-github-actions-n-workflows init --force
 # skip creating .justactions.yml
 just-github-actions-n-workflows init --no-settings
 
+# skip scaffolding .github/AGENTS.md and the root symlink
+just-github-actions-n-workflows init --no-agents
+
 # list available workflows without installing
 just-github-actions-n-workflows init --list
 ```
+
+`init` and `update` also write `.github/AGENTS.md` (with a symlink at the repo root as `AGENTS.md`) so an AI coding agent landing in this repo gets a guide to the release machinery: conventional-commit scope mapping, the `@scope/name@version` tag annotation JSON contract, why a publish might skip, and the secrets it shouldn't touch. this file is owned by the toolkit — `update` rewrites it on every upgrade. to customize agent-facing instructions for your specific repo, write a separate `CONTRIBUTING.md` instead.
 
 | flag             | short | description                                      |
 |------------------|-------|--------------------------------------------------|
@@ -255,6 +260,7 @@ just-github-actions-n-workflows init --list
 | `--yes`          | `-y`  | skip interactive prompts, install all workflows  |
 | `--ref <ref>`    |       | git ref to fetch from (tag, branch, sha)         |
 | `--no-settings`  |       | skip creating the `.justactions.yml` file        |
+| `--no-agents`    |       | skip scaffolding `.github/AGENTS.md` and the root symlink |
 
 the `init` command:
 1. fetches available versions (sorted by semver, latest first)
@@ -325,7 +331,7 @@ just-github-actions-n-workflows update --ref v2.0.0
 just-github-actions-n-workflows update --yes
 ```
 
-reads `.toolkit-lock.json` to find installed workflows, compares versions, and re-fetches outdated ones.
+reads `.toolkit-lock.json` to find installed workflows, compares versions, and re-fetches outdated ones. also re-writes `.github/AGENTS.md` so doc improvements ship to existing users. **must be run from the repo root** (same constraint as `status`).
 
 #### `status` — check installed workflow versions
 
@@ -337,7 +343,7 @@ just-github-actions-n-workflows status
 just-github-actions-n-workflows status --ref v2.0.0
 ```
 
-shows which workflows are up to date and which can be updated.
+shows which workflows are up to date and which can be updated. **must be run from the repo root** — `status`, `update`, and `init` resolve `.github/workflows/.toolkit-lock.json` and `.github/AGENTS.md` relative to `process.cwd()`.
 
 ## settings file
 
@@ -516,6 +522,7 @@ each action is a composite GitHub Action in `actions/` with its own `action.yml`
 | `actions/setup-ssh`              | provision ssh key + known_hosts                   | `private_key`, `host`                                         |
 | `actions/skip-check`             | detect `[skip bump]` loops                        | —                                                             |
 | `actions/ssh-exec`               | run a script on remote server via ssh             | `host`, `username`, `script`                                  |
+| `actions/trigger-deploy-hook`    | HTTP POST to a deploy hook URL (e.g. vercel)      | `hook_url`, `tag`                                             |
 
 use any action directly in your workflow steps:
 
@@ -588,17 +595,16 @@ ready-to-copy workflow files in `workflows/`:
 
 ## secrets required
 
-| secret             | used by                                             |
-|--------------------|-----------------------------------------------------|
-| `GH_TOKEN`         | all workflows (github api + push access)            |
-| `NPM_TOKEN`        | publish-npm, publish-docker (npm registry)          |
-| `SSH_PRIVATE_KEY`  | deploy-docker-compose (ssh authentication)          |
-| `SERVER_USERNAME`  | deploy-docker-compose (ssh/scp username)            |
-| `DOCKER_USERNAME`  | deploy-docker-compose (ghcr login)                  |
-| `DOCKER_PASSWORD`  | deploy-docker-compose (ghcr login)                  |
-| `VERCEL_TOKEN`     | deploy-vercel-on-tag (vercel api token)             |
-| `VERCEL_ORG_ID`    | deploy-vercel-on-tag (vercel organization id)       |
-| `VERCEL_PROJECT_ID`| deploy-vercel-on-tag (vercel project id)            |
+| secret                | used by                                                              |
+|-----------------------|----------------------------------------------------------------------|
+| `NPM_TOKEN`           | `publish-npm-on-tag.yml`; optional build-arg in `publish-docker-on-tag.yml` |
+| `VERCEL_DEPLOY_HOOK_URL` | `deploy-vercel-on-tag.yml`                                        |
+| `SSH_PRIVATE_KEY`     | `deploy-docker-compose.yml` (ssh authentication)                     |
+| `SERVER_USERNAME`     | `deploy-docker-compose.yml` (ssh/scp username)                       |
+| `DOCKER_USERNAME`     | `deploy-docker-compose.yml` (ghcr login)                             |
+| `DOCKER_PASSWORD`     | `deploy-docker-compose.yml` (ghcr login)                             |
+
+all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_TOKEN` and forward it via `workflow_call` only if a specific step needs a PAT with elevated scopes.
 
 ## project structure
 
@@ -650,7 +656,8 @@ ready-to-copy workflow files in `workflows/`:
 │   ├── scp-transfer/
 │   ├── setup-ssh/
 │   ├── skip-check/
-│   └── ssh-exec/
+│   ├── ssh-exec/
+│   └── trigger-deploy-hook/
 │
 ├── cli/                          # npm-published cli package
 │   └── src/

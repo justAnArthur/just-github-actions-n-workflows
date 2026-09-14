@@ -18,11 +18,9 @@
 #       with:
 #         tag: ${{ github.ref_name }}
 #       secrets:
-#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
 #         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 #
 # required secrets:
-#   GH_TOKEN  — github token with contents:write and packages:write
 #   NPM_TOKEN — npm registry token (optional, passed as docker build arg)
 # ---
 
@@ -45,9 +43,6 @@ on:
         type: string
         required: true
     secrets:
-      GH_TOKEN:
-        description: "github token with contents:write and packages:write"
-        required: true
       NPM_TOKEN:
         description: "npm registry token (passed as docker build arg)"
         required: false
@@ -95,7 +90,6 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-          token: ${{ secrets.GH_TOKEN }}
           ref: ${{ needs.resolve-meta.outputs.tag || inputs.tag || github.ref_name }}
           lfs: true
 
@@ -121,7 +115,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GH_TOKEN }}
+          password: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Build and push docker image to ghcr
         uses: docker/build-push-action@v6
@@ -133,7 +127,7 @@ jobs:
           platforms: linux/amd64
           build-args: |
             USERNAME_GITHUB=${{ github.actor }}
-            TOKEN_GITHUB=${{ secrets.GH_TOKEN }}
+            TOKEN_GITHUB=${{ secrets.GITHUB_TOKEN }}
             TAG_NAME=${{ steps.prepare.outputs.original_tag }}
             SANITIZED_IMAGE_TAG=${{ steps.prepare.outputs.image_tag }}
             NPM_TOKEN=${{ secrets.NPM_TOKEN }}
@@ -164,4 +158,4 @@ jobs:
 
             published to [github container registry](https://github.com/${{ github.repository }}/pkgs/container/${{ steps.prepare.outputs.repo_name }}%2F${{ steps.prepare.outputs.package_image_name }}?tag=${{ steps.prepare.outputs.image_tag }})
         env:
-          GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

@@ -184,9 +184,19 @@ export async function resolveRefSha(ref: string): Promise<string> {
 }
 
 export const SETTINGS_FILENAME = ".justactions.yml"
+export const AGENTS_TEMPLATE_PATH = "docs/AGENTS.template.md"
 
 export async function fetchSettingsTemplate(gitRef: string): Promise<string | null> {
   const url = `${RAW_BASE}/${gitRef}/${SETTINGS_FILENAME}`
+  const res = await fetch(url, { headers: authHeaders() })
+
+  if (!res.ok) return null
+
+  return await res.text()
+}
+
+export async function fetchAgentsTemplate(gitRef: string): Promise<string | null> {
+  const url = `${RAW_BASE}/${gitRef}/${AGENTS_TEMPLATE_PATH}`
   const res = await fetch(url, { headers: authHeaders() })
 
   if (!res.ok) return null

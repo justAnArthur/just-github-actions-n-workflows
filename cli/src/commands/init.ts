@@ -4,7 +4,9 @@ import { existsSync, mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import {
+  AGENTS_TEMPLATE_PATH,
   enrichWorkflows,
+  fetchAgentsTemplate,
   fetchSettingsTemplate,
   fetchTags,
   fetchWorkflowContent,
@@ -15,7 +17,15 @@ import {
   type VersionTag,
   type WorkflowEntry
 } from "../github.js"
-import { injectRefComment, mergeLockfile, readLockfile, writeLockfile } from "../lockfile.js"
+import {
+  AGENTS_FILE,
+  AGENTS_REL_PATH,
+  ensureAgentsLink,
+  injectRefComment,
+  mergeLockfile,
+  readLockfile,
+  writeLockfile
+} from "../lockfile.js"
 
 export default class Init extends Command {
   static override description = "Scaffold workflow files into .github/workflows/ of the current repo"
@@ -25,7 +35,8 @@ export default class Init extends Command {
     "<%= config.bin %> init bump-version",
     "<%= config.bin %> init --ref v1.0.0",
     "<%= config.bin %> init --list",
-    "<%= config.bin %> init --yes --force"
+    "<%= config.bin %> init --yes --force",
+    "<%= config.bin %> init --no-agents"
   ]
 
   static override args = {
@@ -58,6 +69,10 @@ export default class Init extends Command {
     }),
     "no-settings": Flags.boolean({
       description: "Skip creating the .justactions.yml settings file",
+      default: false
+    }),
+    "no-agents": Flags.boolean({
+      description: "Skip scaffolding .github/AGENTS.md and the root symlink",
       default: false
     })
   }
@@ -94,6 +109,10 @@ export default class Init extends Command {
 
     if (!flags["no-settings"]) {
       await this.scaffoldSettings(ref, flags)
+    }
+
+    if (!flags["no-agents"]) {
+      await this.scaffoldAgents(ref, flags)
     }
 
     this.log(`\n  done — ${ux.colorize("green", `${created} created`)}, ${skipped} skipped\n`)
@@ -291,6 +310,55 @@ export default class Init extends Command {
 
       writeFileSync(targetPath, fallback, "utf-8")
       this.log(`  ${ux.colorize("green", "create")}  ${SETTINGS_FILENAME}`)
+    }
+  }
+
+  private async scaffoldAgents(
+    ref: string,
+    flags: { force: boolean }
+  ): Promise<void> {
+    const githubDir = join(process.cwd(), ".github")
+    const targetPath = join(githubDir, AGENTS_FILE)
+
+    if (!flags.force && existsSync(targetPath)) {
+      this.log(`  ${ux.colorize("yellow", "skip")}    ${AGENTS_REL_PATH} ${ux.colorize("dim", "(already exists, use --force)")}`)
+    } else {
+      const template = await fetchAgentsTemplate(ref)
+
+      mkdirSync(githubDir, { recursive: true })
+
+      if (template) {
+        writeFileSync(targetPath, template, "utf-8")
+        this.log(`  ${ux.colorize("green", "create")}  ${AGENTS_REL_PATH}`)
+      } else {
+        const fallback = [
+          `# ${AGENTS_FILE}`,
+          `# ---`,
+          `# scaffolded by just-github-actions-n-workflows init`,
+          `# this ref (${ref}) does not have ${AGENTS_TEMPLATE_PATH} — using a minimal placeholder.`,
+          `# run \`update\` after upgrading to a toolkit version that ships the template.`,
+          `# ---`,
+          "",
+          "this repo uses workflows from justAnArthur/just-github-actions-n-workflows.",
+          "see https://github.com/justAnArthur/just-github-actions-n-workflows for the",
+          "full agent-facing guide (commit format, scope-to-package mapping, tag annotations).",
+          ""
+        ].join("\n")
+
+        writeFileSync(targetPath, fallback, "utf-8")
+        this.log(`  ${ux.colorize("yellow", "create")}  ${AGENTS_REL_PATH} ${ux.colorize("dim", "(fallback — template not found at ref)")}`)
+      }
+    }
+
+    const link = ensureAgentsLink(process.cwd(), { force: flags.force })
+    if (link === "created") {
+      this.log(`  ${ux.colorize("green", "link")}    ${AGENTS_FILE} → ${AGENTS_REL_PATH}`)
+    } else if (link === "unchanged") {
+      this.log(`  ${ux.colorize("dim", "link")}    ${AGENTS_FILE} → ${AGENTS_REL_PATH} ${ux.colorize("dim", "(already linked)")}`)
+    } else if (link === "skipped-exists") {
+      this.log(`  ${ux.colorize("dim", "skip")}    ${AGENTS_FILE} ${ux.colorize("dim", "(real file at root — remove it to let the toolkit manage the symlink)")}`)
+    } else {
+      this.log(`  ${ux.colorize("yellow", "warn")}    could not create ${AGENTS_FILE} symlink ${ux.colorize("dim", "(see .github/AGENTS.md instead)")}`)
     }
   }
 

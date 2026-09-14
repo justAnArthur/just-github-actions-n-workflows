@@ -12,11 +12,9 @@
 #       uses: justAnArthur/just-github-actions-n-workflows/.github/workflows/bump-version.yml@main
 #       with:
 #         bump_type: "minor:canary"
-#       secrets:
-#         GH_TOKEN: ${{ secrets.GH_TOKEN }}
 #
 # required secrets:
-#   GH_TOKEN — github token with contents:write
+#   (none — uses the auto-provided GITHUB_TOKEN)
 # ---
 
 name: bump-version
@@ -78,10 +76,6 @@ on:
         type: string
         required: false
         default: "canary"
-    secrets:
-      GH_TOKEN:
-        description: "github token with contents:write and packages:write"
-        required: true
 
 permissions:
   contents: write

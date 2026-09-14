@@ -1,4 +1,12 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs"
+import {
+  existsSync,
+  lstatSync,
+  readFileSync,
+  readlinkSync,
+  symlinkSync,
+  unlinkSync,
+  writeFileSync,
+} from "node:fs"
 import { join } from "node:path"
 
 export type LockEntry = {
@@ -18,6 +26,60 @@ const LOCKFILE_NAME = ".toolkit-lock.json"
 
 export function lockfilePath(): string {
   return join(process.cwd(), ".github", "workflows", LOCKFILE_NAME)
+}
+
+export const AGENTS_FILE = "AGENTS.md"
+export const AGENTS_REL_PATH = ".github/AGENTS.md"
+
+export type AgentsLinkResult = "created" | "unchanged" | "skipped-exists" | "failed"
+
+export function ensureAgentsLink(cwd: string, opts: { force: boolean }): AgentsLinkResult {
+  const root = join(cwd, AGENTS_FILE)
+  const exists = existsSync(root) || lstatExists(root)
+
+  if (exists) {
+    const stat = lstatSync(root)
+    if (stat.isSymbolicLink()) {
+      let target: string | null = null
+      try {
+        target = readlinkSync(root)
+      } catch {
+        // dangling or unreadable link — fall through to replacement
+      }
+      if (target === AGENTS_REL_PATH) {
+        return "unchanged"
+      }
+      try {
+        unlinkSync(root)
+      } catch {
+        return "failed"
+      }
+    } else if (opts.force) {
+      try {
+        unlinkSync(root)
+      } catch {
+        return "failed"
+      }
+    } else {
+      return "skipped-exists"
+    }
+  }
+
+  try {
+    symlinkSync(AGENTS_REL_PATH, root)
+    return "created"
+  } catch {
+    return "failed"
+  }
+}
+
+function lstatExists(p: string): boolean {
+  try {
+    lstatSync(p)
+    return true
+  } catch {
+    return false
+  }
 }
 
 export function readLockfile(): Lockfile | null {

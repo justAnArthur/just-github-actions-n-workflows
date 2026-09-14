@@ -1,15 +1,20 @@
 import { Command, Flags, ux } from "@oclif/core"
 import { confirm } from "@inquirer/prompts"
-import { writeFileSync } from "node:fs"
+import { mkdirSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
 
 import {
+  AGENTS_TEMPLATE_PATH,
   REPO,
+  fetchAgentsTemplate,
   fetchTags,
   fetchWorkflowContent,
   resolveRefSha,
 } from "../github.js"
 import {
+  AGENTS_FILE,
+  AGENTS_REL_PATH,
+  ensureAgentsLink,
   injectRefComment,
   mergeLockfile,
   readLockfile,
@@ -135,7 +140,32 @@ export default class Update extends Command {
       writeLockfile(updatedLock)
     }
 
+    await this.refreshAgents(targetRef)
+
     this.log(`\n  done — ${ux.colorize("green", `${updated} updated`)}, ${errors} errors, ${upToDate.length} already current\n`)
+  }
+
+  private async refreshAgents(ref: string): Promise<void> {
+    const targetPath = join(process.cwd(), ".github", AGENTS_FILE)
+
+    mkdirSync(join(process.cwd(), ".github"), { recursive: true })
+
+    const template = await fetchAgentsTemplate(ref)
+    if (template) {
+      writeFileSync(targetPath, template, "utf-8")
+      this.log(`  ${ux.colorize("green", "update")}  ${AGENTS_REL_PATH} ${ux.colorize("dim", `→ ${ref}`)}`)
+    } else {
+      this.log(`  ${ux.colorize("yellow", "warn")}    could not fetch ${AGENTS_TEMPLATE_PATH} from ${ref} ${ux.colorize("dim", `(${AGENTS_REL_PATH} not updated)`)}`)
+    }
+
+    const link = ensureAgentsLink(process.cwd(), { force: false })
+    if (link === "created") {
+      this.log(`  ${ux.colorize("green", "link")}    ${AGENTS_FILE} → ${AGENTS_REL_PATH}`)
+    } else if (link === "unchanged") {
+      this.log(`  ${ux.colorize("dim", "link")}    ${AGENTS_FILE} → ${AGENTS_REL_PATH} ${ux.colorize("dim", "(already linked)")}`)
+    } else if (link === "skipped-exists") {
+      this.log(`  ${ux.colorize("dim", "skip")}    ${AGENTS_FILE} ${ux.colorize("dim", "(real file at root — remove it to let the toolkit manage the symlink)")}`)
+    }
   }
 }
 
