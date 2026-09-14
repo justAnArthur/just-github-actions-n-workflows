@@ -1,10 +1,3 @@
-// deploy-compose-remote/src/index.ts
-// ---
-// generates the remote deployment script for docker compose.
-// builds the SSH command sequence: registry login, compose pull,
-// compose up, cleanup. outputs the script for use with ssh-exec.
-// ---
-
 import { getRequiredEnv, getEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 
 log.group("deploy-compose-remote")
@@ -16,8 +9,6 @@ const registry = getEnv("REGISTRY", "ghcr.io")
 
 log.info(`target path: ${targetPath}`)
 log.info(`registry: ${registry}`)
-
-// --- build deployment script ---
 
 const scriptLines: string[] = [
   "set -euo pipefail",
@@ -38,7 +29,6 @@ const scriptLines: string[] = [
   ""
 ]
 
-// registry login (optional)
 if (registryUsername && registryPassword) {
   scriptLines.push(
     `echo "Logging in to container registry (${registry})"`,
@@ -47,7 +37,6 @@ if (registryUsername && registryPassword) {
   )
 }
 
-// compose command detection + deploy
 scriptLines.push(
   'if $DOCKER_BIN compose version >/dev/null 2>&1; then',
   '  DOCKER_COMPOSE_CMD="$DOCKER_BIN compose"',

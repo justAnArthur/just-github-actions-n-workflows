@@ -1,9 +1,3 @@
-// resolves deployment configuration for a target environment.
-// reads deploy targets from `.justactions.yml` settings file,
-// with fallback to a JSON-encoded DEPLOY_CONFIG env var override.
-// no hardcoded defaults — all config comes from the project.
-// ---
-
 import { getEnv, getRequiredEnv, log, setEnv, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { loadSettings, resolveDeployTarget, type DeployTarget } from "@justanarthur/just-github-actions-n-workflows-lib/settings"
 
@@ -16,8 +10,6 @@ log.info(`target environment: ${environment}`)
 const settings = await loadSettings(process.cwd())
 let config: DeployTarget | undefined
 
-// --- priority 1: JSON env var override ---
-
 if (customConfigRaw) {
   try {
     const customConfig = JSON.parse(customConfigRaw)
@@ -29,8 +21,6 @@ if (customConfigRaw) {
     log.warn(`failed to parse DEPLOY_CONFIG json: ${err}`)
   }
 }
-
-// --- priority 2: .justactions.yml settings file ---
 
 if (!config) {
   config = resolveDeployTarget(settings, environment)

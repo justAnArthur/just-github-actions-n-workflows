@@ -38,7 +38,6 @@ if (!dockerfilePath) {
 log.info(`resolved dockerfile: ${dockerfilePath}`)
 setOutput("dockerfile", dockerfilePath)
 
-// --- resolve context directory ---
 // priority: input override > manifest dockerContext > dirname(dockerfilePath)
 
 let contextDir: string

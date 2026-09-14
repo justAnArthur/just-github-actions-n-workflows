@@ -1,14 +1,5 @@
-// adapters/maven.ts
-// ---
-// manifest adapter for maven `pom.xml` files.
-// uses the xml codec in order-preserving mode so that comments and
-// element ordering survive a parse → modify → build round-trip.
-// ---
-
 import { registerAdapter, type Manifest, type ManifestAdapter } from "../registry"
 import * as xmlCodec from "../../codecs/xml"
-
-// --- xml node helpers ---
 
 function findTagValue(nodes: any[], tag: string): string {
   const node = nodes.find((n) => n[tag])
@@ -25,9 +16,6 @@ function setTagValue(nodes: any[], tag: string, value: string) {
   }
 }
 
-// --- helper ---
-// unwraps the `<project>` element from the parsed json tree.
-
 function getProjectArray(pomJson: any): any[] {
   const entry = Array.isArray(pomJson)
     ? pomJson.find((n: any) => n.project)
@@ -38,12 +26,8 @@ function getProjectArray(pomJson: any): any[] {
   return arr
 }
 
-// --- adapter ---
-
 const mavenAdapter: ManifestAdapter = {
   fileName: "pom.xml",
-
-  // --- parse ---
 
   async parseManifest(fileContent: string): Promise<Manifest> {
     const pomJson = xmlCodec.pomXmlToJson(fileContent)
@@ -64,7 +48,6 @@ const mavenAdapter: ManifestAdapter = {
       ? scopeNames.split(",").map((s) => s.trim())
       : []
 
-    // --- infer deploy targets ---
     const dockerfilePath = findTagValue(props, "DockerfilePath") ?? findTagValue(props, "dockerfilePath")
     const dockerContext = findTagValue(props, "dockerContext")
     const deployTargets: string[] = []
@@ -89,8 +72,6 @@ const mavenAdapter: ManifestAdapter = {
     }
   },
 
-  // --- update version ---
-
   async setManifestVersion(fileContent: string, version: string): Promise<string> {
     const pomJson = xmlCodec.pomXmlToJson(fileContent)
     const project = getProjectArray(pomJson)
@@ -102,5 +83,3 @@ const mavenAdapter: ManifestAdapter = {
 registerAdapter(mavenAdapter)
 
 export default mavenAdapter
-
-

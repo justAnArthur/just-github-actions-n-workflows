@@ -1,17 +1,7 @@
-// adapters/npm.ts
-// ---
-// manifest adapter for `package.json` files.
-// reads name, version, and custom properties (priority, dockerfilePath,
-// scopeAliases) from the `properties` field.
-// ---
-
 import { registerAdapter, type Manifest, type ManifestAdapter } from "../registry"
 
 const npmAdapter: ManifestAdapter = {
   fileName: "package.json",
-
-  // --- parse ---
-  // extracts manifest metadata from a raw package.json string.
 
   async parseManifest(fileContent: string): Promise<Manifest> {
     const pkg = JSON.parse(fileContent)
@@ -21,7 +11,6 @@ const npmAdapter: ManifestAdapter = {
       ? props.gitCommitScopeRelatedNames.split(",").map((s: string) => s.trim())
       : []
 
-    // --- infer deploy targets ---
     const deployTargets: string[] = []
     if (pkg.private !== true) deployTargets.push("npm")
     if (props.DockerfilePath || props.dockerfilePath) deployTargets.push("docker")
@@ -44,9 +33,6 @@ const npmAdapter: ManifestAdapter = {
     }
   },
 
-  // --- update version ---
-  // replaces the `version` field and re-serialises with 2-space indent.
-
   async setManifestVersion(fileContent: string, version: string): Promise<string> {
     const pkg = JSON.parse(fileContent)
     pkg.version = version
@@ -57,5 +43,3 @@ const npmAdapter: ManifestAdapter = {
 registerAdapter(npmAdapter)
 
 export default npmAdapter
-
-

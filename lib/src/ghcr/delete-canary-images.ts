@@ -1,19 +1,6 @@
-// delete-canary-images.ts
-// ---
-// cleans up old prerelease container images from github container registry (ghcr).
-// after a stable release is published, prerelease images (canary, beta,
-// alpha, rc, …) are no longer needed and can be deleted to free storage.
-//
-// uses the github packages api:
-//   GET    /orgs/{org}/packages/container/{name}/versions
-//   DELETE /orgs/{org}/packages/container/{name}/versions/{id}
-// ---
-
 import { log } from "../github"
 
 const GITHUB_API = "https://api.github.com"
-
-// --- types ---
 
 interface PackageVersion {
   id: number;
@@ -24,8 +11,6 @@ interface PackageVersion {
     };
   };
 }
-
-// --- helpers ---
 
 // converts a manifest name (e.g. `@camasys/backend_core`) to a
 // ghcr-compatible image name (e.g. `camasys-backend_core`).
@@ -47,12 +32,6 @@ function isPrereleaseTag(tag: string): boolean {
   return /(canary|beta|alpha|rc)/i.test(tag)
 }
 
-/** @deprecated use isPrereleaseTag */
-export const isCanaryTag = isPrereleaseTag
-
-// --- api ---
-
-// fetches all package versions with pagination.
 async function fetchAllVersions(
   owner: string,
   packageName: string,
@@ -93,7 +72,6 @@ async function fetchAllVersions(
   return all
 }
 
-// deletes a single package version. returns true on success or 404 (already gone).
 async function deleteVersion(
   owner: string,
   packageName: string,
@@ -119,11 +97,8 @@ async function deleteVersion(
   return false
 }
 
-// --- public api ---
-
-// deletes all prerelease image versions for a package.
 // only digests where *every* tag is a prerelease tag are removed —
-// shared layers and untagged manifests are left untouched.
+// shared layers and untagged manifests are left untouched
 export async function deletePrereleaseImages(
   owner: string,
   packageName: string,
@@ -141,7 +116,6 @@ export async function deletePrereleaseImages(
     // keep untagged manifests (shared layers)
     if (tags.length === 0) continue
 
-    // only delete when every tag on this digest is a prerelease tag
     if (!tags.every(isPrereleaseTag)) continue
 
     log.info(`deleting version id=${v.id} tags=[${tags.join(", ")}]`)
@@ -151,7 +125,3 @@ export async function deletePrereleaseImages(
   log.info(`deleted ${deleted} prerelease version(s) for ${packageName}`)
   return deleted
 }
-
-/** @deprecated use deletePrereleaseImages */
-export const deleteCanaryImages = deletePrereleaseImages
-

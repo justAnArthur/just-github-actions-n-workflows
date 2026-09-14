@@ -1,13 +1,5 @@
-// cli/src/lockfile.ts
-// ---
-// reads and writes .github/workflows/.toolkit-lock.json
-// tracks which version (git ref) each workflow was installed from.
-// ---
-
 import { existsSync, readFileSync, writeFileSync } from "node:fs"
 import { join } from "node:path"
-
-// --- types ---
 
 export type LockEntry = {
   name: string
@@ -22,15 +14,11 @@ export type Lockfile = {
   workflows: Record<string, LockEntry>
 }
 
-// --- constants ---
-
 const LOCKFILE_NAME = ".toolkit-lock.json"
 
 export function lockfilePath(): string {
   return join(process.cwd(), ".github", "workflows", LOCKFILE_NAME)
 }
-
-// --- read ---
 
 export function readLockfile(): Lockfile | null {
   const path = lockfilePath()
@@ -44,15 +32,10 @@ export function readLockfile(): Lockfile | null {
   }
 }
 
-// --- write ---
-
 export function writeLockfile(lock: Lockfile): void {
   const path = lockfilePath()
   writeFileSync(path, JSON.stringify(lock, null, 2) + "\n", "utf-8")
 }
-
-// --- merge ---
-// merges new entries into an existing lockfile (or creates a new one).
 
 export function mergeLockfile(
   existing: Lockfile | null,
@@ -82,22 +65,13 @@ export function mergeLockfile(
   return lock
 }
 
-// --- version comment ---
-// prepends a `# toolkit-ref: <ref>` comment to workflow content
-// and rewrites action `uses:` references to point at the selected ref.
-// when usesRef is provided (e.g. a commit SHA), it's used in `uses:` lines
-// to avoid issues with special characters (@, /) in scoped tag names.
-
-
 export function injectRefComment(content: string, ref: string, usesRef?: string): string {
   const marker = "# toolkit-ref:"
   const comment = `${marker} ${ref}`
 
-  // replace existing marker if present
   if (content.includes(marker)) {
     content = content.replace(/^# toolkit-ref:.*$/m, comment)
   } else {
-    // prepend before first non-comment, non-empty line
     const lines = content.split("\n")
     const insertIdx = lines.findIndex(
       (l) => l.trim() !== "" && !l.startsWith("#")
@@ -112,9 +86,6 @@ export function injectRefComment(content: string, ref: string, usesRef?: string)
     content = lines.join("\n")
   }
 
-  // rewrite `uses: justAnArthur/just-github-actions-n-workflows/...@<anything>`
-  // to point at the selected ref. uses usesRef (SHA) when available to avoid
-  // breaking `uses:` syntax with tags containing @ or / characters.
   const safeRef = usesRef ?? ref
   content = content.replace(
     /(uses:\s+justAnArthur\/just-github-actions-n-workflows\/[^@\s]+)@\S+/g,

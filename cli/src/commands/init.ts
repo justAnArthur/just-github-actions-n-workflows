@@ -66,15 +66,11 @@ export default class Init extends Command {
     const { argv, flags } = await this.parse(Init)
     const positional = argv as string[]
 
-    // --- list mode ---
-
     if (flags.list) {
       const ref = flags.ref ?? "main"
       await this.listWorkflows(ref)
       return
     }
-
-    // --- interactive / install mode ---
 
     this.log()
     this.log(ux.colorize("bold", "  just-github-actions-n-workflows"))
@@ -89,15 +85,12 @@ export default class Init extends Command {
       return
     }
 
-    // resolve tag → commit SHA for safe `uses:` refs
     const sha = await resolveRefSha(ref)
     if (sha !== ref) {
       this.log(ux.colorize("dim", `  resolved ${ref} → ${sha.slice(0, 12)}\n`))
     }
 
     const { created, skipped } = await this.installWorkflows(selected, ref, sha, flags)
-
-    // --- scaffold .justactions.yml ---
 
     if (!flags["no-settings"]) {
       await this.scaffoldSettings(ref, flags)
@@ -108,8 +101,6 @@ export default class Init extends Command {
     this.printSecretsReminder(selected)
     this.printNextSteps(created, selected)
   }
-
-  // ── step 1: resolve ref ────────────────────────────────
 
   private async resolveRef(
     flags: { ref?: string; yes: boolean },
@@ -155,8 +146,6 @@ export default class Init extends Command {
     this.log(ux.colorize("green", `\n  → using ${ref}\n`))
     return ref
   }
-
-  // ── step 2: select workflows ───────────────────────────
 
   private async selectWorkflows(
     ref: string,
@@ -205,8 +194,6 @@ export default class Init extends Command {
     return available.filter((w) => selected.includes(w.name))
   }
 
-  // ── step 3: install ────────────────────────────────────
-
   private async installWorkflows(
     selected: WorkflowEntry[],
     ref: string,
@@ -247,8 +234,6 @@ export default class Init extends Command {
       }
     }
 
-    // --- write lock file ---
-
     if (installed.length > 0) {
       const existing = readLockfile()
       const lock = mergeLockfile(existing, ref, installed)
@@ -258,8 +243,6 @@ export default class Init extends Command {
 
     return { created, skipped }
   }
-
-  // ── scaffold .justactions.yml ──────────────────────────
 
   private async scaffoldSettings(
     ref: string,
@@ -311,8 +294,6 @@ export default class Init extends Command {
     }
   }
 
-  // ── step 4: secrets reminder ───────────────────────────
-
   private printSecretsReminder(selected: WorkflowEntry[]): void {
     const allSecrets = new Map<string, string>()
     for (const wf of selected) {
@@ -333,12 +314,10 @@ export default class Init extends Command {
     this.log(ux.colorize("dim", `\n  set these in your repo → Settings → Secrets → Actions\n`))
   }
 
-  // ── next steps ─────────────────────────────────────────
-
   private printNextSteps(created: number, selected: WorkflowEntry[]): void {
     if (created === 0) return
 
-    const hasSecrets = selected.some((w) => w.secrets && w.secrets.length > 0)
+    const hasSecrets = selected.some((w) => w.secrets?.length)
 
     this.log(ux.colorize("bold", "  next steps:\n"))
     this.log(`  1. ${hasSecrets ? "set the secrets listed above" : "set the GH_TOKEN secret in your repo settings"}`)
@@ -348,8 +327,6 @@ export default class Init extends Command {
     this.log(ux.colorize("dim", `     git add .github/ .justactions.yml && git commit -m "ci: add workflows" && git push`))
     this.log()
   }
-
-  // ── list mode ──────────────────────────────────────────
 
   private async listWorkflows(ref: string): Promise<void> {
     const workflows = await enrichWorkflows(await fetchWorkflowList(ref), ref)

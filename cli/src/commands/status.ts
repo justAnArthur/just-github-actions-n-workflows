@@ -1,9 +1,3 @@
-// cli/src/commands/status.ts
-// ---
-// shows the current state of installed workflows:
-// version, install date, and whether each is outdated.
-// ---
-
 import { Command, Flags, ux } from "@oclif/core"
 
 import { fetchTags } from "../github.js"

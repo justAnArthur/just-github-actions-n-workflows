@@ -11,9 +11,6 @@ const REPO = (pkg.repository as any).url
 const API_BASE = `https://api.github.com/repos/${REPO}`
 const RAW_BASE = `https://raw.githubusercontent.com/${REPO}`
 
-// --- auth ---
-// supports private repos via GH_TOKEN or GITHUB_TOKEN env var.
-
 function authHeaders(): Record<string, string> {
   const token = process.env.GH_TOKEN || process.env.GITHUB_TOKEN
   const headers: Record<string, string> = {
@@ -25,11 +22,6 @@ function authHeaders(): Record<string, string> {
   return headers
 }
 
-// --- root package tag prefixes ---
-// tags may use the package name (e.g. "@justanarthur/just-github-actions-n-workflows@1.0.0")
-// or the repo name (e.g. "just-github-actions-n-workflows@1.0.0").
-// we search for both and deduplicate.
-
 const REPO_NAME = REPO.split("/").pop()!
 const TAG_PREFIXES = [
   `${rootPkg.name}@`,
@@ -37,8 +29,6 @@ const TAG_PREFIXES = [
 ]
 
 export { REPO }
-
-// --- types ---
 
 export type VersionTag = {
   tag: string
@@ -51,9 +41,6 @@ export type WorkflowEntry = {
   description?: string
   secrets?: string[]
 }
-
-// --- parse workflow header ---
-// extracts description and required secrets from the yaml header comment block.
 
 export function parseWorkflowHeader(content: string): { description: string; secrets: string[] } {
   const lines = content.split("\n")
@@ -85,8 +72,6 @@ export function parseWorkflowHeader(content: string): { description: string; sec
 
   return { description, secrets }
 }
-
-// --- api ---
 
 export async function fetchTags(): Promise<VersionTag[]> {
   const results = await Promise.all(
@@ -166,24 +151,15 @@ export async function enrichWorkflows(workflows: WorkflowEntry[], gitRef: string
   return enriched
 }
 
-// --- resolve ref to sha ---
-// resolves a git ref (tag, branch, or sha) to its commit SHA.
-// this is needed because tags like "@scope/pkg@1.0.0" contain
-// "@" and "/" which break the `uses: owner/repo/path@ref` syntax.
-// using the commit SHA as the ref avoids all special-character issues.
-
 export async function resolveRefSha(ref: string): Promise<string> {
-  // if it already looks like a full SHA, return as-is
   if (/^[0-9a-f]{40}$/i.test(ref)) return ref
 
-  // try resolving as a tag first
   const tagUrl = `${API_BASE}/git/ref/tags/${encodeURIComponent(ref)}`
   const tagRes = await fetch(tagUrl, { headers: authHeaders() })
 
   if (tagRes.ok) {
     const tagData: any = await tagRes.json()
 
-    // annotated tags point to a tag object, need to dereference to commit
     if (tagData.object?.type === "tag") {
       const derefUrl = `${API_BASE}/git/tags/${tagData.object.sha}`
       const derefRes = await fetch(derefUrl, { headers: authHeaders() })
@@ -196,7 +172,6 @@ export async function resolveRefSha(ref: string): Promise<string> {
     return tagData.object?.sha ?? ref
   }
 
-  // fall back to resolving as a branch/commit
   const commitUrl = `${API_BASE}/commits/${encodeURIComponent(ref)}`
   const commitRes = await fetch(commitUrl, { headers: authHeaders() })
 
@@ -205,11 +180,8 @@ export async function resolveRefSha(ref: string): Promise<string> {
     return commitData.sha ?? ref
   }
 
-  // if all else fails, return the original ref (best effort)
   return ref
 }
-
-// --- settings template ---
 
 export const SETTINGS_FILENAME = ".justactions.yml"
 

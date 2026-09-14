@@ -1,9 +1,3 @@
-// bump-version step
-// ---
-// automated version bumping for mono-repo manifests.
-// see package @justanarthur/actions-lib for shared utilities.
-// ---
-
 import { parseCommitMessage, type ParsedCommit } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
 import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
 import type { Manifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
@@ -15,16 +9,10 @@ import { deletePrereleaseImages, manifestNameToImageName } from "@justanarthur/j
 import { log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { GITHUB_ACTIONS_BOT, withCoAuthors, type CoAuthor } from "@justanarthur/just-github-actions-n-workflows-lib/git/co-authors"
 
-// --- resolve co-author identity ---
-// when configure-git-user sets the bot as committer, the real user
-// is passed here as co-author via env vars.
-
 const coAuthor: CoAuthor = {
   name: process.env.CO_AUTHOR_NAME || GITHUB_ACTIONS_BOT.name,
   email: process.env.CO_AUTHOR_EMAIL || GITHUB_ACTIONS_BOT.email,
 }
-
-// --- discover manifests ---
 
 log.group("bump-manifest-versions")
 log.info("starting version bump process...")
@@ -34,8 +22,6 @@ log.info(`manifest search directory: ${dir}`)
 
 const manifests = await findManifests(dir)
 log.info(`discovered manifests: ${manifests.map((m) => m.name)}`)
-
-// --- read env configuration ---
 
 const bumpToCalculatedStableEnv =
   process.env.BUMP_TO_CALCULATED_STABLE_VERSION?.toLowerCase() === "true"
@@ -52,11 +38,9 @@ log.debug(`bump-to-stable: ${bumpToCalculatedStableEnv}`)
 log.debug(`bump-type: ${bumpTypeEnv}, channel: ${bumpStableOrCanary}`)
 log.debug(`manifest filter: ${handleBumpManifestNamesEnv}`)
 
-// prerelease channel label — defaults to "canary", can be "beta", "alpha", "rc", …
 const prereleaseChannel = process.env.BUMP_PRERELEASE_CHANNEL?.trim() || "canary"
 log.debug(`prerelease channel: ${prereleaseChannel}`)
 
-// only bump the manifests the user asked for, or all of them
 const bumpManifests =
   handleBumpManifestNamesEnv && handleBumpManifestNamesEnv.length > 0
     ? handleBumpManifestNamesEnv.map((name) => {
