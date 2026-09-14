@@ -1,10 +1,3 @@
-// get-commits-from-the-last-stable.ts
-// ---
-// returns all commit messages between the latest stable tag and HEAD
-// for a given manifest.  checks the manifest's primary name and any
-// related scope aliases to find the last stable tag.
-// ---
-
 import type { Manifest } from "../manifests/registry"
 import { exec } from "../exec"
 import { log } from "../github"
@@ -15,8 +8,7 @@ export async function getCommitsFromTheLastStable(
 ): Promise<string[]> {
   let lastStableCommit = ""
 
-  // try the primary name first, then fall back to related scope names
-  const scopes = [manifest.name, ...(manifest.scopeAliases ?? manifest.gitCommitScopeRelatedNames ?? [])]
+  const scopes = [manifest.name, ...manifest.scopeAliases, ...(manifest.gitCommitScopeRelatedNames ?? [])]
 
   for (const scope of scopes) {
     log.debug(`checking scope for stable tag: ${scope}`)

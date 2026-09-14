@@ -1,19 +1,9 @@
-// manifests/discovery.ts
-// ---
-// manifest discovery and manipulation.
-// recursively scans a directory tree for known manifest files
-// (package.json, pom.xml, …), parses them via the adapter registry,
-// and provides helpers for looking up and updating individual manifests.
-// ---
-
 import type { Dirent } from "node:fs"
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
 
 import type { Manifest } from "./registry"
 import { getAdapters } from "./registry"
-
-// --- constants ---
 
 const DEFAULT_EXCLUDE = new Set([
   "node_modules",
@@ -25,10 +15,6 @@ const DEFAULT_EXCLUDE = new Set([
   "target",
   ".next"
 ])
-
-// --- discovery ---
-// walks the file tree starting at `dir`, collecting every manifest
-// that matches a registered adapter. skips common non-source dirs.
 
 export async function findManifests<R = Manifest & { path: string }>(
   dir: string,
@@ -60,9 +46,6 @@ export async function findManifests<R = Manifest & { path: string }>(
   return results
 }
 
-// --- parsing ---
-// delegates to the adapter that matches the file name.
-
 export async function parseManifest(filePath: string): Promise<Manifest> {
   const fileName = path.basename(filePath)
   const adapter = getAdapters().find((a) => a.fileName === fileName)
@@ -72,9 +55,6 @@ export async function parseManifest(filePath: string): Promise<Manifest> {
   return adapter.parseManifest(content)
 }
 
-// --- lookup ---
-// finds a manifest by its `name` or by a related scope alias.
-
 export function findManifestByName(
   manifests: Manifest[],
   name: string
@@ -82,13 +62,10 @@ export function findManifestByName(
   return manifests.find(
     (m) =>
       m.name === name ||
-      m.scopeAliases?.includes(name) ||
+      m.scopeAliases.includes(name) ||
       m.gitCommitScopeRelatedNames?.includes(name)
   )
 }
-
-// --- update ---
-// rewrites the version field in a manifest file on disk.
 
 export async function updateManifest(
   filePath: string,
@@ -103,13 +80,8 @@ export async function updateManifest(
   await fs.writeFile(filePath, updated, "utf-8")
 }
 
-// --- cli helper ---
-// reads the manifest search directory from argv, defaulting to cwd.
-
 export function getManifestSearchDir(): string {
   const argv = process.argv.slice(2)
   const dirArgIndex = argv.findIndex((a) => !a.startsWith("-"))
   return dirArgIndex >= 0 ? path.resolve(argv[dirArgIndex]) : process.cwd()
 }
-
-
