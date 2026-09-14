@@ -1,7 +1,11 @@
 # just-github-actions-n-workflows
 
+> **v1.0.0 — first stable release.** tags use the `@scope/name@1.0.0` per-package format. pin a specific major by referencing `@v1` after release; see *Repo-level tag* below.
+
 generic, versioned CI/CD workflow toolkit — version bumping, npm publishing, docker publishing, vercel deployment, docker compose deployment.  
 built as **composite GitHub Actions** powered by [Bun](https://bun.sh).
+
+> **v1 limitation.** the CLI (`@justanarthur/just-github-actions-n-workflows-cli`) depends on the private library `@justanarthur/just-github-actions-n-workflows-lib`. as a result, `npm install -g @justanarthur/just-github-actions-n-workflows-cli@1.0.0` is **not yet resolvable from the registry** — `bun publish` substitutes the workspace dep from the lockfile, but lib itself is unpublished. the CLI ships on npm for tagging purposes and is fully usable from source via `bun run cli/`. resolving this is tracked for v1.x.
 
 ## overview
 
@@ -500,3 +504,7 @@ bun install          # install deps
 bun run build        # validate all action packages
 bun test             # run tests
 ```
+
+## license
+
+[MIT](LICENSE).
