@@ -67,6 +67,16 @@ jobs:
       has_annotation: ${{ steps.meta.outputs.has_annotation }}
       publish_docker: ${{ steps.meta.outputs.publish_docker }}
     steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref_name }}
+          lfs: true
+
+      - name: Fetch all tags
+        uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
+
       - name: Resolve tag metadata
         id: meta
         uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-tag-meta@main
@@ -155,4 +165,3 @@ jobs:
             published to [github container registry](https://github.com/${{ github.repository }}/pkgs/container/${{ steps.prepare.outputs.repo_name }}%2F${{ steps.prepare.outputs.package_image_name }}?tag=${{ steps.prepare.outputs.image_tag }})
         env:
           GITHUB_TOKEN: ${{ secrets.GH_TOKEN }}
-
