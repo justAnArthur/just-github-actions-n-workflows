@@ -101,7 +101,7 @@ jobs:
         with:
           fetch-depth: 0
           persist-credentials: "true"
-          token: ${{ secrets.GH_TOKEN }}
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           lfs: true
 
       - name: Fetch all tags and history
@@ -120,7 +120,7 @@ jobs:
           bump_type_and_channel: ${{ inputs.bump_type || '' }}
           bump_manifest_names: ${{ inputs.bump_manifest_names || '' }}
           prerelease_channel: ${{ inputs.bump_prerelease_channel || 'canary' }}
-          github_token: ${{ secrets.GH_TOKEN }}
+          github_token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           github_event: ${{ toJson(github.event) }}
           co_author_name: ${{ steps.git_user.outputs.co_author_name }}
           co_author_email: ${{ steps.git_user.outputs.co_author_email }}
