@@ -35,7 +35,7 @@ run-name: "deploy-vercel — ${{ inputs.tag || github.ref_name }}"
 
 on:
   push:
-    tags: [ "**@*" ]
+    tags: [ "*@*" ]
   workflow_dispatch:
     inputs:
       tag:
