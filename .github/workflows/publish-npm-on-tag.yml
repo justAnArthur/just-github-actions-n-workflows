@@ -86,7 +86,6 @@ jobs:
         with:
           ref: ${{ needs.resolve-meta.outputs.tag }}
           fetch-depth: 0
-          token: ${{ secrets.GH_TOKEN }}
           lfs: true
 
       - name: Resolve package directory
