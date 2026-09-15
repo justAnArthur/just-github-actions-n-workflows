@@ -1,7 +1,7 @@
 import { Args, Command, Flags, ux } from "@oclif/core"
 import { checkbox, select } from "@inquirer/prompts"
 import { existsSync, mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { join, resolve as resolvePath } from "node:path"
 
 import {
   AGENTS_TEMPLATE_PATH,
@@ -33,10 +33,11 @@ export default class Init extends Command {
   static override examples = [
     "<%= config.bin %> init",
     "<%= config.bin %> init bump-version",
-    "<%= config.bin %> init --ref v1.0.0",
+    "<%= config.bin %> init --ref v1.0.1",
     "<%= config.bin %> init --list",
     "<%= config.bin %> init --yes --force",
-    "<%= config.bin %> init --no-agents"
+    "<%= config.bin %> init --no-agents",
+    "<%= config.bin %> init --cwd /path/to/target-repo"
   ]
 
   static override args = {
@@ -74,12 +75,16 @@ export default class Init extends Command {
     "no-agents": Flags.boolean({
       description: "Skip scaffolding .github/AGENTS.md and the root symlink",
       default: false
+    }),
+    cwd: Flags.string({
+      description: "Target repo directory. Defaults to the current working directory."
     })
   }
 
   async run(): Promise<void> {
     const { argv, flags } = await this.parse(Init)
     const positional = argv as string[]
+    const cwd = this.resolveCwd(flags.cwd)
 
     if (flags.list) {
       const ref = flags.ref ?? "main"
@@ -105,20 +110,28 @@ export default class Init extends Command {
       this.log(ux.colorize("dim", `  resolved ${ref} → ${sha.slice(0, 12)}\n`))
     }
 
-    const { created, skipped } = await this.installWorkflows(selected, ref, sha, flags)
+    const { created, skipped } = await this.installWorkflows(selected, ref, sha, flags, cwd)
 
     if (!flags["no-settings"]) {
-      await this.scaffoldSettings(ref, flags)
+      await this.scaffoldSettings(ref, flags, cwd)
     }
 
     if (!flags["no-agents"]) {
-      await this.scaffoldAgents(ref, flags)
+      await this.scaffoldAgents(ref, flags, cwd)
     }
 
     this.log(`\n  done — ${ux.colorize("green", `${created} created`)}, ${skipped} skipped\n`)
 
     this.printSecretsReminder(selected)
     this.printNextSteps(created, selected)
+  }
+
+  private resolveCwd(flag?: string): string {
+    const cwd = flag ? resolvePath(flag) : process.cwd()
+    if (!existsSync(cwd)) {
+      this.error(`--cwd path does not exist: ${cwd}`, { exit: 2 })
+    }
+    return cwd
   }
 
   private async resolveRef(
@@ -217,9 +230,10 @@ export default class Init extends Command {
     selected: WorkflowEntry[],
     ref: string,
     sha: string,
-    flags: { force: boolean; yes: boolean }
+    flags: { force: boolean; yes: boolean },
+    cwd: string
   ): Promise<{ created: number; skipped: number }> {
-    const targetDir = join(process.cwd(), ".github", "workflows")
+    const targetDir = join(cwd, ".github", "workflows")
     mkdirSync(targetDir, { recursive: true })
 
     if (!flags.yes) {
@@ -254,9 +268,9 @@ export default class Init extends Command {
     }
 
     if (installed.length > 0) {
-      const existing = readLockfile()
+      const existing = readLockfile(cwd)
       const lock = mergeLockfile(existing, ref, installed)
-      writeLockfile(lock)
+      writeLockfile(lock, cwd)
       this.log(ux.colorize("dim", `\n  lock file written → .github/workflows/.toolkit-lock.json`))
     }
 
@@ -265,9 +279,10 @@ export default class Init extends Command {
 
   private async scaffoldSettings(
     ref: string,
-    flags: { force: boolean }
+    flags: { force: boolean },
+    cwd: string
   ): Promise<void> {
-    const targetPath = join(process.cwd(), SETTINGS_FILENAME)
+    const targetPath = join(cwd, SETTINGS_FILENAME)
 
     if (!flags.force && existsSync(targetPath)) {
       this.log(`  ${ux.colorize("yellow", "skip")}    ${SETTINGS_FILENAME} ${ux.colorize("dim", "(already exists)")}`)
@@ -315,9 +330,10 @@ export default class Init extends Command {
 
   private async scaffoldAgents(
     ref: string,
-    flags: { force: boolean }
+    flags: { force: boolean },
+    cwd: string
   ): Promise<void> {
-    const githubDir = join(process.cwd(), ".github")
+    const githubDir = join(cwd, ".github")
     const targetPath = join(githubDir, AGENTS_FILE)
 
     if (!flags.force && existsSync(targetPath)) {
@@ -350,7 +366,7 @@ export default class Init extends Command {
       }
     }
 
-    const link = ensureAgentsLink(process.cwd(), { force: flags.force })
+    const link = ensureAgentsLink(cwd, { force: flags.force })
     if (link === "created") {
       this.log(`  ${ux.colorize("green", "link")}    ${AGENTS_FILE} → ${AGENTS_REL_PATH}`)
     } else if (link === "unchanged") {

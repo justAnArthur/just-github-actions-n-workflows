@@ -24,8 +24,8 @@ export type Lockfile = {
 
 const LOCKFILE_NAME = ".toolkit-lock.json"
 
-export function lockfilePath(): string {
-  return join(process.cwd(), ".github", "workflows", LOCKFILE_NAME)
+export function lockfilePath(cwd: string): string {
+  return join(cwd, ".github", "workflows", LOCKFILE_NAME)
 }
 
 export const AGENTS_FILE = "AGENTS.md"
@@ -82,8 +82,8 @@ function lstatExists(p: string): boolean {
   }
 }
 
-export function readLockfile(): Lockfile | null {
-  const path = lockfilePath()
+export function readLockfile(cwd: string): Lockfile | null {
+  const path = lockfilePath(cwd)
   if (!existsSync(path)) return null
 
   try {
@@ -94,8 +94,8 @@ export function readLockfile(): Lockfile | null {
   }
 }
 
-export function writeLockfile(lock: Lockfile): void {
-  const path = lockfilePath()
+export function writeLockfile(lock: Lockfile, cwd: string): void {
+  const path = lockfilePath(cwd)
   writeFileSync(path, JSON.stringify(lock, null, 2) + "\n", "utf-8")
 }
 

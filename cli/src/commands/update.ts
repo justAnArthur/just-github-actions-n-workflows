@@ -1,7 +1,7 @@
 import { Command, Flags, ux } from "@oclif/core"
 import { confirm } from "@inquirer/prompts"
-import { mkdirSync, writeFileSync } from "node:fs"
-import { join } from "node:path"
+import { existsSync, mkdirSync, writeFileSync } from "node:fs"
+import { join, resolve as resolvePath } from "node:path"
 
 import {
   AGENTS_TEMPLATE_PATH,
@@ -29,6 +29,7 @@ export default class Update extends Command {
     "<%= config.bin %> update",
     "<%= config.bin %> update --ref v2.0.0",
     "<%= config.bin %> update --yes",
+    "<%= config.bin %> update --cwd /path/to/target-repo --yes",
   ]
 
   static override flags = {
@@ -40,12 +41,16 @@ export default class Update extends Command {
       description: "Skip confirmation prompt",
       default: false,
     }),
+    cwd: Flags.string({
+      description: "Target repo directory. Defaults to the current working directory.",
+    }),
   }
 
   async run(): Promise<void> {
     const { flags } = await this.parse(Update)
+    const cwd = this.resolveCwd(flags.cwd)
 
-    const lock = readLockfile()
+    const lock = readLockfile(cwd)
 
     if (!lock || Object.keys(lock.workflows).length === 0) {
       this.error(
@@ -109,7 +114,7 @@ export default class Update extends Command {
       this.log()
     }
 
-    const targetDir = join(process.cwd(), ".github", "workflows")
+    const targetDir = join(cwd, ".github", "workflows")
     let updated = 0
     let errors = 0
     const updatedEntries: { name: string; file: string }[] = []
@@ -137,18 +142,26 @@ export default class Update extends Command {
 
     if (updatedEntries.length > 0) {
       const updatedLock = mergeLockfile(lock, targetRef, updatedEntries)
-      writeLockfile(updatedLock)
+      writeLockfile(updatedLock, cwd)
     }
 
-    await this.refreshAgents(targetRef)
+    await this.refreshAgents(targetRef, cwd)
 
     this.log(`\n  done — ${ux.colorize("green", `${updated} updated`)}, ${errors} errors, ${upToDate.length} already current\n`)
   }
 
-  private async refreshAgents(ref: string): Promise<void> {
-    const targetPath = join(process.cwd(), ".github", AGENTS_FILE)
+  private resolveCwd(flag?: string): string {
+    const cwd = flag ? resolvePath(flag) : process.cwd()
+    if (!existsSync(cwd)) {
+      this.error(`--cwd path does not exist: ${cwd}`, { exit: 2 })
+    }
+    return cwd
+  }
 
-    mkdirSync(join(process.cwd(), ".github"), { recursive: true })
+  private async refreshAgents(ref: string, cwd: string): Promise<void> {
+    const targetPath = join(cwd, ".github", AGENTS_FILE)
+
+    mkdirSync(join(cwd, ".github"), { recursive: true })
 
     const template = await fetchAgentsTemplate(ref)
     if (template) {
@@ -158,7 +171,7 @@ export default class Update extends Command {
       this.log(`  ${ux.colorize("yellow", "warn")}    could not fetch ${AGENTS_TEMPLATE_PATH} from ${ref} ${ux.colorize("dim", `(${AGENTS_REL_PATH} not updated)`)}`)
     }
 
-    const link = ensureAgentsLink(process.cwd(), { force: false })
+    const link = ensureAgentsLink(cwd, { force: false })
     if (link === "created") {
       this.log(`  ${ux.colorize("green", "link")}    ${AGENTS_FILE} → ${AGENTS_REL_PATH}`)
     } else if (link === "unchanged") {

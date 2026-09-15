@@ -1,4 +1,6 @@
 import { Command, Flags, ux } from "@oclif/core"
+import { existsSync } from "node:fs"
+import { resolve as resolvePath } from "node:path"
 
 import { fetchTags } from "../github.js"
 import { readLockfile } from "../lockfile.js"
@@ -9,18 +11,23 @@ export default class Status extends Command {
   static override examples = [
     "<%= config.bin %> status",
     "<%= config.bin %> status --ref v2.0.0",
+    "<%= config.bin %> status --cwd /path/to/target-repo",
   ]
 
   static override flags = {
     ref: Flags.string({
       description: "Compare against this ref instead of the latest tag",
     }),
+    cwd: Flags.string({
+      description: "Target repo directory. Defaults to the current working directory.",
+    }),
   }
 
   async run(): Promise<void> {
     const { flags } = await this.parse(Status)
+    const cwd = this.resolveCwd(flags.cwd)
 
-    const lock = readLockfile()
+    const lock = readLockfile(cwd)
 
     if (!lock || Object.keys(lock.workflows).length === 0) {
       this.log(ux.colorize("yellow", "\n  no workflows installed — run `init` first.\n"))
@@ -63,6 +70,14 @@ export default class Status extends Command {
     } else {
       this.log(ux.colorize("green", `  all ${entries.length} workflow(s) are up to date.\n`))
     }
+  }
+
+  private resolveCwd(flag?: string): string {
+    const cwd = flag ? resolvePath(flag) : process.cwd()
+    if (!existsSync(cwd)) {
+      this.error(`--cwd path does not exist: ${cwd}`, { exit: 2 })
+    }
+    return cwd
   }
 }
 

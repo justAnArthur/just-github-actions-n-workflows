@@ -327,6 +327,9 @@ just-github-actions-n-workflows init --no-settings
 # skip scaffolding .github/AGENTS.md and the root symlink
 just-github-actions-n-workflows init --no-agents
 
+# target a different repo directory (no need to `cd` first)
+just-github-actions-n-workflows init --cwd /path/to/target-repo --yes
+
 # list available workflows without installing
 just-github-actions-n-workflows init --list
 ```
@@ -339,6 +342,7 @@ just-github-actions-n-workflows init --list
 | `--force`        | `-f`  | overwrite existing workflow files                |
 | `--yes`          | `-y`  | skip interactive prompts, install all workflows  |
 | `--ref <ref>`    |       | git ref to fetch from (tag, branch, sha)         |
+| `--cwd <path>`   |       | target repo directory (defaults to current dir)  |
 | `--no-settings`  |       | skip creating the `.justactions.yml` file        |
 | `--no-agents`    |       | skip scaffolding `.github/AGENTS.md` and the root symlink |
 
@@ -409,6 +413,9 @@ just-github-actions-n-workflows update --ref v2.0.0
 
 # skip confirmation prompt
 just-github-actions-n-workflows update --yes
+
+# target a different repo directory (no need to `cd` first)
+just-github-actions-n-workflows update --cwd /path/to/target-repo --yes
 ```
 
 reads `.toolkit-lock.json` to find installed workflows, compares versions, and re-fetches outdated ones. also re-writes `.github/AGENTS.md` so doc improvements ship to existing users. **must be run from the repo root** (same constraint as `status`).
@@ -421,9 +428,12 @@ just-github-actions-n-workflows status
 
 # compare against a specific ref
 just-github-actions-n-workflows status --ref v2.0.0
+
+# target a different repo directory (no need to `cd` first)
+just-github-actions-n-workflows status --cwd /path/to/target-repo
 ```
 
-shows which workflows are up to date and which can be updated. **must be run from the repo root** — `status`, `update`, and `init` resolve `.github/workflows/.toolkit-lock.json` and `.github/AGENTS.md` relative to `process.cwd()`.
+shows which workflows are up to date and which can be updated. resolves `.github/workflows/.toolkit-lock.json` and `.github/AGENTS.md` relative to `--cwd` (or `process.cwd()` if not set), so you can run it from any directory as long as you point `--cwd` at the repo root.
 
 ## settings file
 
