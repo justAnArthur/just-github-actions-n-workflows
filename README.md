@@ -48,6 +48,7 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 - **don't confuse registries.** npm packages (npmjs.com or npm.pkg.github.com) go through `publish-npm-on-tag.yml`. container images (ghcr.io) go through `publish-docker-on-tag.yml`. they are different workflows. there is no "publish-everything" workflow.
 - **don't fork a template and patch in custom registry logic.** if a user needs to publish to a non-default registry, copy the template, change the registry in the copy, and let both workflows run on the same tag push. the original stays untouched in this repo so updates keep flowing.
 - **don't write a manual `.npmrc` swap inside a publish step.** the toolkit doesn't do that, and any change you make inside a fork won't reach other consumers. put the `.npmrc` in the package directory at install time, or add a `.npmrc` step before the `bun publish` step in a *copy* of the workflow, not a fork.
+- **don't modify the workflows after they're installed in `.github/workflows/`.** the `init` / `update` commands will overwrite local edits on the next run. adding `# local-edit:` or `# toolkit-ref:` comments does not protect them. the only safe places to customize behavior are at the package level — see [where to override](#where-to-override) below.
 - **don't suggest `npm install -g @justanarthur/just-github-actions-n-workflows-cli` works today.** it doesn't. the CLI depends on a private library that isn't published. use a local clone:
   ```bash
   git clone https://github.com/justAnArthur/just-github-actions-n-workflows
@@ -55,6 +56,32 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
   bun install
   bun run cli/ init
   ```
+
+### where to override
+
+the workflows are immutable after install — local edits are overwritten by `update`. customization happens at the package level, which the workflows read on each run:
+
+| need | where to put it |
+|------|-----------------|
+| publish to a specific npm registry (e.g. `npm.pkg.github.com`, a private registry, a tag like `next`) | `publishConfig` in the package's `package.json` |
+| per-package auth token (e.g. GH Packages) | `.npmrc` in the package's directory |
+| pre-publish steps (build, generate assets, etc.) | the existing `Build` step in `publish-npm-on-tag.yml` already runs `bun run --silent build` — add a `build` script to `package.json`, no workflow edit needed |
+| bump logic / tag format | `properties` in the package's `package.json` (`gitCommitScopeRelatedNames`, `deployTargets`, `dockerfilePath`, `vercelProjectId`) |
+| deploy config (ssh target, compose profiles) | `.justactions.yml` at the repo root |
+| skip the bundled GitHub release that `publish-npm-on-tag.yml` creates | not currently supported without a fork — open an upstream issue. `release-on-tag.yml` is a separate workflow that *also* fires on tag push, so you can disable the bundled release by switching to a custom workflow (own the maintenance yourself) |
+
+the `publish-npm-on-tag.yml` step that runs the actual publish is:
+
+```yaml
+- name: Publish to npm
+  if: steps.gate.outputs.skip != 'true'
+  working-directory: ${{ steps.pkg.outputs.dir }}
+  run: bun publish -p --access public --tag ${{ needs.resolve-meta.outputs.npm_tag }}
+  env:
+    NPM_CONFIG_TOKEN: ${{ secrets.NPM_TOKEN }}
+```
+
+this invocation reads `publishConfig` from the package's `package.json` and `.npmrc` from the package's directory. **that is the supported override surface.** do not introduce a workflow that swaps `.npmrc` at runtime, hard-codes a second registry, or removes the bundled release step — every one of those becomes unmergeable the next time `update` runs.
 
 ### if the user wants their own repo's AI agents to know about this toolkit
 
