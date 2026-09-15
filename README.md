@@ -1,11 +1,64 @@
 # just-github-actions-n-workflows
 
-> **v1.0.0 — first stable release.** tags use the `@scope/name@1.0.0` per-package format. pin a specific major by referencing `@v1` after release; see *Repo-level tag* below.
+> **v1.0.1 — stable release.** tags use the `@scope/name@1.0.1` per-package format. pin a specific major by referencing `@v1` after release; see *Repo-level tag* below.
 
 generic, versioned CI/CD workflow toolkit — version bumping, npm publishing, docker publishing, vercel deployment, docker compose deployment.  
 built as **composite GitHub Actions** powered by [Bun](https://bun.sh).
 
-> **v1 limitation.** the CLI (`@justanarthur/just-github-actions-n-workflows-cli`) depends on the private library `@justanarthur/just-github-actions-n-workflows-lib`. as a result, `npm install -g @justanarthur/just-github-actions-n-workflows-cli@1.0.0` is **not yet resolvable from the registry** — `bun publish` substitutes the workspace dep from the lockfile, but lib itself is unpublished. the CLI ships on npm for tagging purposes and is fully usable from source via `bun run cli/`. resolving this is tracked for v1.x.
+> **v1 limitation.** the CLI (`@justanarthur/just-github-actions-n-workflows-cli`) depends on the private library `@justanarthur/just-github-actions-n-workflows-lib`. as a result, `npm install -g @justanarthur/just-github-actions-n-workflows-cli@1.0.1` is **not yet resolvable from the registry** — `bun publish` substitutes the workspace dep from the lockfile, but lib itself is unpublished. the CLI ships on npm for tagging purposes and is fully usable from source via `bun run cli/`. resolving this is tracked for v1.x.
+
+## for AI agents
+
+if you're an LLM helping a user adopt this toolkit, read this section first. it lists what is actually here and the patterns that work — not the ones you'll invent by skimming the rest of the README.
+
+### what's in this repo
+
+- **6 workflow templates** in `workflows/` (the source of truth). each fires on tag push, manual dispatch, or as a reusable workflow:
+  - `bump-version.yml` — auto-bumps package versions on push to main via conventional commits
+  - `publish-npm-on-tag.yml` — runs `bun publish` for the npm registry
+  - `publish-docker-on-tag.yml` — builds and pushes a docker image to ghcr.io
+  - `release-on-tag.yml` — creates a github release with notes
+  - `deploy-vercel-on-tag.yml` — POSTs a deploy hook to vercel
+  - `deploy-docker-compose.yml` — runs `docker compose` on a remote SSH host
+- **19 composite actions** in `actions/` (each is `action.yml` + `src/index.ts`; see [available actions](#available-actions) for the full list)
+- **a CLI** in `cli/` with `init` / `update` / `status` commands. it scaffolds workflows into a target repo, tracks them in a lockfile, and also writes `.github/AGENTS.md` so the downstream repo's own AI agents learn the conventions.
+
+### three ways to adopt
+
+| path | what it does | when to use |
+|------|--------------|-------------|
+| **file copy** | `curl` workflow files from `workflows/` into `.github/workflows/` of the target repo | simple, single-user, no lockfile overhead |
+| **action reference** | `uses: justAnArthur/just-github-actions-n-workflows/actions/<name>@main` in your own workflow | mixing pieces (e.g. just `setup-ssh` + `scp-transfer`) |
+| **CLI install** | `npx @justanarthur/just-github-actions-n-workflows-cli init` | team-managed, versioned, updateable. *currently broken for `npm install` — use a local clone until v1.x ships the lib fix.* |
+
+**don't invent a fourth path.** if the user asks for something the toolkit already does, use one of these three — do not fork a workflow file and patch in custom logic. the templates are designed to be copied whole and configured via the manifest's `properties` block and `.justactions.yml`, not edited in place.
+
+### common scenarios (copy-paste recipes)
+
+| scenario | what to copy into `.github/workflows/` | secrets required |
+|----------|------------------------------------------|-------------------|
+| bump + npm publish + github release | `bump-version.yml`, `publish-npm-on-tag.yml`, `release-on-tag.yml` | `NPM_TOKEN` |
+| bump + docker image (ghcr.io) + release | `bump-version.yml`, `publish-docker-on-tag.yml`, `release-on-tag.yml` | (none — uses `GITHUB_TOKEN`) |
+| bump + npm publish + docker image + release | `bump-version.yml`, `publish-npm-on-tag.yml`, `publish-docker-on-tag.yml`, `release-on-tag.yml` | `NPM_TOKEN` |
+| bump + npm + GitHub Packages (`npm.pkg.github.com`) + release | `bump-version.yml`, `publish-npm-on-tag.yml`, `release-on-tag.yml`, **+ a copy of `publish-npm-on-tag.yml` renamed to `publish-gh-packages.yml` with a `.npmrc` step pointing at `https://npm.pkg.github.com` before `bun publish`** | `NPM_TOKEN` (public), `GH_TOKEN` (with `write:packages`) |
+| bump + vercel deploy | `bump-version.yml`, `deploy-vercel-on-tag.yml` | `VERCEL_DEPLOY_HOOK_URL` |
+
+### anti-patterns
+
+- **don't confuse registries.** npm packages (npmjs.com or npm.pkg.github.com) go through `publish-npm-on-tag.yml`. container images (ghcr.io) go through `publish-docker-on-tag.yml`. they are different workflows. there is no "publish-everything" workflow.
+- **don't fork a template and patch in custom registry logic.** if a user needs to publish to a non-default registry, copy the template, change the registry in the copy, and let both workflows run on the same tag push. the original stays untouched in this repo so updates keep flowing.
+- **don't write a manual `.npmrc` swap inside a publish step.** the toolkit doesn't do that, and any change you make inside a fork won't reach other consumers. put the `.npmrc` in the package directory at install time, or add a `.npmrc` step before the `bun publish` step in a *copy* of the workflow, not a fork.
+- **don't suggest `npm install -g @justanarthur/just-github-actions-n-workflows-cli` works today.** it doesn't. the CLI depends on a private library that isn't published. use a local clone:
+  ```bash
+  git clone https://github.com/justAnArthur/just-github-actions-n-workflows
+  cd just-github-actions-n-workflows
+  bun install
+  bun run cli/ init
+  ```
+
+### if the user wants their own repo's AI agents to know about this toolkit
+
+the CLI's `init` (or `update`) automatically writes `.github/AGENTS.md` (with a symlink at repo root) so any agent landing in the downstream repo learns the conventions. this file is owned by the toolkit — `update` rewrites it on every upgrade. to customize agent-facing instructions for the user's own repo, write a separate `CONTRIBUTING.md`.
 
 ## use this in your repo
 
@@ -19,8 +72,8 @@ the most reliable option right now. each workflow file in `workflows/` is self-c
 
    ```bash
    mkdir -p .github/workflows
-   curl -fsSL https://raw.githubusercontent.com/justAnArthur/just-github-actions-n-workflows/v1.0.0/workflows/bump-version.yml       > .github/workflows/bump-version.yml
-   curl -fsSL https://raw.githubusercontent.com/justAnArthur/just-github-actions-n-workflows/v1.0.0/workflows/publish-npm-on-tag.yml > .github/workflows/publish-npm-on-tag.yml
+   curl -fsSL https://raw.githubusercontent.com/justAnArthur/just-github-actions-n-workflows/v1.0.1/workflows/bump-version.yml       > .github/workflows/bump-version.yml
+   curl -fsSL https://raw.githubusercontent.com/justAnArthur/just-github-actions-n-workflows/v1.0.1/workflows/publish-npm-on-tag.yml > .github/workflows/publish-npm-on-tag.yml
    # add any other workflows from https://github.com/justAnArthur/just-github-actions-n-workflows/tree/main/workflows
    ```
 
@@ -83,7 +136,7 @@ jobs:
             docker compose up -d
 ```
 
-pin to `@v1` for major-version stability once we cut a `v1.0.0` repo-level tag (currently we ship per-package tags — see [available actions](#available-actions) for the full list).
+pin to `@v1` for major-version stability — the `v1.0.1` repo-level tag is live.
 
 ### path C — CLI install (best UX, broken for npm install in v1)
 
@@ -236,7 +289,7 @@ just-github-actions-n-workflows init bump-version publish-npm-on-tag
 just-github-actions-n-workflows init --yes
 
 # pin to a specific version
-just-github-actions-n-workflows init --ref v1.0.0
+just-github-actions-n-workflows init --ref v1.0.1
 
 # overwrite existing workflow files
 just-github-actions-n-workflows init --force
@@ -278,7 +331,7 @@ $ just-github-actions-n-workflows init
   step 1 — select version
 
 ? Pick a version
-❯ 1.0.0 (latest stable)
+❯ 1.0.1 (latest stable)
   0.0.0-beta.11
   0.0.0-beta.8
 
