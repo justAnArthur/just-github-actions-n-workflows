@@ -10,133 +10,140 @@
     },
     "actions/bump-version": {
       "name": "@justanarthur/step-bump-manifest-versions",
-      "version": "0.0.0-beta.5",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/check-publishable": {
       "name": "@justanarthur/step-check-publishable",
-      "version": "0.0.0-beta.3",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/configure-git-user": {
       "name": "@justanarthur/step-setup-git-author",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/create-env-file": {
       "name": "@justanarthur/step-create-dotenv",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/deploy-compose-remote": {
       "name": "@justanarthur/step-deploy-compose-remote",
-      "version": "0.0.0-beta.6",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/fetch-tags": {
       "name": "@justanarthur/step-git-fetch-and-unshallow",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/generate-release-notes": {
       "name": "@justanarthur/step-generate-release-notes",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/get-dockerfile-path": {
       "name": "@justanarthur/step-resolve-dockerfile-path",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
+      "dependencies": {
+        "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
+      },
+    },
+    "actions/pin-workspace-versions": {
+      "name": "@justanarthur/step-pin-workspace-versions",
+      "version": "0.0.0-beta.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/prepare-docker-meta": {
       "name": "@justanarthur/step-prepare-docker-meta",
-      "version": "0.0.0-beta.6",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/resolve-deploy-config": {
       "name": "@justanarthur/step-resolve-deploy-config",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/resolve-image-tags": {
       "name": "@justanarthur/step-resolve-docker-image-tags",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/resolve-package-dir": {
       "name": "@justanarthur/step-resolve-package-dir",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/resolve-tag-meta": {
       "name": "@justanarthur/step-resolve-tag-meta",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/scp-transfer": {
       "name": "@justanarthur/step-scp-upload",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/setup-ssh": {
       "name": "@justanarthur/step-setup-ssh-keys",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/skip-check": {
       "name": "@justanarthur/step-check-ci-skip",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/ssh-exec": {
       "name": "@justanarthur/step-ssh-remote-exec",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "actions/trigger-deploy-hook": {
       "name": "@justanarthur/step-trigger-deploy-hook",
-      "version": "0.0.0-beta.4",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
     "cli": {
       "name": "@justanarthur/just-github-actions-n-workflows-cli",
-      "version": "0.0.0-beta.23",
+      "version": "1.0.1",
       "bin": {
         "just-github-actions-n-workflows": "./bin/run.js",
       },
@@ -150,7 +157,7 @@
     },
     "lib": {
       "name": "@justanarthur/just-github-actions-n-workflows-lib",
-      "version": "0.0.0-beta.8",
+      "version": "1.0.1",
       "dependencies": {
         "fast-xml-parser": "^5.5.9",
       },
@@ -206,6 +213,8 @@
     "@justanarthur/step-generate-release-notes": ["@justanarthur/step-generate-release-notes@workspace:actions/generate-release-notes"],
 
     "@justanarthur/step-git-fetch-and-unshallow": ["@justanarthur/step-git-fetch-and-unshallow@workspace:actions/fetch-tags"],
+
+    "@justanarthur/step-pin-workspace-versions": ["@justanarthur/step-pin-workspace-versions@workspace:actions/pin-workspace-versions"],
 
     "@justanarthur/step-prepare-docker-meta": ["@justanarthur/step-prepare-docker-meta@workspace:actions/prepare-docker-meta"],
 
