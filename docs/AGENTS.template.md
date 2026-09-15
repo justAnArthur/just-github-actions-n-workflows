@@ -131,7 +131,13 @@ just-github-actions-n-workflows update    # upgrade to latest
 just-github-actions-n-workflows update --ref v1.2.3   # pin to version
 ```
 
-If you can't run the CLI (the v1 npm-install limitation noted in the toolkit README), re-curl the workflow files manually from the new tag and re-commit. The `update` command refreshes both workflows and this AGENTS.md.
+All three commands accept `--cwd <path>` (added in CLI v1.0.2), so you can run the CLI from anywhere — `--cwd` points at this repo:
+
+```sh
+npx @justanarthur/just-github-actions-n-workflows-cli@1.0.2 update --cwd /path/to/this-repo --yes
+```
+
+If you can't run the CLI for some reason (e.g. CI), re-curl the workflow files manually from the new tag and re-commit. Since CLI v1.0.2, `npx` works from any directory — the lib dep is rewritten at publish time, so no local clone is needed.
 
 ## 9. Don't edit the workflows or this file directly
 

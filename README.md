@@ -1,11 +1,9 @@
 # just-github-actions-n-workflows
 
-> **v1.0.1 — stable release.** tags use the `@scope/name@1.0.1` per-package format. pin a specific major by referencing `@v1` after release; see *Repo-level tag* below.
+> **v1.0.1 — stable release.** tags use the `@scope/name@1.0.1` per-package format. pin a specific major by referencing `@v1` after release; see *Repo-level tag* below. **CLI v1.0.2+** is installable from npm — the lib workspace dep is rewritten to a concrete version at publish time, so `npx` and `npm install -g` both work.
 
 generic, versioned CI/CD workflow toolkit — version bumping, npm publishing, docker publishing, vercel deployment, docker compose deployment.  
 built as **composite GitHub Actions** powered by [Bun](https://bun.sh).
-
-> **v1 limitation.** the CLI (`@justanarthur/just-github-actions-n-workflows-cli`) depends on the private library `@justanarthur/just-github-actions-n-workflows-lib`. as a result, `npm install -g @justanarthur/just-github-actions-n-workflows-cli@1.0.1` is **not yet resolvable from the registry** — `bun publish` substitutes the workspace dep from the lockfile, but lib itself is unpublished. the CLI ships on npm for tagging purposes and is fully usable from source via `bun run cli/`. resolving this is tracked for v1.x.
 
 ## for AI agents
 
@@ -29,7 +27,7 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 |------|--------------|-------------|
 | **file copy** | `curl` workflow files from `workflows/` into `.github/workflows/` of the target repo | simple, single-user, no lockfile overhead |
 | **action reference** | `uses: justAnArthur/just-github-actions-n-workflows/actions/<name>@main` in your own workflow | mixing pieces (e.g. just `setup-ssh` + `scp-transfer`) |
-| **CLI install** | `npx @justanarthur/just-github-actions-n-workflows-cli init` | team-managed, versioned, updateable. *currently broken for `npm install` — use a local clone until v1.x ships the lib fix.* |
+| **CLI install** | `npx @justanarthur/just-github-actions-n-workflows-cli@1.0.2 init` | team-managed, versioned, updateable. **works since CLI v1.0.2** (pin-workspace-versions rewrites the lib dep at publish time, so `npm install` / `npx` resolve correctly). |
 
 **don't invent a fourth path.** if the user asks for something the toolkit already does, use one of these three — do not fork a workflow file and patch in custom logic. the templates are designed to be copied whole and configured via the manifest's `properties` block and `.justactions.yml`, not edited in place.
 
@@ -49,13 +47,7 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 - **don't fork a template and patch in custom registry logic.** if a user needs to publish to a non-default registry, copy the template, change the registry in the copy, and let both workflows run on the same tag push. the original stays untouched in this repo so updates keep flowing.
 - **don't write a manual `.npmrc` swap inside a publish step.** the toolkit doesn't do that, and any change you make inside a fork won't reach other consumers. put the `.npmrc` in the package directory at install time, or add a `.npmrc` step before the `bun publish` step in a *copy* of the workflow, not a fork.
 - **don't modify the workflows after they're installed in `.github/workflows/`.** the `init` / `update` commands will overwrite local edits on the next run. adding `# local-edit:` or `# toolkit-ref:` comments does not protect them. the only safe places to customize behavior are at the package level — see [where to override](#where-to-override) below.
-- **don't suggest `npm install -g @justanarthur/just-github-actions-n-workflows-cli` works today.** it doesn't. the CLI depends on a private library that isn't published. use a local clone:
-  ```bash
-  git clone https://github.com/justAnArthur/just-github-actions-n-workflows
-  cd just-github-actions-n-workflows
-  bun install
-  bun run cli/ init
-  ```
+- **don't tell the user to clone the toolkit to use the CLI.** since CLI v1.0.2, `npx @justanarthur/just-github-actions-n-workflows-cli@1.0.2 init` works from any directory and resolves the lib dep correctly. the local-clone path is only needed for development on the toolkit itself.
 
 ### where to override
 
@@ -165,20 +157,24 @@ jobs:
 
 pin to `@v1` for major-version stability — the `v1.0.1` repo-level tag is live.
 
-### path C — CLI install (best UX, broken for npm install in v1)
+### path C — CLI install (best UX, works since CLI v1.0.2)
 
-the CLI scaffolds workflows into your repo, tracks installed versions in a lock file, and lets you update with one command. it is the best long-term path but **is not currently usable via npm install** — see the v1 limitation callout at the top. workarounds:
+the CLI scaffolds workflows into your repo, tracks installed versions in a lock file, and lets you update with one command. the right path for most teams:
 
-- **run from a local clone of this repo**:
+```bash
+npx @justanarthur/just-github-actions-n-workflows-cli@1.0.2 init
+```
 
-  ```bash
-  git clone https://github.com/justAnArthur/just-github-actions-n-workflows.git
-  cd just-github-actions-n-workflows
-  bun install
-  bun run cli/ <command>             # see "cli" section below
-  ```
+use `--cwd <path>` to target a worktree or different repo without `cd`-ing. the published CLI's lib dep is rewritten at publish time by `pin-workspace-versions`, so `npx` resolves lib correctly from the registry — no local clone needed for end users.
 
-- **wait for v1.x**: making the lib package publishable is tracked. once shipped, `npm install -g @justanarthur/just-github-actions-n-workflows-cli` will work as documented below.
+only needed for toolkit development:
+
+```bash
+git clone https://github.com/justAnArthur/just-github-actions-n-workflows.git
+cd just-github-actions-n-workflows
+bun install
+bun run cli/ <command>             # see "cli" section below
+```
 
 ## end-to-end example: ship a 3-package monorepo to npm + docker
 
@@ -282,23 +278,25 @@ each workflow works with project **modules** — independent packages within a m
 
 ## cli
 
-the CLI is `cli/` in this repo. it ships on npm at `@justanarthur/just-github-actions-n-workflows-cli` (see the v1 limitation callout at the top for why `npm install` doesn't yet work).
+the CLI is `cli/` in this repo. it ships on npm at `@justanarthur/just-github-actions-n-workflows-cli` (v1.0.2+, installable directly).
 
-### install (from source, current workaround)
+### install (from npm — recommended)
+
+```bash
+npm install -g @justanarthur/just-github-actions-n-workflows-cli
+# or
+npx @justanarthur/just-github-actions-n-workflows-cli@1.0.2 <command>
+```
+
+the published CLI's `lib` dep is rewritten to a concrete version by the toolkit's `pin-workspace-versions` action at publish time, so `npm install` / `npx` resolve correctly.
+
+### install (from source, only for toolkit development)
 
 ```bash
 git clone https://github.com/justAnArthur/just-github-actions-n-workflows.git
 cd just-github-actions-n-workflows
 bun install
 bun run cli/ <command>
-```
-
-### install (when v1.x ships the lib fix)
-
-```bash
-npm install -g @justanarthur/just-github-actions-n-workflows-cli
-# or
-npx @justanarthur/just-github-actions-n-workflows-cli <command>
 ```
 
 ### commands
