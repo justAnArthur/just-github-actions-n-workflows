@@ -6,7 +6,7 @@ import { commitAndPush } from "@justanarthur/just-github-actions-n-workflows-lib
 import { tagAndPush, type TagAnnotation } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n-workflows-lib/git/get-commits-from-the-last-stable"
 import { deletePrereleaseImages, manifestNameToImageName } from "@justanarthur/just-github-actions-n-workflows-lib/ghcr/delete-canary-images"
-import { log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { GITHUB_ACTIONS_BOT, withCoAuthors, type CoAuthor } from "@justanarthur/just-github-actions-n-workflows-lib/git/co-authors"
 
 const coAuthor: CoAuthor = {
@@ -182,12 +182,18 @@ if (manifestNextVersions.length !== 0) {
   log.info("committed and pushed version bump")
 }
 
+const pushedTags: string[] = []
+
 for (const [manifest, newVersion] of manifestNextVersions) {
   const annotation: TagAnnotation = {
     deployTargets: manifest.deployTargets ?? []
   }
-  await tagAndPush(`${manifest.name}@${newVersion}`, annotation)
-  log.info(`tagged ${manifest.name}@${newVersion} (deployTargets: ${annotation.deployTargets.join(", ") || "none"})`)
+  const tag = `${manifest.name}@${newVersion}`
+  await tagAndPush(tag, annotation)
+  pushedTags.push(tag)
+  // written per tag so tags already pushed are still dispatched if a later push fails
+  setOutput("tags", JSON.stringify(pushedTags))
+  log.info(`tagged ${tag} (deployTargets: ${annotation.deployTargets.join(", ") || "none"})`)
 }
 
 // --- post-stable: advance to next prerelease ---
