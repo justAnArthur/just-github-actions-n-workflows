@@ -13,6 +13,14 @@
 #       with:
 #         bump_type: "minor:canary"
 #
+# release tags are pushed with GITHUB_TOKEN, and GitHub never starts
+# workflows from pushes made with that token. so after tagging, this
+# workflow dispatches every installed workflow whose `push.tags` filter
+# matches a new tag (publish-npm-on-tag, publish-docker-on-tag,
+# release-on-tag, deploy-vercel-on-tag, and copies of them) on the tag
+# ref, with the tag as their `tag` input. that's why it needs
+# `actions: write` — a reusable-workflow caller must grant it too.
+#
 # required secrets:
 #   (none — uses the auto-provided GITHUB_TOKEN)
 # ---
@@ -80,6 +88,7 @@ on:
 permissions:
   contents: write
   packages: write
+  actions: write
 
 jobs:
   bump-version:
@@ -107,6 +116,7 @@ jobs:
           mode: ${{ github.event_name == 'push' && 'push' || 'dispatch' }}
 
       - name: Bump version
+        id: bump
         uses: justAnArthur/just-github-actions-n-workflows/actions/bump-version@main
         with:
           bump_to_calculated_stable: ${{ inputs.bump_to_calculated_stable || 'false' }}
@@ -117,3 +127,10 @@ jobs:
           github_event: ${{ toJson(github.event) }}
           co_author_name: ${{ steps.git_user.outputs.co_author_name }}
           co_author_email: ${{ steps.git_user.outputs.co_author_email }}
+
+      - name: Dispatch tag-triggered workflows
+        if: ${{ !cancelled() && steps.bump.outputs.tags != '' }}
+        uses: justAnArthur/just-github-actions-n-workflows/actions/dispatch-tag-workflows@main
+        with:
+          tags: ${{ steps.bump.outputs.tags }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
