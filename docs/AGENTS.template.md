@@ -75,6 +75,7 @@ When the `bump-version.yml` workflow runs (push to `main`, or via `workflow_disp
    ```
 
    This JSON controls which publish/deploy workflows fire.
+6. **Dispatches the tag workflows** for each new tag. The tags are pushed with the default `GITHUB_TOKEN`, and GitHub never starts workflows from pushes made with that token — so `bump-version.yml` itself starts every workflow in `.github/workflows/` whose `push.tags` filter matches the tag, via `workflow_dispatch` on the tag ref with `tag=<tag>` (step "Dispatch tag-triggered workflows"; needs `actions: write`, already in the file). No PAT is involved.
 
 `deployTargets` is inferred from each manifest's properties:
 
@@ -86,6 +87,8 @@ When the `bump-version.yml` workflow runs (push to `main`, or via `workflow_disp
 | `deployTargets` (explicit, comma-separated) | overrides the above |
 
 ## 5. Why a publish or deploy silently skipped
+
+**No run at all for a new tag** → open the `bump-version` run that created it and check the "Dispatch tag-triggered workflows" step. It names every workflow it started and fails if a dispatch was rejected (most often: `actions: write` missing because a reusable-workflow caller didn't grant it). A tag workflow without a `workflow_dispatch` `tag` input is skipped with a warning. To recover, run the tag workflow from the Actions tab with the tag as `tag` input.
 
 Each of `publish-npm-on-tag.yml`, `publish-docker-on-tag.yml`, `deploy-vercel-on-tag.yml` runs `resolve-tag-meta` first, then guards the main job with `if:`. The job skips when the tag annotation doesn't list its target.
 
@@ -187,5 +190,7 @@ For repo-specific agent instructions, write a separate `CONTRIBUTING.md` or root
 - Pushing a tag like `v1.2.3` instead of `@scope/name@1.2.3` — none of the `*@*` triggers will match.
 - Running `npm version patch` directly — bypasses the conventional-commit-driven bump and produces a tag without the JSON annotation, which downstream workflows then fall back to legacy detection for.
 - Hand-editing `bump-version.yml` to change the bump logic — overwritten by `update`.
+- Adding a `workflow_run` / `gh workflow run` workflow to "publish after bump" — `bump-version.yml` already dispatches the tag workflows, so this publishes twice. Delete such a workaround after updating.
+- Copying a tag workflow (e.g. `publish-npm-on-tag.yml` → `publish-gh-packages.yml`) and removing its `workflow_dispatch` `tag` input — bump-version can then no longer start it.
 - Hand-editing `publish-npm-on-tag.yml` to swap `.npmrc` for dual-registry, comment out the release step, or hard-code a registry — overwritten by `update`. Use `publishConfig` / `.npmrc` / `.justactions.yml` instead (see section 9).
 - Adding `# toolkit-ref:` / `# local-edit:` comments to track manual workflow edits — deleted on next `update`. The lockfile already tracks the ref.
