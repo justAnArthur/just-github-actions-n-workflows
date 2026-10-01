@@ -38,6 +38,14 @@ inputs:
     required: false
     default: ""
 
+outputs:
+  tags:
+    description: >
+      JSON array of the release tags this run created and pushed (e.g. '["@scope/pkg@1.2.3"]').
+      Empty when nothing was bumped. Tags pushed with GITHUB_TOKEN don't start `on: push: tags`
+      workflows — pass this to the dispatch-tag-workflows action.
+    value: ${{ steps.run.outputs.tags }}
+
 runs:
   using: composite
   steps:
@@ -50,6 +58,7 @@ runs:
       working-directory: ${{ github.action_path }}/../..
 
     - name: Run bump-manifest-versions
+      id: run
       shell: bash
       working-directory: ${{ github.workspace }}
       env:

@@ -12,13 +12,13 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 ### what's in this repo
 
 - **6 workflow templates** in `workflows/` (the source of truth). each fires on tag push, manual dispatch, or as a reusable workflow:
-  - `bump-version.yml` — auto-bumps package versions on push to main via conventional commits
+  - `bump-version.yml` — auto-bumps package versions on push to main via conventional commits, then dispatches the tag workflows below for each new tag
   - `publish-npm-on-tag.yml` — runs `bun publish` for the npm registry
   - `publish-docker-on-tag.yml` — builds and pushes a docker image to ghcr.io
   - `release-on-tag.yml` — creates a github release with notes
   - `deploy-vercel-on-tag.yml` — POSTs a deploy hook to vercel
   - `deploy-docker-compose.yml` — runs `docker compose` on a remote SSH host
-- **19 composite actions** in `actions/` (each is `action.yml` + `src/index.ts`; see [available actions](#available-actions) for the full list)
+- **20 composite actions** in `actions/` (each is `action.yml` + `src/index.ts`; see [available actions](#available-actions) for the full list)
 - **a CLI** in `cli/` with `init` / `update` / `status` commands. it scaffolds workflows into a target repo, tracks them in a lockfile, and also writes `.github/AGENTS.md` so the downstream repo's own AI agents learn the conventions.
 
 ### three ways to adopt
@@ -46,6 +46,8 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 - **don't confuse registries.** npm packages (npmjs.com or npm.pkg.github.com) go through `publish-npm-on-tag.yml`. container images (ghcr.io) go through `publish-docker-on-tag.yml`. they are different workflows. there is no "publish-everything" workflow.
 - **don't fork a template and patch in custom registry logic.** if a user needs to publish to a non-default registry, copy the template, change the registry in the copy, and let both workflows run on the same tag push. the original stays untouched in this repo so updates keep flowing.
 - **don't write a manual `.npmrc` swap inside a publish step.** the toolkit doesn't do that, and any change you make inside a fork won't reach other consumers. put the `.npmrc` in the package directory at install time, or add a `.npmrc` step before the `bun publish` step in a *copy* of the workflow, not a fork.
+- **don't add a "publish on bump" glue workflow.** tags pushed with `GITHUB_TOKEN` never start `on: push: tags` workflows, so `bump-version.yml` itself dispatches every installed workflow whose `push.tags` filter matches a new tag (see [how release tags reach the tag workflows](#how-release-tags-reach-the-tag-workflows)). an extra `workflow_run` → `gh workflow run` workflow on top of that publishes twice.
+- **don't drop the `workflow_dispatch` `tag` input from a copied tag workflow.** that input is how `bump-version.yml` starts it — a copy without it (or with another required input) is skipped with a warning.
 - **don't modify the workflows after they're installed in `.github/workflows/`.** the `init` / `update` commands will overwrite local edits on the next run. adding `# local-edit:` or `# toolkit-ref:` comments does not protect them. the only safe places to customize behavior are at the package level — see [where to override](#where-to-override) below.
 - **don't tell the user to clone the toolkit to use the CLI.** since CLI v1.0.2, `npx @justanarthur/just-github-actions-n-workflows-cli@1.0.2 init` works from any directory and resolves the lib dep correctly. the local-clone path is only needed for development on the toolkit itself.
 
@@ -100,7 +102,7 @@ the most reliable option right now. each workflow file in `workflows/` is self-c
 
    | workflow                          | secrets (in addition to auto `GITHUB_TOKEN`)               |
    |-----------------------------------|-------------------------------------------------------------|
-   | `bump-version.yml`                | (none)                                                      |
+   | `bump-version.yml`                | (none — needs `actions: write`, already granted in the file) |
    | `publish-npm-on-tag.yml`          | `NPM_TOKEN`                                                 |
    | `publish-docker-on-tag.yml`       | (optional `NPM_TOKEN` build-arg)                            |
    | `deploy-vercel-on-tag.yml`        | `VERCEL_DEPLOY_HOOK_URL`                                    |
@@ -248,7 +250,7 @@ git commit -m "feat(frontend): redesign dashboard"    # bumps @myorg/web only
 git push                                              # bump-version.yml auto-bumps on push to main
 ```
 
-**step 4 — release**. the bump-version workflow pushes annotated tags like `@myorg/api@0.2.0` with a JSON annotation listing the deploy targets. the publish-npm workflow picks each tag up and:
+**step 4 — release**. the bump-version workflow pushes annotated tags like `@myorg/api@0.2.0` with a JSON annotation listing the deploy targets, then dispatches `publish-npm-on-tag.yml` (and every other installed tag workflow) for each new tag. the publish-npm workflow then:
 - for `npm`-tagged packages → publishes to npm at the new version
 - for non-npm-tagged packages (private, lib, etc.) → skips
 - creates a GitHub release with conventional-commit-derived notes
@@ -555,10 +557,22 @@ to **override** auto-detection, set `properties.deployTargets` explicitly:
 
 1. **manifest parse** → adapter reads `package.json` / `pom.xml` and infers `deployTargets`
 2. **version bump** → `bump-version` action creates an annotated git tag with `{"deployTargets":["npm","docker"]}` in the tag message
-3. **tag push** → publish/deploy workflows trigger, `resolve-tag-meta` reads the tag annotation
+3. **dispatch** → `bump-version.yml` starts the publish/deploy workflows for each new tag (see below), `resolve-tag-meta` reads the tag annotation
 4. **skip check** → each workflow checks its target (e.g. `publish_npm == 'true'`) and skips early if not present
 
 for legacy tags without annotations, workflows fall back to runtime detection (e.g. `check-publishable` for npm, `get-dockerfile-path` for docker).
+
+### how release tags reach the tag workflows
+
+`bump-version.yml` pushes its tags with the auto-provided `GITHUB_TOKEN`, and GitHub never starts workflow runs from events created by that token (except `workflow_dispatch` / `repository_dispatch`). a plain tag push from bump-version therefore starts nothing.
+
+so the last step of `bump-version.yml` runs the `dispatch-tag-workflows` action with the tags the bump just pushed. it scans `.github/workflows/`, picks every workflow whose `on.push.tags` / `tags-ignore` filter matches the tag, and starts it via `workflow_dispatch` **on the tag ref** with the tag as its `tag` input — so `github.ref_name` and `inputs.tag` are the tag, same as a real tag push. consequences:
+
+- **no PAT needed.** the job has `permissions: actions: write`. if you call `bump-version.yml` as a reusable workflow, the caller must grant `actions: write` too.
+- **copies are covered.** a `publish-gh-packages.yml` copy of `publish-npm-on-tag.yml` is dispatched like the original, as long as it keeps the `workflow_dispatch` `tag` input. narrowing its `push.tags` (e.g. `@myorg/api@*`) narrows what gets dispatched.
+- **only workflows that filter on tags count.** an unfiltered `on: push` CI workflow is not started for release tags.
+- **tags you push by hand** (e.g. the first release) still trigger the workflows the normal way — dispatch only covers tags bump-version created, so nothing runs twice.
+- **a failed dispatch fails the bump job** with the tag and workflow named; re-run the tag workflow from the Actions tab with that tag as input.
 
 ### how modules work
 
@@ -598,6 +612,7 @@ each action is a composite GitHub Action in `actions/` with its own `action.yml`
 | `actions/configure-git-user`     | set git user from push author or actor            | `mode`                                                        |
 | `actions/create-env-file`        | write a `.env` file from key=value pairs          | `variables`, `filename`, `path`                               |
 | `actions/deploy-compose-remote`  | generate docker compose deploy script for SSH     | `target_path`, `registry_username`, `registry_password`       |
+| `actions/dispatch-tag-workflows` | dispatch installed tag workflows for new tags     | `tags`, `github_token`                                        |
 | `actions/fetch-tags`             | fetch all tags + unshallow if needed              | —                                                             |
 | `actions/generate-release-notes` | markdown release notes between tags               | `tag_name`, `root_dir`                                        |
 | `actions/get-dockerfile-path`    | resolve dockerfile from module metadata           | `tag_name`                                                    |
@@ -647,12 +662,14 @@ ready-to-copy workflow files in `workflows/`:
 
 | workflow                         | description                                    | triggers                 |
 |----------------------------------|------------------------------------------------|--------------------------|
-| `bump-version.yml`               | auto-bump module versions on push              | push, dispatch, call     |
+| `bump-version.yml`               | auto-bump module versions on push, then dispatch tag workflows | push, dispatch, call     |
 | `publish-npm-on-tag.yml`         | publish to npm + github release                | tag push, dispatch, call |
 | `publish-docker-on-tag.yml`      | build + publish docker image + github release  | tag push, dispatch, call |
 | `deploy-vercel-on-tag.yml`       | deploy to vercel (production or preview)       | tag push, dispatch, call |
 | `release-on-tag.yml`             | create github release with notes               | tag push, dispatch, call |
 | `deploy-docker-compose.yml`      | deploy docker compose to remote server         | dispatch, call           |
+
+the tag workflows are started by `bump-version.yml` via dispatch for the tags it creates (see [how release tags reach the tag workflows](#how-release-tags-reach-the-tag-workflows)); the `tag push` trigger covers tags you push yourself.
 
 ## how it works
 
@@ -708,6 +725,7 @@ all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_
 │       ├── exec.ts               # shell execution utilities
 │       ├── github.ts             # github actions runtime helpers
 │       ├── index.ts              # barrel exports
+│       ├── workflow-dispatch.ts  # tag-trigger matching + workflow_dispatch calls
 │       ├── codecs/               # file format codecs (xml)
 │       ├── git/                  # git utilities (tags, commits, parsing)
 │       │   └── tag-n-push.ts     # annotated tag creation + reading
@@ -734,6 +752,7 @@ all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_
 │   ├── configure-git-user/
 │   ├── create-env-file/
 │   ├── deploy-compose-remote/
+│   ├── dispatch-tag-workflows/
 │   ├── fetch-tags/
 │   ├── generate-release-notes/
 │   ├── get-dockerfile-path/

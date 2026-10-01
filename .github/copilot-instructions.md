@@ -142,7 +142,7 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 ### Tags
 - Git tags follow the `<package-name>@<version>` format (e.g. `@justanarthur/just-github-actions-n-workflows@1.0.0`).
 - Tags are created automatically by the bump-version workflow after updating manifest versions.
-- Tag pushes trigger the publish workflows.
+- Tags pushed with `GITHUB_TOKEN` start no workflows, so the bump-version workflow dispatches the installed tag workflows itself (`actions/dispatch-tag-workflows`, logic in `lib/src/workflow-dispatch.ts`). Tag workflows must keep a `workflow_dispatch` trigger with a `tag` input.
 
 ### Testing
 - Tests use Bun's built-in test runner (`bun test`).
@@ -192,6 +192,7 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 | `lib/src/github.ts` | GitHub Actions runtime helpers (setOutput, log, getEnv) |
 | `lib/src/exec.ts` | Shell command execution with timeout |
 | `actions/bump-version/src/index.ts` | Main version bump orchestrator |
+| `lib/src/workflow-dispatch.ts` | Tag-trigger matching + workflow_dispatch API calls |
 | `.justactions.yml` | Project settings file (deploy targets, module overrides) |
 | `.githooks/pre-commit` | Workflow sync hook |
 | `.github/git-commit-instructions.md` | Commit message format rules |

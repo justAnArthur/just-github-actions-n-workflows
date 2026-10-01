@@ -60,6 +60,7 @@ Choose the scope based on which directory/package you actually modified:
 | `actions/check-publishable/` | `check-publishable` |
 | `actions/configure-git-user/` | `configure-git-user` |
 | `actions/create-env-file/` | `create-env-file` |
+| `actions/dispatch-tag-workflows/` | `dispatch-tag-workflows` |
 | `actions/fetch-tags/` | `fetch-tags` |
 | `actions/generate-release-notes/` | `generate-release-notes` |
 | `actions/get-dockerfile-path/` | `get-dockerfile-path` |
@@ -88,6 +89,7 @@ Only the following scope values are recognized. Any other value is treated as un
 | `check-publishable` | `@justanarthur/step-check-publishable` |
 | `configure-git-user` | `@justanarthur/step-configure-git-user` |
 | `create-env-file` | `@justanarthur/step-create-env-file` |
+| `dispatch-tag-workflows` | `@justanarthur/step-dispatch-tag-workflows` |
 | `fetch-tags` | `@justanarthur/step-fetch-tags` |
 | `generate-release-notes` | `@justanarthur/step-generate-release-notes` |
 | `get-dockerfile-path` | `@justanarthur/step-get-dockerfile-path` |

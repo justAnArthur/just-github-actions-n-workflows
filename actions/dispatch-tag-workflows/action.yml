@@ -1,0 +1,46 @@
+name: Dispatch Tag Workflows
+description: >
+  Starts the tag-triggered workflows installed in the repo for tags that were
+  pushed with the default GITHUB_TOKEN. GitHub never starts workflows from
+  pushes made with that token, so without this the `on: push: tags` workflows
+  silently never run. Each workflow whose `push` trigger would match the tag is
+  started via `workflow_dispatch` on the tag ref (with a `tag` input when it
+  declares one). Needs `actions: write`.
+
+inputs:
+  tags:
+    description: 'Tags to dispatch for — JSON array (e.g. ''["@scope/pkg@1.2.3"]'') or comma/newline separated'
+    required: true
+  github_token:
+    description: "Token with actions:write, used to call the workflow dispatch API"
+    required: true
+  workflows_dir:
+    description: "Directory holding the repo's workflow files"
+    required: false
+    default: ".github/workflows"
+
+outputs:
+  dispatched:
+    description: 'JSON array of {"tag","workflow"} pairs that were dispatched'
+    value: ${{ steps.run.outputs.dispatched }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Dispatch tag workflows
+      id: run
+      shell: bash
+      working-directory: ${{ github.workspace }}
+      env:
+        TAGS: ${{ inputs.tags }}
+        DISPATCH_TOKEN: ${{ inputs.github_token }}
+        WORKFLOWS_DIR: ${{ inputs.workflows_dir }}
+      run: bun run ${{ github.action_path }}/src/index.ts

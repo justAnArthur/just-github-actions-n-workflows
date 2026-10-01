@@ -43,6 +43,13 @@
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
+    "actions/dispatch-tag-workflows": {
+      "name": "@justanarthur/step-dispatch-tag-workflows",
+      "version": "1.0.1",
+      "dependencies": {
+        "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
+      },
+    },
     "actions/fetch-tags": {
       "name": "@justanarthur/step-git-fetch-and-unshallow",
       "version": "1.0.1",
@@ -143,7 +150,7 @@
     },
     "cli": {
       "name": "@justanarthur/just-github-actions-n-workflows-cli",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "bin": {
         "just-github-actions-n-workflows": "./bin/run.js",
       },
@@ -209,6 +216,8 @@
     "@justanarthur/step-create-dotenv": ["@justanarthur/step-create-dotenv@workspace:actions/create-env-file"],
 
     "@justanarthur/step-deploy-compose-remote": ["@justanarthur/step-deploy-compose-remote@workspace:actions/deploy-compose-remote"],
+
+    "@justanarthur/step-dispatch-tag-workflows": ["@justanarthur/step-dispatch-tag-workflows@workspace:actions/dispatch-tag-workflows"],
 
     "@justanarthur/step-generate-release-notes": ["@justanarthur/step-generate-release-notes@workspace:actions/generate-release-notes"],
 
