@@ -1,9 +1,17 @@
+<a href="https://github.com/justAnArthur/just-github-actions-n-workflows"><img src=".github/banner.svg" alt="Release automation for monorepos: Conventional commits bump each package and push an annotated tag. Tag workflows publish to npm or ghcr.io, cut a release, and deploy." width="100%"></a>
+
 # just-github-actions-n-workflows
+
+[![npm](https://img.shields.io/npm/v/@justanarthur/just-github-actions-n-workflows-cli?label=cli)](https://www.npmjs.com/package/@justanarthur/just-github-actions-n-workflows-cli) [![license](https://img.shields.io/github/license/justAnArthur/just-github-actions-n-workflows)](LICENSE)
 
 > **v1.0.1 — stable release.** tags use the `@scope/name@1.0.1` per-package format. pin a specific major by referencing `@v1` after release; see *Repo-level tag* below. **CLI v1.0.2+** is installable from npm — the lib workspace dep is rewritten to a concrete version at publish time, so `npx` and `npm install -g` both work.
 
 generic, versioned CI/CD workflow toolkit — version bumping, npm publishing, docker publishing, vercel deployment, docker compose deployment.  
 built as **composite GitHub Actions** powered by [Bun](https://bun.sh).
+
+```bash
+npx @justanarthur/just-github-actions-n-workflows-cli init   # pick workflows, write them to .github/workflows/
+```
 
 ## for AI agents
 
@@ -673,6 +681,20 @@ the tag workflows are started by `bump-version.yml` via dispatch for the tags it
 
 ## how it works
 
+one push to main, end to end. the npm, docker and vercel workflows read the tag annotation with `resolve-tag-meta` and skip when their target isn't in it; `release-on-tag.yml` runs for every tag. `deploy-docker-compose.yml` has no tag trigger: it runs on manual dispatch or `workflow_call`.
+
+```mermaid
+flowchart LR
+  P[push to main] --> B[bump-version]
+  B -->|by commit scope| T[annotated tag with deploy targets]
+  T --> D[dispatch-tag-workflows]
+  D --> N[publish-npm-on-tag: npm]
+  D --> K[publish-docker-on-tag: ghcr.io]
+  D --> R[release-on-tag: GitHub release]
+  D --> V[deploy-vercel-on-tag: deploy hook]
+  M[manual dispatch or workflow_call] --> C[deploy-docker-compose: SSH host]
+```
+
 1. **modules** are discovered by scanning the repo for manifest files (`package.json`,
    `pom.xml`, …). each manifest is parsed by its adapter into a unified `Module` object
    with name, version, directory, deploy targets, and metadata.
@@ -799,6 +821,10 @@ bun install          # install deps
 bun run build        # validate all action packages
 bun test             # run tests
 ```
+
+## releases
+
+this repo releases itself with its own templates: `.github/workflows/` runs `bump-version.yml`, `publish-npm-on-tag.yml` and `release-on-tag.yml`, synced from `workflows/` by the pre-commit hook (the list is in `.github/workflows/sync-from-root-workflows`). tags are `@scope/name@version`, one per package. commit scopes: `cli` bumps the CLI (the only package published to npm), `lib` the lib, `toolkit` / `workflows` the root, and each action's folder name (`bump-version`, `setup-ssh`, …) that action. commits without a scope bump nothing, and a push whose head commit says `[skip bump]` skips the job.
 
 ## license
 
