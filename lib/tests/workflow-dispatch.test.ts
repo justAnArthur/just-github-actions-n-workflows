@@ -13,6 +13,15 @@ import {
 const TEMPLATES = join(import.meta.dir, "..", "..", "workflows")
 const SCOPED = "@scope/pkg@1.2.3"
 
+// GitHub's own filter globs, which decide a real tag push: `*` stops at `/`,
+// `**` crosses it. globToRegExp is looser on purpose, so it can't catch this.
+function githubGlob(pattern: string): RegExp {
+  const source = pattern
+    .replace(/[.+?^${}()|[\]\\]/g, "\\$&")
+    .replace(/\*\*|\*/g, (star) => (star === "**" ? ".*" : "[^/]*"))
+  return new RegExp(`^${source}$`)
+}
+
 describe("parseTagList", () => {
   test("reads a JSON array", () => {
     expect(parseTagList('["@a/b@1.0.0","c@2.0.0"]')).toEqual(["@a/b@1.0.0", "c@2.0.0"])
@@ -148,3 +157,23 @@ describe("dispatchWorkflow", () => {
     ).rejects.toThrow(/404/)
   })
 })
+
+describe("tag workflow filters", () => {
+  test("`*@*` doesn't fire for a scoped tag on GitHub; `**@*` does", () => {
+    expect(githubGlob("*@*").test(SCOPED)).toBe(false)
+    expect(githubGlob("**@*").test(SCOPED)).toBe(true)
+    expect(githubGlob("**@*").test("pkg@1.0.0")).toBe(true)
+  })
+
+  for (const dir of [TEMPLATES, join(import.meta.dir, "..", "..", ".github", "workflows")]) {
+    test(`every tag workflow in ${dir.split("/").slice(-2).join("/")} fires on a scoped tag push`, async () => {
+      const tagged = (await loadWorkflows(dir)).filter((w) => w.on.push?.tags)
+      const silent = tagged
+        .filter((w) => ![w.on.push.tags].flat().some((p: string) => !p.startsWith("!") && githubGlob(p).test(SCOPED)))
+        .map((w) => w.file)
+      expect(tagged.length).toBeGreaterThan(0)
+      expect(silent).toEqual([])
+    })
+  }
+})
+

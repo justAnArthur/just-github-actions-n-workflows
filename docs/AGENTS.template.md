@@ -172,13 +172,13 @@ The relevant publish step in `publish-npm-on-tag.yml` is:
 
 Things you must NOT do, even if they look like the right call:
 
-- Replace the `bun publish` step with a `.npmrc` swap + second `bun publish` call to hit a second registry. The toolkit's design for dual-registry is to copy `publish-npm-on-tag.yml` to `publish-gh-packages.yml` in `.github/workflows/` (both fire on `*@*`); do not patch the upstream copy.
+- Replace the `bun publish` step with a `.npmrc` swap + second `bun publish` call to hit a second registry. The toolkit's design for dual-registry is to copy `publish-npm-on-tag.yml` to `publish-gh-packages.yml` in `.github/workflows/` (both fire on `**@*`); do not patch the upstream copy.
 - Comment out or remove the `Create GitHub release` step from `publish-npm-on-tag.yml`. That release is bundled by design. If you don't want it, either accept it, or stop using `publish-npm-on-tag.yml` and write your own (then you own the maintenance — updates won't help you).
 - Add `# toolkit-ref: <sha>` / `# local-edit:` banner comments to track your changes. These are deleted on next `update`. The lockfile at `.github/workflows/.toolkit-lock.json` already tracks the ref — read it.
 
 If you genuinely need behavior the toolkit doesn't support (e.g. you need to *skip* the bundled release, or run a second publish that the existing dual-workflow pattern can't express), open an issue upstream with a concrete use case. Don't patch locally and ship.
 
-Adjusting the workflow's `push.branches` / `push.tags` pattern after install is expected and survives updates — `init` does NOT customize triggers, so the user is responsible for them.
+Adjusting the workflow's `push.branches` / `push.tags` pattern after install is expected and survives updates. Keep `**` before the `@` in a tag pattern: GitHub's `*` doesn't match `/`, so `*@*` never fires for a scoped tag like `@scope/name@1.2.3` — `init` does NOT customize triggers, so the user is responsible for them.
 
 For repo-specific agent instructions, write a separate `CONTRIBUTING.md` or root-level `AGENTS.md` outside the toolkit's managed path.
 
@@ -187,7 +187,7 @@ For repo-specific agent instructions, write a separate `CONTRIBUTING.md` or root
 - `feat: add endpoint` — missing scope, silent no-bump.
 - `feat(API): ...` — uppercase scope; manifests use lowercase by convention.
 - Adding a new package without setting `properties.gitCommitScopeRelatedNames` — bumps for it will never fire.
-- Pushing a tag like `v1.2.3` instead of `@scope/name@1.2.3` — none of the `*@*` triggers will match.
+- Pushing a tag like `v1.2.3` instead of `@scope/name@1.2.3` — none of the `**@*` triggers will match.
 - Running `npm version patch` directly — bypasses the conventional-commit-driven bump and produces a tag without the JSON annotation, which downstream workflows then fall back to legacy detection for.
 - Hand-editing `bump-version.yml` to change the bump logic — overwritten by `update`.
 - Adding a `workflow_run` / `gh workflow run` workflow to "publish after bump" — `bump-version.yml` already dispatches the tag workflows, so this publishes twice. Delete such a workaround after updating.
