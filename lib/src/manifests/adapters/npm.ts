@@ -36,7 +36,8 @@ const npmAdapter: ManifestAdapter = {
   async setManifestVersion(fileContent: string, version: string): Promise<string> {
     const pkg = JSON.parse(fileContent)
     pkg.version = version
-    return JSON.stringify(pkg, null, 2)
+    // a final newline, as npm writes it; formatters reject the file without one
+    return `${JSON.stringify(pkg, null, 2)}\n`
   }
 }
 
