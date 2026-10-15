@@ -5,7 +5,7 @@ import * as path from "node:path"
 import type { Manifest } from "./registry"
 import { getAdapters } from "./registry"
 
-const DEFAULT_EXCLUDE = new Set([
+export const DEFAULT_EXCLUDE = new Set([
   "node_modules",
   ".git",
   ".github",
@@ -37,7 +37,9 @@ export async function findManifests<R = Manifest & { path: string }>(
     const full = path.join(dir, entry.name)
 
     if (entry.isFile() && targetFilenames.has(entry.name)) {
-      results.push({ ...(await parseManifest(full)), path: full } as R)
+      const manifest = await parseManifest(full)
+      // null means the file is not a versioned module on its own
+      if (manifest) results.push({ ...manifest, path: full } as R)
     } else if (entry.isDirectory() && !exclude.has(entry.name)) {
       await findManifests(full, { exclude, results })
     }
@@ -46,7 +48,7 @@ export async function findManifests<R = Manifest & { path: string }>(
   return results
 }
 
-export async function parseManifest(filePath: string): Promise<Manifest> {
+export async function parseManifest(filePath: string): Promise<Manifest | null> {
   const fileName = path.basename(filePath)
   const adapter = getAdapters().find((a) => a.fileName === fileName)
   if (!adapter) throw new Error(`no manifest adapter for file: ${filePath}`)
@@ -78,6 +80,7 @@ export async function updateManifest(
   const content = await fs.readFile(filePath, "utf-8")
   const updated = await adapter.setManifestVersion(content, newVersion)
   await fs.writeFile(filePath, updated, "utf-8")
+  await adapter.updateRelatedFiles?.(filePath, newVersion)
 }
 
 export function getManifestSearchDir(): string {
