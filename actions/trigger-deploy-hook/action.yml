@@ -1,24 +1,42 @@
 name: Trigger Deploy Hook
 description: >
   Sends an HTTP POST request to a deploy hook URL (e.g. Vercel)
-  and validates the response. No CLI or checkout required.
+  and validates the response. Either a single `hook_url`, or a fan-out
+  to every `vercel.targets` entry in `.justactions.yml` whose `packages`
+  and `channels` match the tag. Writes a job summary of fired/skipped hooks.
 
 inputs:
   hook_url:
-    description: "Deploy hook URL to trigger (e.g. Vercel deploy hook)"
-    required: true
+    description: "Single deploy hook URL. Used only when .justactions.yml has no vercel.targets"
+    required: false
+    default: ""
   tag:
-    description: "Tag name being deployed (used for logging)"
+    description: "Tag name being deployed (used for logging and the job summary)"
+    required: false
+    default: ""
+  pkg_name:
+    description: "Package name from the tag; matched against vercel.targets.<name>.packages"
+    required: false
+    default: ""
+  prerelease_channel:
+    description: "Prerelease channel from the tag (e.g. 'beta'); empty means 'stable'. Matched against vercel.targets.<name>.channels"
+    required: false
+    default: ""
+  secrets:
+    description: "JSON object of secret name → value (the workflow passes toJSON(secrets)); hook URLs are looked up by vercel.targets.<name>.hook_secret"
     required: false
     default: ""
 
 outputs:
   status:
-    description: "HTTP status code from the deploy hook response"
+    description: "HTTP status code from the deploy hook response (single hook_url mode only)"
     value: ${{ steps.run.outputs.status }}
   body:
-    description: "Response body from the deploy hook"
+    description: "Response body from the deploy hook (single hook_url mode only)"
     value: ${{ steps.run.outputs.body }}
+  results:
+    description: "JSON array of { name, status: fired|skipped|failed, detail } per hook"
+    value: ${{ steps.run.outputs.results }}
 
 runs:
   using: composite
@@ -37,5 +55,8 @@ runs:
       env:
         DEPLOY_HOOK_URL: ${{ inputs.hook_url }}
         DEPLOY_TAG: ${{ inputs.tag }}
+        DEPLOY_PKG_NAME: ${{ inputs.pkg_name }}
+        DEPLOY_PRERELEASE_CHANNEL: ${{ inputs.prerelease_channel }}
+        DEPLOY_SECRETS: ${{ inputs.secrets }}
       run: bun run ${{ github.action_path }}/src/index.ts
 
