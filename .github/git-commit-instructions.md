@@ -72,6 +72,7 @@ Choose the scope based on which directory/package you actually modified:
 | `actions/setup-ssh/` | `setup-ssh` |
 | `actions/skip-check/` | `skip-check` |
 | `actions/ssh-exec/` | `ssh-exec` |
+| `actions/trigger-deploy-hook/` | `trigger-deploy-hook` |
 | `workflows/`, root config, `package.json`, README | `toolkit` or `workflows` |
 
 If a change spans multiple directories, use comma-separated scopes or multi-line commits (see below).
@@ -101,6 +102,7 @@ Only the following scope values are recognized. Any other value is treated as un
 | `setup-ssh` | `@justanarthur/step-setup-ssh` |
 | `skip-check` | `@justanarthur/step-skip-check` |
 | `ssh-exec` | `@justanarthur/step-ssh-exec` |
+| `trigger-deploy-hook` | `@justanarthur/step-trigger-deploy-hook` |
 
 If a commit affects multiple packages, either use comma-separated scopes or multiple conventional commit lines.
 
