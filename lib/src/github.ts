@@ -43,3 +43,16 @@ export const log = {
   group: (title: string) => console.log(`::group::${title}`),
   groupEnd: () => console.log("::endgroup::")
 }
+
+export function appendStepSummary(markdown: string): void {
+  const filePath = process.env.GITHUB_STEP_SUMMARY
+  if (!filePath) {
+    console.warn("GITHUB_STEP_SUMMARY is not set — cannot write the job summary")
+    return
+  }
+  appendFileSync(filePath, `${markdown}\n`)
+}
+
+export function maskValue(value: string): void {
+  if (value) console.log(`::add-mask::${value}`)
+}
