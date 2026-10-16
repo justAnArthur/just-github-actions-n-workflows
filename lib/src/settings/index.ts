@@ -19,6 +19,20 @@ export interface DeploySettings {
   targets: Record<string, DeployTarget>;
 }
 
+/** one deploy hook (e.g. one vercel project) that a tag can fan out to */
+export interface DeployHookTarget {
+  /** name of the repo secret that holds the deploy hook URL */
+  hook_secret: string;
+  /** release channels this target accepts: "stable" and/or prerelease channels ("beta", "rc", …). default: ["stable"] */
+  channels: string[];
+  /** package names this target deploys. empty = any package */
+  packages: string[];
+}
+
+export interface VercelSettings {
+  targets: Record<string, DeployHookTarget>;
+}
+
 export interface ModuleOverride {
   name: string;
   docker_compose_service?: string;
@@ -36,102 +50,27 @@ export interface GitSettings {
 
 export interface Settings {
   deploy?: DeploySettings;
+  vercel?: VercelSettings;
   modules?: ModuleSettings;
   git?: GitSettings;
 }
 
+export const STABLE_CHANNEL = "stable"
+
 const SETTINGS_FILENAME = ".justactions.yml"
-
-function parseSimpleYaml(content: string): any {
-  const lines = content.split("\n")
-  const result: any = {}
-  const stack: { obj: any; indent: number }[] = [{ obj: result, indent: -1 }]
-  let currentArray: any[] | null = null
-  let currentArrayParent: any = null
-
-  for (const rawLine of lines) {
-    const line = rawLine.replace(/\r$/, "")
-    if (line.trim() === "" || line.trim().startsWith("#")) continue
-
-    const indent = line.length - line.trimStart().length
-    const trimmed = line.trim()
-
-    // pop stack to find the right parent level
-    while (stack.length > 1 && stack[stack.length - 1].indent >= indent) {
-      stack.pop()
-      currentArray = null
-    }
-
-    const parent = stack[stack.length - 1].obj
-
-    // array item
-    if (trimmed.startsWith("- ")) {
-      const value = trimmed.slice(2).trim()
-
-      if (currentArray && currentArrayParent === parent) {
-        const arr = currentArray as any[]
-        // check if it's a key: value pair within array
-        const colonIdx = value.indexOf(":")
-        if (colonIdx > 0) {
-          const k = value.slice(0, colonIdx).trim()
-          const v = value.slice(colonIdx + 1).trim()
-          // start a new array object or add to last
-          if (k === "name" || !arr.length || arr[arr.length - 1][k] !== undefined) {
-            const item: any = {}
-            item[k] = unquote(v)
-            arr.push(item)
-          } else {
-            arr[arr.length - 1][k] = unquote(v)
-          }
-        } else {
-          arr.push(unquote(value))
-        }
-        continue
-      }
-    }
-
-    // key: value
-    const colonIdx = trimmed.indexOf(":")
-    if (colonIdx > 0) {
-      const key = trimmed.slice(0, colonIdx).trim()
-      const value = trimmed.slice(colonIdx + 1).trim()
-
-      if (value === "" || value === "|") {
-        // nested object or empty
-        parent[key] = {}
-        stack.push({ obj: parent[key], indent })
-        currentArray = null
-      } else {
-        parent[key] = unquote(value)
-      }
-
-      // check if next lines are array items for this key
-      continue
-    }
-  }
-
-  // second pass: detect arrays by re-parsing
-  return result
-}
-
-function unquote(s: string): string {
-  if ((s.startsWith('"') && s.endsWith('"')) || (s.startsWith("'") && s.endsWith("'"))) {
-    return s.slice(1, -1)
-  }
-  return s
-}
 
 export async function loadSettings(dir: string): Promise<Settings> {
   let current = path.resolve(dir)
 
   while (true) {
     const candidate = path.join(current, SETTINGS_FILENAME)
+    let content: string | undefined
     try {
-      const content = await fs.readFile(candidate, "utf-8")
-      return parseSettingsYaml(content)
+      content = await fs.readFile(candidate, "utf-8")
     } catch {
       // file not found, walk up
     }
+    if (content !== undefined) return parseSettingsYaml(content)
 
     const parent = path.dirname(current)
     if (parent === current) break
@@ -141,8 +80,15 @@ export async function loadSettings(dir: string): Promise<Settings> {
   return {}
 }
 
-function parseSettingsYaml(content: string): Settings {
-  const raw = parseSimpleYaml(content)
+/** accepts a YAML list or a comma-separated string, like the other list-ish settings */
+function toList(value: unknown): string[] {
+  if (value == null) return []
+  const items = Array.isArray(value) ? value : String(value).split(",")
+  return items.map((v) => String(v).trim()).filter(Boolean)
+}
+
+export function parseSettingsYaml(content: string): Settings {
+  const raw = (Bun.YAML.parse(content) ?? {}) as any
   const settings: Settings = {}
 
   if (raw.deploy) {
@@ -153,20 +99,38 @@ function parseSettingsYaml(content: string): Settings {
     }
 
     // each key under deploy.targets is an environment name
-    if (raw.deploy.targets) {
-      for (const [envName, envConfig] of Object.entries(raw.deploy.targets)) {
-        const config = envConfig as any
-        deploy.targets[envName] = {
-          host: config.host ?? envName,
-          compose_profiles: config.compose_profiles,
-          profiles: config.profiles,
-          timezone: config.timezone ?? "UTC",
-          compose_file: config.compose_file
-        }
+    for (const [envName, envConfig] of Object.entries(raw.deploy.targets ?? {})) {
+      const config = (envConfig ?? {}) as any
+      deploy.targets[envName] = {
+        host: config.host ?? envName,
+        compose_profiles: config.compose_profiles,
+        profiles: config.profiles,
+        timezone: config.timezone ?? "UTC",
+        compose_file: config.compose_file
       }
     }
 
     settings.deploy = deploy
+  }
+
+  if (raw.vercel) {
+    const targets: Record<string, DeployHookTarget> = {}
+
+    // each key under vercel.targets is a target name (e.g. one vercel project)
+    for (const [name, targetConfig] of Object.entries(raw.vercel.targets ?? {})) {
+      const config = (targetConfig ?? {}) as any
+      if (!config.hook_secret) {
+        throw new Error(`.justactions.yml: vercel.targets.${name}.hook_secret is required`)
+      }
+      const channels = toList(config.channels)
+      targets[name] = {
+        hook_secret: String(config.hook_secret),
+        channels: channels.length > 0 ? channels : [STABLE_CHANNEL],
+        packages: toList(config.packages)
+      }
+    }
+
+    settings.vercel = { targets }
   }
 
   if (raw.modules) {
