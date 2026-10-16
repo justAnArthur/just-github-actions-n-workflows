@@ -276,13 +276,13 @@ git add . && git commit -m "ci: bump toolkit to v1.2.0" && git push
 ## overview
 
 this is a repo of **generic, installable/updatable workflows** for project release automation.
-each workflow works with project **modules** — independent packages within a monorepo (or single-repo), each with its own **manifest** (`package.json`, `pom.xml`, etc.) that is parsed into a unified `Module` object used across all workflows.
+each workflow works with project **modules** — independent packages within a monorepo (or single-repo), each with its own **manifest** (`package.json`, `pom.xml`, `Cargo.toml`, etc.) that is parsed into a unified `Module` object used across all workflows.
 
 ### core concepts
 
 - **module** — a project component with its own manifest, version, and optional Dockerfile
-- **manifest** — a file (`package.json`, `pom.xml`, …) that declares the module's name, version, and metadata
-- **adapter** — a pluggable parser for each manifest type (npm, maven, … more to come)
+- **manifest** — a file (`package.json`, `pom.xml`, `Cargo.toml`, …) that declares the module's name, version, and metadata
+- **adapter** — a pluggable parser for each manifest type (npm, maven, cargo, … more to come)
 - **deploy targets** — deployment types inferred from the manifest (`npm`, `docker`, `vercel`) and embedded in git tag annotations
 - **settings file** (`.justactions.yml`) — per-project config for deploy targets, module overrides, etc.
 
@@ -483,7 +483,7 @@ modules:
 
 ## manifest configuration
 
-modules are discovered by scanning the repo for manifest files (`package.json`, `pom.xml`). each manifest declares metadata in a `properties` section that controls versioning and deployment.
+modules are discovered by scanning the repo for manifest files (`package.json`, `pom.xml`, `Cargo.toml`). each manifest declares metadata in a `properties` section (`[*.metadata.justactions]` for Cargo.toml) that controls versioning and deployment.
 
 ### package.json
 
@@ -539,6 +539,39 @@ modules are discovered by scanning the repo for manifest files (`package.json`, 
 </project>
 ```
 
+### Cargo.toml
+
+workspace root — one version for every member crate:
+
+```toml
+[workspace.package]
+version = "0.1.0"
+
+[workspace.metadata.justactions]
+name = "jbm"
+gitCommitScopeRelatedNames = ["game", "client"]
+```
+
+standalone crate:
+
+```toml
+[package]
+name = "my-crate"
+version = "1.0.0"
+
+[package.metadata.justactions]
+name = "client"
+DockerfilePath = "./Dockerfile"
+```
+
+module rules:
+
+1. a `[package]` table with a literal `version` is a **crate** module
+2. otherwise a `[workspace.package]` table with a literal `version` is a **workspace** module — one version for the whole workspace; the name comes from `[workspace.metadata.justactions]` `name` or `package.name`
+3. anything else, such as a member crate with `version.workspace = true`, is skipped
+
+a bump also rewrites the matching `Cargo.lock` entries so `--locked` builds keep passing.
+
 ### deploy targets
 
 deploy targets are **inferred automatically** from manifest properties and embedded into git tag annotations when versions are bumped. downstream workflows read the annotation and skip jobs that don't apply.
@@ -563,7 +596,7 @@ to **override** auto-detection, set `properties.deployTargets` explicitly:
 
 ### how deploy targets flow
 
-1. **manifest parse** → adapter reads `package.json` / `pom.xml` and infers `deployTargets`
+1. **manifest parse** → adapter reads `package.json` / `pom.xml` / `Cargo.toml` and infers `deployTargets`
 2. **version bump** → `bump-version` action creates an annotated git tag with `{"deployTargets":["npm","docker"]}` in the tag message
 3. **dispatch** → `bump-version.yml` starts the publish/deploy workflows for each new tag (see below), `resolve-tag-meta` reads the tag annotation
 4. **skip check** → each workflow checks its target (e.g. `publish_npm == 'true'`) and skips early if not present
@@ -591,7 +624,7 @@ each module is discovered by scanning the repo for manifest files. the unified `
 | `name`           | module name from the manifest                      |
 | `version`        | current version string                             |
 | `dir`            | resolved directory containing the manifest         |
-| `manifestType`   | which adapter parsed it (`npm`, `maven`, …)        |
+| `manifestType`   | which adapter parsed it (`npm`, `maven`, `cargo`, …) |
 | `dockerfilePath`  | path to the Dockerfile (if declared in manifest)  |
 | `deployTargets`  | inferred deployment targets (`npm`, `docker`, `vercel`) |
 | `scopeAliases`   | commit scope aliases for version bumping           |
@@ -600,7 +633,7 @@ modules are matched to conventional commit scopes — when a commit like `feat(b
 
 ### adding a new manifest adapter
 
-to support a new manifest type (e.g. `Cargo.toml`, `build.gradle.kts`):
+to support a new manifest type (e.g. `build.gradle.kts`):
 
 1. create `lib/src/manifests/adapters/<name>.ts`
 2. implement the `ManifestAdapter` interface (`fileName`, `parseManifest`, `setManifestVersion`)
@@ -696,7 +729,7 @@ flowchart LR
 ```
 
 1. **modules** are discovered by scanning the repo for manifest files (`package.json`,
-   `pom.xml`, …). each manifest is parsed by its adapter into a unified `Module` object
+   `pom.xml`, `Cargo.toml`, …). each manifest is parsed by its adapter into a unified `Module` object
    with name, version, directory, deploy targets, and metadata.
 
 2. **deploy targets** (`npm`, `docker`, `vercel`) are inferred from manifest properties
@@ -758,7 +791,8 @@ all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_
 │       │   ├── discovery.ts      # recursive manifest scanner
 │       │   └── adapters/         # manifest format adapters
 │       │       ├── npm.ts        # package.json adapter
-│       │       └── maven.ts      # pom.xml adapter
+│       │       ├── maven.ts      # pom.xml adapter
+│       │       └── cargo.ts      # Cargo.toml adapter
 │       ├── modules/              # unified module abstraction
 │       │   └── index.ts          # Module type + discovery
 │       ├── settings/             # project settings (.justactions.yml)

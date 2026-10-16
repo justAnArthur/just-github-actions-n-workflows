@@ -4,7 +4,7 @@ import { findManifests, findManifestByName } from "../manifests"
 
 // --- types ---
 
-export type ManifestType = "npm" | "maven" | string
+export type ManifestType = "npm" | "maven" | "cargo" | string
 
 export type Module = {
   name: string;
@@ -25,6 +25,7 @@ function detectManifestType(filePath: string): ManifestType {
   switch (fileName) {
     case "package.json": return "npm"
     case "pom.xml": return "maven"
+    case "Cargo.toml": return "cargo"
     default: return fileName
   }
 }
