@@ -52,8 +52,8 @@
 #   DOKPLOY_API_KEY  — Dokploy API key (dokploy targets)
 #   SSH_PRIVATE_KEY  — ssh private key for server access (ssh targets)
 #   SERVER_USERNAME  — ssh username on the target server (ssh targets)
-#   DOCKER_USERNAME  — container registry username (ssh targets)
-#   DOCKER_PASSWORD  — container registry password (ssh targets)
+#   DOCKER_USERNAME  — container registry username (ssh targets, optional)
+#   DOCKER_PASSWORD  — container registry password (ssh targets, optional)
 # ---
 
 name: deploy
@@ -100,10 +100,10 @@ on:
         description: "ssh username on the target server (ssh targets)"
         required: false
       DOCKER_USERNAME:
-        description: "container registry username (ssh targets)"
+        description: "container registry username (ssh targets, optional)"
         required: false
       DOCKER_PASSWORD:
-        description: "container registry password (ssh targets)"
+        description: "container registry password (ssh targets, optional)"
         required: false
 
 permissions:

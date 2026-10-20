@@ -48,8 +48,10 @@
 #   DOKPLOY_API_KEY  — Dokploy API key (dokploy targets)
 #   SSH_PRIVATE_KEY  — ssh private key for server access (ssh targets)
 #   SERVER_USERNAME  — ssh username on the target server (ssh targets)
-#   DOCKER_USERNAME  — container registry username (ssh targets)
-#   DOCKER_PASSWORD  — container registry password (ssh targets)
+#   DOCKER_USERNAME  — container registry username (ssh targets, optional)
+#   DOCKER_PASSWORD  — container registry password (ssh targets, optional)
+#   GH_TOKEN         — optional PAT for private packages / cross-repo registry access;
+#                      checks the images on ghcr.io instead of GITHUB_TOKEN when set
 # ---
 
 name: deploy-on-release
