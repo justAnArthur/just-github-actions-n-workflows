@@ -13,6 +13,21 @@
 #       with:
 #         bump_type: "minor:canary"
 #
+# the push trigger only covers `main`. a repo that releases from other
+# branches keeps this file as installed and calls it from a small workflow
+# of its own (not overwritten by `update`); called from a push, it bumps
+# from the pushed commits and pushes the bump commit to the pushed branch:
+#
+#   name: bump-version-on-push
+#   on: { push: { branches: [ canary, 'versions/**' ] } }
+#   permissions: { contents: write, packages: write, actions: write }
+#   jobs:
+#     bump: { uses: ./.github/workflows/bump-version.yml, secrets: inherit }
+#
+# after a stable promotion (bump_to_calculated_stable) the ghcr.io images of
+# the promoted prerelease channel and major (e.g. 5.x canary) are deleted;
+# other channels and majors (6.0.0-beta.4) stay.
+#
 # release tags are pushed with GITHUB_TOKEN, and GitHub never starts
 # workflows from pushes made with that token. so after tagging, this
 # workflow dispatches every installed workflow whose `push.tags` filter
@@ -23,6 +38,8 @@
 #
 # required secrets:
 #   (none — uses the auto-provided GITHUB_TOKEN)
+#   GH_TOKEN — optional PAT for private packages / cross-repo registry access;
+#              deletes the prerelease images instead of GITHUB_TOKEN when set
 # ---
 
 name: bump-version
@@ -84,6 +101,10 @@ on:
         type: string
         required: false
         default: "canary"
+    secrets:
+      GH_TOKEN:
+        description: "optional PAT for private packages / cross-repo registry access (falls back to GITHUB_TOKEN)"
+        required: false
 
 permissions:
   contents: write
@@ -93,9 +114,9 @@ permissions:
 jobs:
   bump-version:
     runs-on: ubuntu-latest
+    # under workflow_call, event_name and head_commit are the caller's (e.g. push)
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'workflow_call' ||
       !contains(github.event.head_commit.message, '[skip bump]')
 
     steps:
@@ -123,7 +144,7 @@ jobs:
           bump_type_and_channel: ${{ inputs.bump_type || '' }}
           bump_manifest_names: ${{ inputs.bump_manifest_names || '' }}
           prerelease_channel: ${{ inputs.bump_prerelease_channel || 'canary' }}
-          github_token: ${{ secrets.GITHUB_TOKEN }}
+          github_token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           github_event: ${{ toJson(github.event) }}
           co_author_name: ${{ steps.git_user.outputs.co_author_name }}
           co_author_email: ${{ steps.git_user.outputs.co_author_email }}

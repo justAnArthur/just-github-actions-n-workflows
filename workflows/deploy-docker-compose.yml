@@ -25,11 +25,16 @@
 # actions used: setup-ssh, resolve-deploy-config, resolve-image-tags,
 #               create-env-file, scp-transfer, deploy-compose-remote, ssh-exec
 #
+# the remote script logs in to ghcr.io and Docker Hub with DOCKER_USERNAME /
+# DOCKER_PASSWORD (skipped when empty; a failed login only warns), prunes
+# unused images, pulls, runs `compose up`, then `docker system prune -af`
+# (never --volumes). a target path like ~/my-app is relative to the remote home.
+#
 # required secrets:
 #   SSH_PRIVATE_KEY  — ssh private key for server access
 #   SERVER_USERNAME  — ssh username on the target server
-#   DOCKER_USERNAME  — container registry username
-#   DOCKER_PASSWORD  — container registry password
+#   DOCKER_USERNAME  — container registry username (optional, skips the login when empty)
+#   DOCKER_PASSWORD  — container registry password (optional, skips the login when empty)
 # ---
 
 name: "deploy-docker-compose"
@@ -87,11 +92,11 @@ on:
         description: "ssh username on the target server"
         required: true
       DOCKER_USERNAME:
-        description: "container registry username"
-        required: true
+        description: "container registry username (optional, skips the login when empty)"
+        required: false
       DOCKER_PASSWORD:
-        description: "container registry password"
-        required: true
+        description: "container registry password (optional, skips the login when empty)"
+        required: false
 
 jobs:
   deploy:
@@ -148,6 +153,7 @@ jobs:
           target_path: ${{ inputs.ssh_target_path || env.SSH_TARGET_PATH || '~/app' }}
           registry_username: ${{ secrets.DOCKER_USERNAME }}
           registry_password: ${{ secrets.DOCKER_PASSWORD }}
+          additional_registries: docker.io
 
       - name: Execute deployment on remote server
         uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main

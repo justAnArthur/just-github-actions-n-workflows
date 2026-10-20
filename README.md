@@ -20,7 +20,7 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 ### what's in this repo
 
 - **10 workflow templates** in `workflows/` (the source of truth). each fires on tag push, pull request, manual dispatch, or as a reusable workflow:
-  - `bump-version.yml` — auto-bumps package versions on push to main via conventional commits, then dispatches the tag workflows below for each new tag
+  - `bump-version.yml` — auto-bumps package versions on push to main via conventional commits, then dispatches the tag workflows below for each new tag. releasing from other branches (`canary`, `versions/**`)? call it from a tiny caller workflow, see [release branches other than main](#release-branches-other-than-main)
   - `publish-npm-on-tag.yml` — runs `bun publish` for the npm registry
   - `publish-docker-on-tag.yml` — builds and pushes a docker image to ghcr.io
   - `release-on-tag.yml` — creates a github release with notes
@@ -121,15 +121,17 @@ the most reliable option right now. each workflow file in `workflows/` is self-c
 
    | workflow                          | secrets (in addition to auto `GITHUB_TOKEN`)               |
    |-----------------------------------|-------------------------------------------------------------|
-   | `bump-version.yml`                | (none — needs `actions: write`, already granted in the file) |
+   | `bump-version.yml`                | (none — needs `actions: write`, already granted in the file); optional `GH_TOKEN` |
    | `publish-npm-on-tag.yml`          | `NPM_TOKEN`                                                 |
-   | `publish-docker-on-tag.yml`       | (optional `NPM_TOKEN` build-arg)                            |
+   | `publish-docker-on-tag.yml`       | (optional `NPM_TOKEN` build-arg); optional `GH_TOKEN`       |
    | `deploy-vercel-on-tag.yml`        | `VERCEL_DEPLOY_HOOK_URL`, or one secret per `vercel.targets` entry |
    | `release-on-tag.yml`              | (none)                                                      |
-   | `deploy-docker-compose.yml`       | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` |
-   | `deploy.yml`, `deploy-on-release.yml` | `DOKPLOY_API_KEY` (dokploy targets); the `deploy-docker-compose.yml` secrets (ssh targets) |
-   | `preview.yml`                     | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.seed`; optional `NPM_TOKEN` build-arg |
-   | `preview-cleanup.yml`             | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.cleanup_command` |
+   | `deploy-docker-compose.yml`       | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`; optional `DOCKER_USERNAME`, `DOCKER_PASSWORD` (registry login skipped when empty) |
+   | `deploy.yml`, `deploy-on-release.yml` | `DOKPLOY_API_KEY` (dokploy targets); the `deploy-docker-compose.yml` secrets (ssh targets); optional `GH_TOKEN` (`deploy-on-release.yml`) |
+   | `preview.yml`                     | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.seed`; optional `NPM_TOKEN` build-arg; optional `GH_TOKEN` |
+   | `preview-cleanup.yml`             | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.cleanup_command`; optional `GH_TOKEN` |
+
+   `GH_TOKEN` is an optional PAT for private packages / cross-repo registry access. when set, it replaces `GITHUB_TOKEN` for the ghcr.io login, the `github_token` BuildKit secret of docker builds (`RUN --mount=type=secret,id=github_token cat /run/secrets/github_token`), and the GitHub packages API calls (prerelease cleanup, image checks, preview image deletion).
 
 3. **configure each package's manifest** with a `properties` block so the bump-version workflow knows which package to bump on which commit scope. see [manifest configuration](#manifest-configuration) for the schema.
 
@@ -498,7 +500,7 @@ modules:
 
 | path                                  | type     | description                                             |
 |---------------------------------------|----------|---------------------------------------------------------|
-| `deploy.ssh_target_path`              | string   | remote path for deployment files                        |
+| `deploy.ssh_target_path`              | string   | remote path for deployment files; a leading `~/` is the remote home |
 | `deploy.targets.<name>.host`          | string   | ssh hostname for the environment                        |
 | `deploy.targets.<name>.compose_profiles` | string | comma-separated module names to deploy                 |
 | `deploy.targets.<name>.profiles`      | string   | docker compose profile names                            |
@@ -778,6 +780,23 @@ so the last step of `bump-version.yml` runs the `dispatch-tag-workflows` action 
 - **tags you push by hand** (e.g. the first release) still trigger the workflows the normal way — dispatch only covers tags bump-version created, so nothing runs twice.
 - **a failed dispatch fails the bump job** with the tag and workflow named; re-run the tag workflow from the Actions tab with that tag as input.
 
+### release branches other than main
+
+`bump-version.yml` triggers on pushes to `main` only. a repo that releases from other branches keeps the installed file untouched (`update` would overwrite edits) and calls it from a tiny workflow of its own:
+
+```yaml
+# .github/workflows/bump-version-on-push.yml
+name: bump-version-on-push
+on: { push: { branches: [ canary, 'versions/**' ] } }
+permissions: { contents: write, packages: write, actions: write }
+jobs:
+  bump: { uses: ./.github/workflows/bump-version.yml, secrets: inherit }
+```
+
+called from a push it behaves like a direct push run: `github.event` is the caller's push, so the bump comes from the pushed commits and a head commit with `[skip bump]` skips it; the checkout is the pushed branch, so the bump commit goes back to that branch; the new tags are dispatched as usual. the caller must grant the three permissions above. the file's own `push: main` trigger stays — if `main` also gets pushes that must not bump, don't push release commits there.
+
+after a stable promotion (`bump_to_calculated_stable`), only the ghcr.io images of the promoted prerelease channel (the channel of the version being promoted, else `bump_prerelease_channel`) and of the same major are deleted — promoting `5.2.0-canary.3` to `5.2.0` removes `5.x` canary images and keeps `6.0.0-beta.4`.
+
 ### how modules work
 
 each module is discovered by scanning the repo for manifest files. the unified `Module` type includes:
@@ -937,12 +956,13 @@ flowchart LR
 | `<hook_secret>` per `vercel.targets` entry | `deploy-vercel-on-tag.yml` (fan-out mode)       |
 | `SSH_PRIVATE_KEY`     | `deploy-docker-compose.yml` (ssh authentication)                     |
 | `SERVER_USERNAME`     | `deploy-docker-compose.yml` (ssh/scp username)                       |
-| `DOCKER_USERNAME`     | `deploy-docker-compose.yml` (ghcr login)                             |
-| `DOCKER_PASSWORD`     | `deploy-docker-compose.yml` (ghcr login)                             |
+| `DOCKER_USERNAME`     | `deploy-docker-compose.yml` (ghcr.io + Docker Hub login on the server; optional, skipped when empty) |
+| `DOCKER_PASSWORD`     | `deploy-docker-compose.yml` (ghcr.io + Docker Hub login on the server; optional, skipped when empty) |
+| `GH_TOKEN`            | optional PAT for private packages / cross-repo registry access: ghcr login + `github_token` build secret in `publish-docker-on-tag.yml` / `preview.yml`, packages API in `bump-version.yml` (prerelease cleanup), `deploy-on-release.yml` (image check), `preview-cleanup.yml` (image deletion). falls back to `GITHUB_TOKEN` |
 | `DOKPLOY_API_KEY`     | `deploy.yml` / `deploy-on-release.yml` (dokploy targets), `preview.yml`, `preview-cleanup.yml` |
 | `SSH_PRIVATE_KEY`, `SERVER_USERNAME` | also `preview.yml` (`previews.seed`) and `preview-cleanup.yml` (`previews.cleanup_command`) |
 
-all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_TOKEN` and forward it via `workflow_call` only if a specific step needs a PAT with elevated scopes.
+all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_TOKEN` when images live in private packages the repo's `GITHUB_TOKEN` can't reach (e.g. packages pushed by a PAT or owned by another repo); forward it via `workflow_call` (`secrets: inherit` or `GH_TOKEN: ${{ secrets.GH_TOKEN }}`).
 
 ## project structure
 

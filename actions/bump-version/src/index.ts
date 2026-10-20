@@ -6,6 +6,8 @@ import { commitAndPush } from "@justanarthur/just-github-actions-n-workflows-lib
 import { tagAndPush, type TagAnnotation } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n-workflows-lib/git/get-commits-from-the-last-stable"
 import { deletePrereleaseImages, manifestNameToImageName } from "@justanarthur/just-github-actions-n-workflows-lib/ghcr/delete-canary-images"
+import { detectChannel } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
+import { parseSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 import { log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { GITHUB_ACTIONS_BOT, withCoAuthors, type CoAuthor } from "@justanarthur/just-github-actions-n-workflows-lib/git/co-authors"
 
@@ -120,7 +122,8 @@ if (bumpToCalculatedStableEnv) {
   const githubEvent = JSON.parse(process.env.GITHUB_EVENT)
   const perManifestBump = new Map<string, number>()
 
-  const commitItems = githubEvent.commits
+  // only push events carry commits; a caller started some other way bumps nothing
+  const commitItems = (githubEvent.commits ?? [])
     .map((c: any) => c.message)
     .map(parseCommitMessage)
     .flatMap((c: ParsedCommit) => c.items)
@@ -235,7 +238,11 @@ if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
   if (token && repo) {
     const [owner, repositoryName] = repo.split("/")
 
-    for (const [manifest] of manifestNextVersions) {
+    for (const [manifest, stableVersion] of manifestNextVersions) {
+      // the channel the promoted version was on; other channels keep their images
+      const channel = detectChannel(parseSemver(manifest.version)?.prerelease ?? null) ?? prereleaseChannel
+      const major = parseSemver(stableVersion)?.major
+
       const imageSuffix = manifestNameToImageName(manifest.name)
       if (!imageSuffix) {
         log.info(`skipping prerelease cleanup for "${manifest.name}" — could not derive image name`)
@@ -244,7 +251,7 @@ if (bumpToCalculatedStableEnv && manifestNextVersions.length !== 0) {
 
       const imageName = `${repositoryName}/${imageSuffix}`
       try {
-        await deletePrereleaseImages(owner, imageName, token)
+        await deletePrereleaseImages(owner, imageName, token, { channel, major })
       } catch (err) {
         log.error(`failed to clean prerelease images for ${manifest.name}: ${err}`)
       }

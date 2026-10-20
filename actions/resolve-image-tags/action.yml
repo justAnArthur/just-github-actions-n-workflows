@@ -14,6 +14,8 @@ inputs:
       JSON format for components to resolve. Can be either:
       1. Array format: [{"name":"MY_PKG","package":"@scope/pkg","version":"stable"}]
       2. Object format: {"@scope/pkg":"stable","@scope/other":"1.2.3"}
+      "stable" is the newest version without any prerelease (canary, beta, alpha,
+      rc, ...); "canary" the newest canary prerelease; anything else is used as is.
       Leave empty to auto-discover from project modules.
     required: false
     default: ""

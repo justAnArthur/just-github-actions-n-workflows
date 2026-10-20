@@ -1,4 +1,6 @@
 import { log } from "../github"
+import { detectChannel } from "../version/calculate-semver"
+import { parseSemver } from "../version/parse-semver"
 
 const GITHUB_API = "https://api.github.com"
 
@@ -28,8 +30,17 @@ export function manifestNameToImageName(input: string): string {
     .toLowerCase()
 }
 
-function isPrereleaseTag(tag: string): boolean {
-  return /(canary|beta|alpha|rc)/i.test(tag)
+export interface PrereleaseCleanup {
+  channel: string
+  // limit to one major, so promoting 5.x keeps the 6.0.0-beta images
+  major?: number
+}
+
+export function isCleanupTag(tag: string, { channel, major }: PrereleaseCleanup): boolean {
+  const parsed = parseSemver(tag)
+  if (!parsed) return false
+  if (detectChannel(parsed.prerelease)?.toLowerCase() !== channel.toLowerCase()) return false
+  return major === undefined || parsed.major === major
 }
 
 const API_HEADERS = (token: string) => ({
@@ -95,12 +106,14 @@ async function deleteVersion(base: string, versionId: number, token: string): Pr
   return false
 }
 
-// only digests where *every* tag is a prerelease tag are removed —
-// shared layers and untagged manifests are left untouched
+// only digests where *every* tag is a prerelease of the promoted channel
+// (and major) are removed — other channels, shared layers and untagged
+// manifests are left untouched
 export async function deletePrereleaseImages(
   owner: string,
   packageName: string,
-  token: string
+  token: string,
+  cleanup: PrereleaseCleanup = { channel: "canary" }
 ): Promise<number> {
   log.info(`listing versions for ${owner}/${packageName}...`)
   const { versions, base } = await fetchAllVersions(owner, packageName, token)
@@ -114,13 +127,14 @@ export async function deletePrereleaseImages(
     // keep untagged manifests (shared layers)
     if (tags.length === 0) continue
 
-    if (!tags.every(isPrereleaseTag)) continue
+    if (!tags.every((t) => isCleanupTag(t, cleanup))) continue
 
     log.info(`deleting version id=${v.id} tags=[${tags.join(", ")}]`)
     if (await deleteVersion(base, v.id, token)) deleted++
   }
 
-  log.info(`deleted ${deleted} prerelease version(s) for ${packageName}`)
+  const scope = cleanup.major === undefined ? cleanup.channel : `${cleanup.channel} ${cleanup.major}.x`
+  log.info(`deleted ${deleted} ${scope} prerelease version(s) for ${packageName}`)
   return deleted
 }
 
