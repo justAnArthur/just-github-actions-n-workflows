@@ -20,8 +20,14 @@
 #       secrets:
 #         NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 #
+# the Dockerfile can read the registry token as a BuildKit secret:
+#   RUN --mount=type=secret,id=github_token cat /run/secrets/github_token
+#
 # required secrets:
 #   NPM_TOKEN — npm registry token (optional, passed as docker build arg)
+#   GH_TOKEN  — optional PAT for private packages / cross-repo registry access;
+#               used for the ghcr login and the github_token build secret
+#               instead of GITHUB_TOKEN when set
 # ---
 
 name: publish-docker-on-tag
@@ -45,6 +51,9 @@ on:
     secrets:
       NPM_TOKEN:
         description: "npm registry token (passed as docker build arg)"
+        required: false
+      GH_TOKEN:
+        description: "optional PAT for private packages / cross-repo registry access (falls back to GITHUB_TOKEN)"
         required: false
 
 permissions:
@@ -115,7 +124,7 @@ jobs:
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
+          password: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
 
       - name: Build and push docker image to ghcr
         uses: docker/build-push-action@v6
@@ -131,6 +140,8 @@ jobs:
             TAG_NAME=${{ steps.prepare.outputs.original_tag }}
             SANITIZED_IMAGE_TAG=${{ steps.prepare.outputs.image_tag }}
             NPM_TOKEN=${{ secrets.NPM_TOKEN }}
+          secrets: |
+            github_token=${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
           labels: |
             org.opencontainers.image.version=${{ steps.prepare.outputs.original_tag }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

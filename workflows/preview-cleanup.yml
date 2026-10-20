@@ -29,6 +29,8 @@
 #   DOKPLOY_API_KEY  — Dokploy API key
 #   SSH_PRIVATE_KEY  — ssh private key for the seed host (only with previews.cleanup_command)
 #   SERVER_USERNAME  — ssh username on the seed host (only with previews.cleanup_command)
+#   GH_TOKEN         — optional PAT for private packages / cross-repo registry access;
+#                      deletes the images instead of GITHUB_TOKEN when set
 # ---
 
 name: preview-cleanup
@@ -55,6 +57,9 @@ on:
       SSH_PRIVATE_KEY:
         required: false
       SERVER_USERNAME:
+        required: false
+      GH_TOKEN:
+        description: "optional PAT for private packages / cross-repo registry access (falls back to GITHUB_TOKEN)"
         required: false
 
 permissions:
@@ -115,4 +120,4 @@ jobs:
           mode: delete
           images: ${{ steps.preview.outputs.preview_image_repos }}
           tag_prefix: pr-${{ inputs.pr || github.event.pull_request.number }}-
-          token: ${{ secrets.GITHUB_TOKEN }}
+          token: ${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}

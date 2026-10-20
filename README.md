@@ -121,15 +121,17 @@ the most reliable option right now. each workflow file in `workflows/` is self-c
 
    | workflow                          | secrets (in addition to auto `GITHUB_TOKEN`)               |
    |-----------------------------------|-------------------------------------------------------------|
-   | `bump-version.yml`                | (none — needs `actions: write`, already granted in the file) |
+   | `bump-version.yml`                | (none — needs `actions: write`, already granted in the file); optional `GH_TOKEN` |
    | `publish-npm-on-tag.yml`          | `NPM_TOKEN`                                                 |
-   | `publish-docker-on-tag.yml`       | (optional `NPM_TOKEN` build-arg)                            |
+   | `publish-docker-on-tag.yml`       | (optional `NPM_TOKEN` build-arg); optional `GH_TOKEN`       |
    | `deploy-vercel-on-tag.yml`        | `VERCEL_DEPLOY_HOOK_URL`, or one secret per `vercel.targets` entry |
    | `release-on-tag.yml`              | (none)                                                      |
-   | `deploy-docker-compose.yml`       | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` |
-   | `deploy.yml`, `deploy-on-release.yml` | `DOKPLOY_API_KEY` (dokploy targets); the `deploy-docker-compose.yml` secrets (ssh targets) |
-   | `preview.yml`                     | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.seed`; optional `NPM_TOKEN` build-arg |
-   | `preview-cleanup.yml`             | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.cleanup_command` |
+   | `deploy-docker-compose.yml`       | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`; optional `DOCKER_USERNAME`, `DOCKER_PASSWORD` (registry login skipped when empty) |
+   | `deploy.yml`, `deploy-on-release.yml` | `DOKPLOY_API_KEY` (dokploy targets); the `deploy-docker-compose.yml` secrets (ssh targets); optional `GH_TOKEN` (`deploy-on-release.yml`) |
+   | `preview.yml`                     | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.seed`; optional `NPM_TOKEN` build-arg; optional `GH_TOKEN` |
+   | `preview-cleanup.yml`             | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.cleanup_command`; optional `GH_TOKEN` |
+
+   `GH_TOKEN` is an optional PAT for private packages / cross-repo registry access. when set, it replaces `GITHUB_TOKEN` for the ghcr.io login, the `github_token` BuildKit secret of docker builds (`RUN --mount=type=secret,id=github_token cat /run/secrets/github_token`), and the GitHub packages API calls (prerelease cleanup, image checks, preview image deletion).
 
 3. **configure each package's manifest** with a `properties` block so the bump-version workflow knows which package to bump on which commit scope. see [manifest configuration](#manifest-configuration) for the schema.
 
@@ -937,12 +939,13 @@ flowchart LR
 | `<hook_secret>` per `vercel.targets` entry | `deploy-vercel-on-tag.yml` (fan-out mode)       |
 | `SSH_PRIVATE_KEY`     | `deploy-docker-compose.yml` (ssh authentication)                     |
 | `SERVER_USERNAME`     | `deploy-docker-compose.yml` (ssh/scp username)                       |
-| `DOCKER_USERNAME`     | `deploy-docker-compose.yml` (ghcr login)                             |
-| `DOCKER_PASSWORD`     | `deploy-docker-compose.yml` (ghcr login)                             |
+| `DOCKER_USERNAME`     | `deploy-docker-compose.yml` (ghcr.io + Docker Hub login on the server; optional, skipped when empty) |
+| `DOCKER_PASSWORD`     | `deploy-docker-compose.yml` (ghcr.io + Docker Hub login on the server; optional, skipped when empty) |
+| `GH_TOKEN`            | optional PAT for private packages / cross-repo registry access: ghcr login + `github_token` build secret in `publish-docker-on-tag.yml` / `preview.yml`, packages API in `bump-version.yml` (prerelease cleanup), `deploy-on-release.yml` (image check), `preview-cleanup.yml` (image deletion). falls back to `GITHUB_TOKEN` |
 | `DOKPLOY_API_KEY`     | `deploy.yml` / `deploy-on-release.yml` (dokploy targets), `preview.yml`, `preview-cleanup.yml` |
 | `SSH_PRIVATE_KEY`, `SERVER_USERNAME` | also `preview.yml` (`previews.seed`) and `preview-cleanup.yml` (`previews.cleanup_command`) |
 
-all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_TOKEN` and forward it via `workflow_call` only if a specific step needs a PAT with elevated scopes.
+all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_TOKEN` when images live in private packages the repo's `GITHUB_TOKEN` can't reach (e.g. packages pushed by a PAT or owned by another repo); forward it via `workflow_call` (`secrets: inherit` or `GH_TOKEN: ${{ secrets.GH_TOKEN }}`).
 
 ## project structure
 
