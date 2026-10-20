@@ -13,6 +13,30 @@
 # setup: create a deploy hook in your vercel project settings
 # (Settings → Git → Deploy Hooks) and store the URL as a secret.
 #
+# two modes:
+#   single hook — no `vercel.targets` in .justactions.yml: POSTs
+#     VERCEL_DEPLOY_HOOK_URL for every tag (stable and prerelease).
+#   fan-out — `vercel.targets` in .justactions.yml: POSTs every target
+#     whose `packages` include the tag's package and whose `channels`
+#     include the tag's channel (`stable`, or the prerelease id such as
+#     `beta`). each target names the secret holding its hook URL via
+#     `hook_secret`. VERCEL_DEPLOY_HOOK_URL is ignored in this mode.
+#
+#   vercel:
+#     targets:
+#       client-a:
+#         hook_secret: VERCEL_HOOK_CLIENT_A
+#         channels: [beta, stable]
+#         packages: ["@scope/www"]
+#
+# secret names are dynamic, so the deploy step receives the job's whole
+# `secrets` context (toJSON(secrets)) and picks the named ones; values
+# are masked in logs. that hands every repo secret to the toolkit's
+# trigger-deploy-hook step — pin the `uses:` ref to a release tag or
+# SHA if that matters to you.
+#
+# the job summary lists which hooks fired and which were skipped (and why).
+#
 # copy this file into your repo's `.github/workflows/` and adjust
 # the `push.tags` pattern to match your package naming convention.
 #
@@ -25,9 +49,12 @@
 #         tag: ${{ github.ref_name }}
 #       secrets:
 #         VERCEL_DEPLOY_HOOK_URL: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
+#       # fan-out mode: use `secrets: inherit` instead, so the per-target
+#       # hook secrets named in .justactions.yml reach this workflow
 #
 # required secrets:
-#   VERCEL_DEPLOY_HOOK_URL — vercel deploy hook URL (from project settings → git → deploy hooks)
+#   VERCEL_DEPLOY_HOOK_URL — vercel deploy hook URL (single hook mode)
+#   <hook_secret> per vercel.targets entry — one hook URL per target (fan-out mode)
 # ---
 
 name: deploy-vercel-on-tag
@@ -50,8 +77,8 @@ on:
         required: true
     secrets:
       VERCEL_DEPLOY_HOOK_URL:
-        description: "vercel deploy hook URL"
-        required: true
+        description: "vercel deploy hook URL (single hook mode; not needed with vercel.targets)"
+        required: false
 
 permissions:
   contents: read
@@ -64,6 +91,7 @@ jobs:
       pkg_name: ${{ steps.meta.outputs.pkg_name }}
       version: ${{ steps.meta.outputs.version }}
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
+      prerelease_channel: ${{ steps.meta.outputs.prerelease_channel }}
       has_annotation: ${{ steps.meta.outputs.has_annotation }}
       publish_vercel: ${{ steps.meta.outputs.publish_vercel }}
     steps:
@@ -81,8 +109,17 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Trigger Vercel deploy hook
+      - name: Checkout .justactions.yml
+        uses: actions/checkout@v4
+        with:
+          sparse-checkout: /.justactions.yml
+          sparse-checkout-cone-mode: false
+
+      - name: Trigger Vercel deploy hook(s)
         uses: justAnArthur/just-github-actions-n-workflows/actions/trigger-deploy-hook@main
         with:
           hook_url: ${{ secrets.VERCEL_DEPLOY_HOOK_URL }}
           tag: ${{ needs.resolve-meta.outputs.tag }}
+          pkg_name: ${{ needs.resolve-meta.outputs.pkg_name }}
+          prerelease_channel: ${{ needs.resolve-meta.outputs.prerelease_channel }}
+          secrets: ${{ toJSON(secrets) }}

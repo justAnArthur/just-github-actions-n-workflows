@@ -58,6 +58,20 @@
 #         .github/preview/seed.sh: ~/previews/pr-{pr}/seed.sh
 #     cleanup_command: "rm -rf ~/previews/pr-{pr}"  # optional, on seed.ssh_host
 #
+# vercel:
+#   # one tag → every target whose packages include the tag's package and
+#   # whose channels include the tag's channel ("stable", or the prerelease
+#   # id such as "beta"). hook_secret names the repo secret with the hook URL.
+#   targets:
+#     client-a:
+#       hook_secret: VERCEL_HOOK_CLIENT_A
+#       channels: [beta, stable]
+#       packages: ["@scope/www"]
+#     client-b:
+#       hook_secret: VERCEL_HOOK_CLIENT_B
+#       channels: [beta]
+#       packages: ["@scope/www"]
+#
 # modules:
 #   overrides:
 #     - name: "@scope/backend"

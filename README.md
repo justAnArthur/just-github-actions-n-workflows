@@ -24,7 +24,7 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
   - `publish-npm-on-tag.yml` — runs `bun publish` for the npm registry
   - `publish-docker-on-tag.yml` — builds and pushes a docker image to ghcr.io
   - `release-on-tag.yml` — creates a github release with notes
-  - `deploy-vercel-on-tag.yml` — POSTs a deploy hook to vercel
+  - `deploy-vercel-on-tag.yml` — POSTs a deploy hook to vercel, or fans one tag out to several vercel projects (`vercel.targets` in `.justactions.yml`)
   - `deploy-docker-compose.yml` — runs `docker compose` on a remote SSH host
   - `deploy.yml` — deploys a release to one `.justactions.yml` target, by its `driver`: Dokploy, or ssh through `deploy-docker-compose.yml`
   - `deploy-on-release.yml` — on a release tag, deploys to every target whose `channel` (`stable` / `canary`) matches the tag, once the image is on ghcr.io
@@ -52,6 +52,7 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 | bump + npm publish + docker image + release | `bump-version.yml`, `publish-npm-on-tag.yml`, `publish-docker-on-tag.yml`, `release-on-tag.yml` | `NPM_TOKEN` |
 | bump + npm + GitHub Packages (`npm.pkg.github.com`) + release | `bump-version.yml`, `publish-npm-on-tag.yml`, `release-on-tag.yml`, **+ a copy of `publish-npm-on-tag.yml` renamed to `publish-gh-packages.yml` with a `.npmrc` step pointing at `https://npm.pkg.github.com` before `bun publish`** | `NPM_TOKEN` (public), `GH_TOKEN` (with `write:packages`) |
 | bump + vercel deploy | `bump-version.yml`, `deploy-vercel-on-tag.yml` | `VERCEL_DEPLOY_HOOK_URL` |
+| bump + one app deployed to N vercel projects (per client / per env), prereleases to staging, stable to production | `bump-version.yml`, `deploy-vercel-on-tag.yml` + `vercel.targets` in `.justactions.yml` (see [vercel fan-out](#vercel-fan-out)) | one hook secret per target, named by `hook_secret` |
 | bump + docker image + auto-deploy to Dokploy | `bump-version.yml`, `publish-docker-on-tag.yml`, `deploy-on-release.yml`, `deploy.yml`, `deploy-docker-compose.yml` (loaded by `deploy.yml` even when unused) | `DOKPLOY_API_KEY` |
 | PR previews on Dokploy | `preview.yml` + a small `pull_request` caller (see [PR previews](#pr-previews)), `preview-cleanup.yml` | `DOKPLOY_API_KEY` (+ `SSH_PRIVATE_KEY`, `SERVER_USERNAME` for seeding) |
 
@@ -77,6 +78,7 @@ the workflows are immutable after install — local edits are overwritten by `up
 | per-package auth token (e.g. GH Packages) | `.npmrc` in the package's directory |
 | pre-publish steps (build, generate assets, etc.) | the existing `Build` step in `publish-npm-on-tag.yml` already runs `bun run --silent build` — add a `build` script to `package.json`, no workflow edit needed |
 | bump logic / tag format | `properties` in the package's `package.json` (`gitCommitScopeRelatedNames`, `deployTargets`, `dockerfilePath`, `vercelProjectId`) |
+| which vercel projects a tag deploys to, per channel (`beta`, `stable`, …) | `vercel.targets` in `.justactions.yml` |
 | deploy config (ssh target, compose profiles, Dokploy compose, release channel, previews) | `.justactions.yml` at the repo root |
 | approval before a deploy (required reviewers, wait timer) | a GitHub Environment named like the target — `deploy.yml` runs its deploy job in it |
 | skip the bundled GitHub release that `publish-npm-on-tag.yml` creates | not currently supported without a fork — open an upstream issue. `release-on-tag.yml` is a separate workflow that *also* fires on tag push, so you can disable the bundled release by switching to a custom workflow (own the maintenance yourself) |
@@ -122,7 +124,7 @@ the most reliable option right now. each workflow file in `workflows/` is self-c
    | `bump-version.yml`                | (none — needs `actions: write`, already granted in the file) |
    | `publish-npm-on-tag.yml`          | `NPM_TOKEN`                                                 |
    | `publish-docker-on-tag.yml`       | (optional `NPM_TOKEN` build-arg)                            |
-   | `deploy-vercel-on-tag.yml`        | `VERCEL_DEPLOY_HOOK_URL`                                    |
+   | `deploy-vercel-on-tag.yml`        | `VERCEL_DEPLOY_HOOK_URL`, or one secret per `vercel.targets` entry |
    | `release-on-tag.yml`              | (none)                                                      |
    | `deploy-docker-compose.yml`       | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` |
    | `deploy.yml`, `deploy-on-release.yml` | `DOKPLOY_API_KEY` (dokploy targets); the `deploy-docker-compose.yml` secrets (ssh targets) |
@@ -475,6 +477,17 @@ deploy:
       profiles: "staging"
       timezone: UTC
 
+vercel:
+  targets:
+    client-a:
+      hook_secret: VERCEL_HOOK_CLIENT_A
+      channels: [beta, stable]
+      packages: ["@scope/www"]
+    client-a-staging:
+      hook_secret: VERCEL_HOOK_CLIENT_A_STAGING
+      channels: [beta]
+      packages: ["@scope/www"]
+
 modules:
   overrides:
     - name: "@scope/backend"
@@ -504,8 +517,36 @@ modules:
 | `deploy.previews.seed.command`        | string   | run on every deploy while it is pending, so it must be idempotent (skip when already seeded); also `{app_name}` |
 | `deploy.previews.seed.upload.<repo path>` | string | remote path the file is copied to before seeding     |
 | `deploy.previews.cleanup_command`     | string   | run by `preview-cleanup.yml` on `seed.ssh_host`         |
+| `vercel.targets.<name>.hook_secret`   | string   | **required.** name of the repo secret holding this target's deploy hook URL |
+| `vercel.targets.<name>.channels`      | list     | release channels that deploy here: `stable` and/or prerelease ids (`beta`, `rc`, …). default: `[stable]` |
+| `vercel.targets.<name>.packages`      | list     | package names that deploy here. default: any package    |
 | `modules.overrides[].name`            | string   | module name to override                                 |
 | `modules.overrides[].docker_compose_service` | string | docker compose service name for the module         |
+
+### vercel fan-out
+
+one package, many vercel projects — e.g. the same app deployed once per client. with `vercel.targets` set, `deploy-vercel-on-tag.yml` POSTs every target whose `packages` include the tag's package **and** whose `channels` include the tag's channel:
+
+- the channel is the tag's prerelease id (`@scope/www@1.4.0-beta.2` → `beta`) or `stable` for a plain version (`@scope/www@1.4.0`).
+- a target only gets production deploys once you add `stable` to its `channels` — that is the per-target cut-over switch.
+- the job summary lists every target as `fired`, `skipped` (with the reason) or `failed`. a missing secret or a non-2xx response fails the job after all other hooks were tried.
+- without `vercel.targets` the workflow behaves as before: it POSTs `VERCEL_DEPLOY_HOOK_URL` for every tag.
+
+```yaml
+# .justactions.yml — beta tags hit every client's staging project, stable tags only cut-over clients
+vercel:
+  targets:
+    client-a:
+      hook_secret: VERCEL_HOOK_CLIENT_A          # cut over: gets prereleases and production
+      channels: [beta, stable]
+      packages: ["@scope/www"]
+    client-b:
+      hook_secret: VERCEL_HOOK_CLIENT_B          # not cut over yet: prereleases only
+      channels: [beta]
+      packages: ["@scope/www"]
+```
+
+**how hook secrets reach the action.** github expressions can't read a secret by a computed name, so the workflow passes the job's whole secrets context (`toJSON(secrets)`) to `trigger-deploy-hook`, which picks the names listed in `hook_secret` and re-masks each URL. the trade-off: every repo/org secret visible to that job is handed to the toolkit's code, not just the hook URLs. github still masks them in logs, and the job only has `contents: read`, but if you don't want the toolkit to see other secrets, pin the action/workflow ref to a release tag or commit SHA you've reviewed, or keep the vercel deploy in a repo whose secrets are only the hook URLs. when calling the workflow via `workflow_call`, use `secrets: inherit` — named secrets can't be forwarded because their names aren't declared inputs.
 
 ## deploy with Dokploy
 
@@ -792,7 +833,7 @@ each action is a composite GitHub Action in `actions/` with its own `action.yml`
 | `actions/setup-ssh`              | provision ssh key + known_hosts                   | `private_key`, `host`                                         |
 | `actions/skip-check`             | detect `[skip bump]` loops                        | —                                                             |
 | `actions/ssh-exec`               | run a script on remote server via ssh             | `host`, `username`, `script`                                  |
-| `actions/trigger-deploy-hook`    | HTTP POST to a deploy hook URL (e.g. vercel)      | `hook_url`, `tag`                                             |
+| `actions/trigger-deploy-hook`    | HTTP POST to one deploy hook, or fan out to `vercel.targets` | `hook_url`, `tag`, `pkg_name`, `prerelease_channel`, `secrets` |
 
 use any action directly in your workflow steps:
 
@@ -892,7 +933,8 @@ flowchart LR
 | secret                | used by                                                              |
 |-----------------------|----------------------------------------------------------------------|
 | `NPM_TOKEN`           | `publish-npm-on-tag.yml`; optional build-arg in `publish-docker-on-tag.yml` |
-| `VERCEL_DEPLOY_HOOK_URL` | `deploy-vercel-on-tag.yml`                                        |
+| `VERCEL_DEPLOY_HOOK_URL` | `deploy-vercel-on-tag.yml` (single hook mode)                     |
+| `<hook_secret>` per `vercel.targets` entry | `deploy-vercel-on-tag.yml` (fan-out mode)       |
 | `SSH_PRIVATE_KEY`     | `deploy-docker-compose.yml` (ssh authentication)                     |
 | `SERVER_USERNAME`     | `deploy-docker-compose.yml` (ssh/scp username)                       |
 | `DOCKER_USERNAME`     | `deploy-docker-compose.yml` (ghcr login)                             |

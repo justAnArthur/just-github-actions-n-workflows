@@ -206,3 +206,48 @@ describe("image helpers", () => {
     expect(() => parseImageRef("ghcr.io/owner/repo")).toThrow()
   })
 })
+
+describe("settings — vercel fan-out", () => {
+  test("parses vercel targets from lists or comma strings", () => {
+    const settings = parseSettingsYaml(`
+vercel:
+  targets:
+    avis-fo:
+      hook_secret: VERCEL_HOOK_AVIS_FO
+      channels: [beta, stable]
+      packages: ["@camasys/www"]
+    budget-fo:
+      hook_secret: VERCEL_HOOK_BUDGET_FO
+      channels: "beta, rc"
+`)
+    expect(settings.vercel?.targets["avis-fo"]).toEqual({
+      hook_secret: "VERCEL_HOOK_AVIS_FO",
+      channels: ["beta", "stable"],
+      packages: ["@camasys/www"]
+    })
+    expect(settings.vercel?.targets["budget-fo"]).toEqual({
+      hook_secret: "VERCEL_HOOK_BUDGET_FO",
+      channels: ["beta", "rc"],
+      packages: []
+    })
+  })
+
+  test("vercel target channels default to stable", () => {
+    const settings = parseSettingsYaml(`
+vercel:
+  targets:
+    prod:
+      hook_secret: VERCEL_HOOK_PROD
+`)
+    expect(settings.vercel?.targets.prod.channels).toEqual(["stable"])
+  })
+
+  test("vercel target without hook_secret is rejected", () => {
+    expect(() => parseSettingsYaml(`
+vercel:
+  targets:
+    prod:
+      channels: [stable]
+`)).toThrow("vercel.targets.prod.hook_secret is required")
+  })
+})

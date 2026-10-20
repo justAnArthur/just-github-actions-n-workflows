@@ -58,6 +58,20 @@ export interface DeploySettings {
   previews?: PreviewSettings;
 }
 
+/** one deploy hook (e.g. one vercel project) that a tag can fan out to */
+export interface DeployHookTarget {
+  /** name of the repo secret that holds the deploy hook URL */
+  hook_secret: string;
+  /** release channels this target accepts: "stable" and/or prerelease channels ("beta", "rc", …). default: ["stable"] */
+  channels: string[];
+  /** package names this target deploys. empty = any package */
+  packages: string[];
+}
+
+export interface VercelSettings {
+  targets: Record<string, DeployHookTarget>;
+}
+
 export interface ModuleOverride {
   name: string;
   docker_compose_service?: string;
@@ -75,9 +89,12 @@ export interface GitSettings {
 
 export interface Settings {
   deploy?: DeploySettings;
+  vercel?: VercelSettings;
   modules?: ModuleSettings;
   git?: GitSettings;
 }
+
+export const STABLE_CHANNEL = "stable"
 
 const SETTINGS_FILENAME = ".justactions.yml"
 
@@ -275,6 +292,26 @@ export function parseSettingsYaml(content: string): Settings {
     if (previews) deploy.previews = previews
 
     settings.deploy = deploy
+  }
+
+  if (raw.vercel) {
+    const targets: Record<string, DeployHookTarget> = {}
+
+    // each key under vercel.targets is a target name (e.g. one vercel project)
+    for (const [name, targetConfig] of Object.entries(raw.vercel.targets ?? {})) {
+      const config = (targetConfig ?? {}) as any
+      if (!config.hook_secret) {
+        throw new Error(`.justactions.yml: vercel.targets.${name}.hook_secret is required`)
+      }
+      const channels = strList(config.channels) ?? []
+      targets[name] = {
+        hook_secret: String(config.hook_secret),
+        channels: channels.length > 0 ? channels : [STABLE_CHANNEL],
+        packages: strList(config.packages) ?? []
+      }
+    }
+
+    settings.vercel = { targets }
   }
 
   if (raw.modules) {
