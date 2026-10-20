@@ -582,7 +582,7 @@ modules:
           image: postgis/postgis:16-3.4
           port: 5432
           env:
-            POSTGRES_PASSWORD: postgres
+            POSTGRES_HOST_AUTH_METHOD: trust
             POSTGRES_DB: app
           options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
 ```

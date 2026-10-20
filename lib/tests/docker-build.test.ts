@@ -29,7 +29,7 @@ modules:
           image: postgis/postgis:16-3.4
           port: 5432
           env:
-            POSTGRES_PASSWORD: postgres
+            POSTGRES_HOST_AUTH_METHOD: trust
             POSTGRES_DB: app
           options: --health-cmd pg_isready --health-interval 5s
     - name: "@scope/other"
@@ -83,7 +83,7 @@ describe("docker build settings", () => {
       network: "host",
       service_image: "postgis/postgis:16-3.4",
       service_ports: "5432:5432",
-      service_options: "-e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=app --health-cmd pg_isready --health-interval 5s"
+      service_options: "-e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=app --health-cmd pg_isready --health-interval 5s"
     })
     expect(validateDockerBuild(s)).toEqual([])
   })
@@ -103,12 +103,12 @@ modules:
         service:
           port: db
           env:
-            PASSWORD: two words
+            LABEL: two words
 `)
     expect(validateDockerBuild(bad)).toEqual([
       "modules.overrides[@scope/backend].docker.service.image is required",
       'modules.overrides[@scope/backend].docker.service.port must be a number, got "db"',
-      "modules.overrides[@scope/backend].docker.service.env.PASSWORD must not contain whitespace"
+      "modules.overrides[@scope/backend].docker.service.env.LABEL must not contain whitespace"
     ])
   })
 })
