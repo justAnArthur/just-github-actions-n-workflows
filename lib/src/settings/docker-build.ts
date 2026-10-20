@@ -32,7 +32,6 @@ export interface ResolvedDockerBuild {
   secrets: Record<string, string>
   network: string
   service_image: string
-  service_ports: string
   service_options: string
 }
 
@@ -47,6 +46,8 @@ export function hasDockerBuild(settings: Settings, moduleName: string): boolean 
 export function dockerBuildFor(settings: Settings, moduleName: string): ResolvedDockerBuild {
   const docker = overrideFor(settings, moduleName)?.docker ?? {}
   const service = docker.service
+  // the port goes into the options too: a workflow can't leave an empty `ports` entry
+  const port = service?.port ? [`-p ${service.port}:${service.port}`] : []
   const env = Object.entries(service?.env ?? {}).map(([k, v]) => `-e ${k}=${v}`)
 
   return {
@@ -54,8 +55,7 @@ export function dockerBuildFor(settings: Settings, moduleName: string): Resolved
     secrets: docker.secrets ?? {},
     network: docker.network ?? "",
     service_image: service?.image ?? "",
-    service_ports: service?.port ? `${service.port}:${service.port}` : "",
-    service_options: [...env, service?.options ?? ""].join(" ").trim()
+    service_options: [...port, ...env, service?.options ?? ""].join(" ").trim()
   }
 }
 

@@ -47,7 +47,6 @@ const EMPTY = {
   secrets: {},
   network: "",
   service_image: "",
-  service_ports: "",
   service_options: ""
 }
 
@@ -76,14 +75,13 @@ describe("docker build settings", () => {
     })
   })
 
-  test("a service becomes image, ports and options", () => {
+  test("a service becomes image and options", () => {
     expect(dockerBuildFor(s, "@scope/backend")).toEqual({
       build_args: { CDS_TRAINING_DB_URL: "jdbc:postgresql://localhost:5432/app" },
       secrets: {},
       network: "host",
       service_image: "postgis/postgis:16-3.4",
-      service_ports: "5432:5432",
-      service_options: "-e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=app --health-cmd pg_isready --health-interval 5s"
+      service_options: "-p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=app --health-cmd pg_isready --health-interval 5s"
     })
     expect(validateDockerBuild(s)).toEqual([])
   })

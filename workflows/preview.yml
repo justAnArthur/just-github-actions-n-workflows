@@ -153,8 +153,6 @@ jobs:
     services:
       build-service:
         image: ${{ matrix.docker_build.service_image || '' }}
-        ports:
-          - ${{ matrix.docker_build.service_ports || '' }}
         options: ${{ matrix.docker_build.service_options || '' }}
 
     steps:

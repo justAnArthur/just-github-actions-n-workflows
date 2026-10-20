@@ -105,8 +105,6 @@ jobs:
     services:
       build-service:
         image: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).service_image }}
-        ports:
-          - ${{ fromJSON(needs.resolve-meta.outputs.docker_build).service_ports }}
         options: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).service_options }}
 
     steps:

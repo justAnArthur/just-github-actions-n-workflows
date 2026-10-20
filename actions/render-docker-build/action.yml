@@ -2,8 +2,8 @@ name: Render Docker Build Settings
 description: >
   Turns a package's docker build settings (the docker_build output of
   resolve-tag-meta or a preview image) into the build-args and secrets
-  lines of docker/build-push-action, filling in `${{ vars.NAME }}` and
-  `${{ secrets.NAME }}` references.
+  lines of docker/build-push-action, filling in the vars.NAME and
+  secrets.NAME references.
 
 inputs:
   config:
