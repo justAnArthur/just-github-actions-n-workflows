@@ -122,7 +122,8 @@ if (bumpToCalculatedStableEnv) {
   const githubEvent = JSON.parse(process.env.GITHUB_EVENT)
   const perManifestBump = new Map<string, number>()
 
-  const commitItems = githubEvent.commits
+  // only push events carry commits; a caller started some other way bumps nothing
+  const commitItems = (githubEvent.commits ?? [])
     .map((c: any) => c.message)
     .map(parseCommitMessage)
     .flatMap((c: ParsedCommit) => c.items)

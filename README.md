@@ -20,7 +20,7 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 ### what's in this repo
 
 - **10 workflow templates** in `workflows/` (the source of truth). each fires on tag push, pull request, manual dispatch, or as a reusable workflow:
-  - `bump-version.yml` — auto-bumps package versions on push to main via conventional commits, then dispatches the tag workflows below for each new tag
+  - `bump-version.yml` — auto-bumps package versions on push to main via conventional commits, then dispatches the tag workflows below for each new tag. releasing from other branches (`canary`, `versions/**`)? call it from a tiny caller workflow, see [release branches other than main](#release-branches-other-than-main)
   - `publish-npm-on-tag.yml` — runs `bun publish` for the npm registry
   - `publish-docker-on-tag.yml` — builds and pushes a docker image to ghcr.io
   - `release-on-tag.yml` — creates a github release with notes
@@ -779,6 +779,23 @@ so the last step of `bump-version.yml` runs the `dispatch-tag-workflows` action 
 - **only workflows that filter on tags count.** an unfiltered `on: push` CI workflow is not started for release tags.
 - **tags you push by hand** (e.g. the first release) still trigger the workflows the normal way — dispatch only covers tags bump-version created, so nothing runs twice.
 - **a failed dispatch fails the bump job** with the tag and workflow named; re-run the tag workflow from the Actions tab with that tag as input.
+
+### release branches other than main
+
+`bump-version.yml` triggers on pushes to `main` only. a repo that releases from other branches keeps the installed file untouched (`update` would overwrite edits) and calls it from a tiny workflow of its own:
+
+```yaml
+# .github/workflows/bump-version-on-push.yml
+name: bump-version-on-push
+on: { push: { branches: [ canary, 'versions/**' ] } }
+permissions: { contents: write, packages: write, actions: write }
+jobs:
+  bump: { uses: ./.github/workflows/bump-version.yml, secrets: inherit }
+```
+
+called from a push it behaves like a direct push run: `github.event` is the caller's push, so the bump comes from the pushed commits and a head commit with `[skip bump]` skips it; the checkout is the pushed branch, so the bump commit goes back to that branch; the new tags are dispatched as usual. the caller must grant the three permissions above. the file's own `push: main` trigger stays — if `main` also gets pushes that must not bump, don't push release commits there.
+
+after a stable promotion (`bump_to_calculated_stable`), only the ghcr.io images of the promoted prerelease channel (the channel of the version being promoted, else `bump_prerelease_channel`) and of the same major are deleted — promoting `5.2.0-canary.3` to `5.2.0` removes `5.x` canary images and keeps `6.0.0-beta.4`.
 
 ### how modules work
 

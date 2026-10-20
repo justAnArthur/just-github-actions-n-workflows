@@ -13,6 +13,21 @@
 #       with:
 #         bump_type: "minor:canary"
 #
+# the push trigger only covers `main`. a repo that releases from other
+# branches keeps this file as installed and calls it from a small workflow
+# of its own (not overwritten by `update`); called from a push, it bumps
+# from the pushed commits and pushes the bump commit to the pushed branch:
+#
+#   name: bump-version-on-push
+#   on: { push: { branches: [ canary, 'versions/**' ] } }
+#   permissions: { contents: write, packages: write, actions: write }
+#   jobs:
+#     bump: { uses: ./.github/workflows/bump-version.yml, secrets: inherit }
+#
+# after a stable promotion (bump_to_calculated_stable) the ghcr.io images of
+# the promoted prerelease channel and major (e.g. 5.x canary) are deleted;
+# other channels and majors (6.0.0-beta.4) stay.
+#
 # release tags are pushed with GITHUB_TOKEN, and GitHub never starts
 # workflows from pushes made with that token. so after tagging, this
 # workflow dispatches every installed workflow whose `push.tags` filter
@@ -99,9 +114,9 @@ permissions:
 jobs:
   bump-version:
     runs-on: ubuntu-latest
+    # under workflow_call, event_name and head_commit are the caller's (e.g. push)
     if: >-
       github.event_name == 'workflow_dispatch' ||
-      github.event_name == 'workflow_call' ||
       !contains(github.event.head_commit.message, '[skip bump]')
 
     steps:
