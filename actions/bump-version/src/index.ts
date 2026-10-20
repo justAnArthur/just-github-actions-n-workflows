@@ -1,4 +1,4 @@
-import { parseCommitMessage, type ParsedCommit } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
+import { parseCommitMessage } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
 import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
 import type { Manifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
 import { findManifestByName, findManifests, getManifestSearchDir, updateManifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
@@ -8,6 +8,7 @@ import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n
 import { deletePrereleaseImages, manifestNameToImageName } from "@justanarthur/just-github-actions-n-workflows-lib/ghcr/delete-canary-images"
 import { detectChannel } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
 import { parseSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
+import { collectPushBumps } from "@justanarthur/just-github-actions-n-workflows-lib/version/push-bumps"
 import { log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { GITHUB_ACTIONS_BOT, withCoAuthors, type CoAuthor } from "@justanarthur/just-github-actions-n-workflows-lib/git/co-authors"
 
@@ -63,6 +64,11 @@ if (bumpToCalculatedStableEnv) {
   log.group("bumping to calculated stable versions...")
 
   for (const manifest of bumpManifests) {
+    if (!manifest.version) {
+      log.info(`${manifest.name}: no version field, skipping`)
+      continue
+    }
+
     try {
       const commits = await getCommitsFromTheLastStable(manifest)
       log.info(`${manifest.name}: ${commits.length} commit(s) since last stable`)
@@ -120,38 +126,18 @@ if (bumpToCalculatedStableEnv) {
   log.group("bumping based on push commit messages...")
 
   const githubEvent = JSON.parse(process.env.GITHUB_EVENT)
-  const perManifestBump = new Map<string, number>()
 
   // only push events carry commits; a caller started some other way bumps nothing
-  const commitItems = (githubEvent.commits ?? [])
-    .map((c: any) => c.message)
-    .map(parseCommitMessage)
-    .flatMap((c: ParsedCommit) => c.items)
+  const { bumps, unversioned } = collectPushBumps(
+    (githubEvent.commits ?? []).map((c: any) => c.message),
+    manifests
+  )
 
-  for (const item of commitItems) {
-    const level = CONVENTIONAL_TO_SEMVER[item.type]
-    if (level === undefined) continue
-
-    if (item.scopes.length === 0) {
-      log.debug(`skipping commit item with no scope: ${item.raw}`)
-      continue
-    }
-
-    for (const scope of item.scopes) {
-      const manifest = findManifestByName(manifests, scope)
-      if (!manifest) {
-        log.debug(`skipping commit item with unknown scope: ${scope}`)
-        continue
-      }
-
-      if ((perManifestBump.get(manifest.name) ?? -1) < level) {
-        perManifestBump.set(manifest.name, level)
-      }
-    }
+  for (const manifest of unversioned) {
+    log.info(`${manifest.name}: no version field, skipping`)
   }
 
-  for (const [name, semver] of perManifestBump) {
-    const manifest = findManifestByName(manifests, name)!
+  for (const [manifest, semver] of bumps) {
     const nextVersion = calculateNextSemver(manifest.version, semver)
     log.info(`${manifest.name}: ${manifest.version} → ${nextVersion}`)
     manifestNextVersions.push([manifest, nextVersion])
