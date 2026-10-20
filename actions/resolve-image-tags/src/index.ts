@@ -2,20 +2,12 @@ import { getEnv, getRequiredEnv, log, setEnv, setOutput } from "@justanarthur/ju
 import { execWithTimeout } from "@justanarthur/just-github-actions-n-workflows-lib/exec"
 import { versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 import { discoverModules } from "@justanarthur/just-github-actions-n-workflows-lib/modules"
+import { resolveLatestTag } from "@justanarthur/just-github-actions-n-workflows-lib/version/resolve-latest-tag"
 
 interface Component {
   name: string
   package: string
   version: string
-}
-
-interface ParsedTag {
-  raw: string
-  major: number
-  minor: number
-  patch: number
-  preLabel: string
-  preNum: number
 }
 
 async function fetchRemoteTags(repoUrl: string, token: string): Promise<string[]> {
@@ -48,77 +40,12 @@ async function fetchRemoteTags(repoUrl: string, token: string): Promise<string[]
     .filter(Boolean)
 }
 
-function parseTagVersion(tag: string): ParsedTag | null {
-  const parts = tag.split("@")
-  const versionStr = parts[parts.length - 1]
-  if (!versionStr) return null
-
-  const clean = versionStr.replace(/^[vV]/, "")
-  const [core, pre = ""] = clean.split("-", 2)
-  const [majStr, minStr, patStr] = core.split(".")
-
-  const major = parseInt(majStr ?? "0", 10)
-  const minor = parseInt(minStr ?? "0", 10)
-  const patch = parseInt(patStr ?? "0", 10)
-  if (isNaN(major) || isNaN(minor) || isNaN(patch)) return null
-
-  let preLabel = "zzzz"
-  let preNum = 0
-  if (pre) {
-    const preParts = pre.split(".")
-    preLabel = preParts[0]
-    preNum = parseInt(preParts[1] ?? "0", 10) || 0
-  }
-
-  return { raw: tag, major, minor, patch, preLabel, preNum }
-}
-
-function sortKey(t: ParsedTag): string {
-  return [
-    String(t.major).padStart(5, "0"),
-    String(t.minor).padStart(5, "0"),
-    String(t.patch).padStart(5, "0"),
-    t.preLabel,
-    String(t.preNum).padStart(5, "0")
-  ].join(".")
-}
-
 function sanitizeEnvKeySegment(value: string): string {
   return value
     .toUpperCase()
     .replace(/[^A-Z0-9_]/g, "_")
     .replace(/_+/g, "_")
     .replace(/^_+|_+$/g, "")
-}
-
-function resolveLatestTag(
-  allTags: string[],
-  packageName: string,
-  mode: "stable" | "canary"
-): string {
-  const nameNoAt = packageName.replace(/^@/, "")
-  const nameDash = nameNoAt.replace(/\//g, "-")
-
-  let candidates = allTags.filter(
-    (t) => t.toLowerCase().includes(nameNoAt.toLowerCase()) ||
-      t.toLowerCase().includes(nameDash.toLowerCase())
-  )
-  if (candidates.length === 0) candidates = allTags
-
-  if (mode === "stable") {
-    const filtered = candidates.filter((t) => !/canary/i.test(t))
-    if (filtered.length > 0) candidates = filtered
-  } else {
-    const filtered = candidates.filter((t) => /canary/i.test(t))
-    if (filtered.length > 0) candidates = filtered
-  }
-
-  const parsed = candidates
-    .map(parseTagVersion)
-    .filter((t): t is ParsedTag => t !== null)
-    .sort((a, b) => sortKey(b).localeCompare(sortKey(a)))
-
-  return parsed[0]?.raw ?? ""
 }
 
 const repoUrl = getRequiredEnv("RESOLVE_REPO_URL")
