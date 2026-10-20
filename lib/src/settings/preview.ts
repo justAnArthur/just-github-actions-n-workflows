@@ -1,4 +1,5 @@
 import { imageTagEnvKey, manifestNameToImageName } from "../ghcr/delete-canary-images"
+import { dockerBuildFor, hasDockerBuild, type ResolvedDockerBuild } from "./docker-build"
 import type { Settings } from "./index"
 
 export interface ResolvedPreview {
@@ -10,7 +11,8 @@ export interface ResolvedPreview {
   environment_id: string
   server_id: string
   env: string
-  images: { name: string; image: string }[]
+  /** docker_build only for modules with `modules.overrides[].docker`, so other matrix entries stay as they were */
+  images: { name: string; image: string; docker_build?: ResolvedDockerBuild }[]
   seed_ssh_host: string
   seed_command: string
   seed_upload: { source: string; target: string }[]
@@ -50,7 +52,8 @@ export function resolvePreview(
     env: env.join("\n"),
     images: imageNames.map((name) => ({
       name,
-      image: `ghcr.io/${repository}/${manifestNameToImageName(name)}`
+      image: `ghcr.io/${repository}/${manifestNameToImageName(name)}`,
+      ...(hasDockerBuild(settings, name) && { docker_build: dockerBuildFor(settings, name) })
     })),
     seed_ssh_host: previews.seed?.ssh_host ?? "",
     seed_command: fill(previews.seed?.command ?? ""),

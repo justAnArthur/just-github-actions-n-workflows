@@ -10,7 +10,7 @@
     },
     "actions/bump-version": {
       "name": "@justanarthur/step-bump-manifest-versions",
-      "version": "1.1.2",
+      "version": "1.1.4",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -38,7 +38,7 @@
     },
     "actions/deploy-compose-remote": {
       "name": "@justanarthur/step-deploy-compose-remote",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -59,7 +59,7 @@
     },
     "actions/dokploy-preview": {
       "name": "@justanarthur/step-dokploy-preview",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -106,6 +106,13 @@
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
     },
+    "actions/render-docker-build": {
+      "name": "@justanarthur/step-render-docker-build",
+      "version": "1.0.0",
+      "dependencies": {
+        "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
+      },
+    },
     "actions/resolve-deploy-config": {
       "name": "@justanarthur/step-resolve-deploy-config",
       "version": "1.0.1",
@@ -115,7 +122,7 @@
     },
     "actions/resolve-image-tags": {
       "name": "@justanarthur/step-resolve-docker-image-tags",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -136,7 +143,7 @@
     },
     "actions/scp-transfer": {
       "name": "@justanarthur/step-scp-upload",
-      "version": "1.0.1",
+      "version": "1.0.2",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -164,7 +171,7 @@
     },
     "actions/trigger-deploy-hook": {
       "name": "@justanarthur/step-trigger-deploy-hook",
-      "version": "1.0.1",
+      "version": "1.1.0",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -185,7 +192,7 @@
     },
     "lib": {
       "name": "@justanarthur/just-github-actions-n-workflows-lib",
-      "version": "1.2.0",
+      "version": "1.3.3",
       "dependencies": {
         "fast-xml-parser": "^5.5.9",
       },
@@ -253,6 +260,8 @@
     "@justanarthur/step-pin-workspace-versions": ["@justanarthur/step-pin-workspace-versions@workspace:actions/pin-workspace-versions"],
 
     "@justanarthur/step-prepare-docker-meta": ["@justanarthur/step-prepare-docker-meta@workspace:actions/prepare-docker-meta"],
+
+    "@justanarthur/step-render-docker-build": ["@justanarthur/step-render-docker-build@workspace:actions/render-docker-build"],
 
     "@justanarthur/step-resolve-deploy-config": ["@justanarthur/step-resolve-deploy-config@workspace:actions/resolve-deploy-config"],
 

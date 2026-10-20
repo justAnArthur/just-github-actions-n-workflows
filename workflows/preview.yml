@@ -33,7 +33,10 @@
 #   build   — one image per `previews.images` entry, dockerfile and context
 #             from the module's manifest like publish-docker-on-tag.yml,
 #             pushed to ghcr.io/<owner>/<repo>/<image>:pr-<n>-<sha8>. the
-#             compose uses them through DOCKER_<NAME>_IMAGE_TAG.
+#             compose uses them through DOCKER_<NAME>_IMAGE_TAG. build
+#             args, secrets, network and service container per module
+#             come from `modules.overrides[].docker`, as in
+#             publish-docker-on-tag.yml.
 #   deploy  — creates or updates the compose pr-<n> and starts the deploy;
 #             on the first deploy uploads the seed files and runs the seed
 #             command over ssh while Dokploy deploys ({app_name} is the
@@ -146,6 +149,12 @@ jobs:
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.images) }}
 
+    # modules.overrides[].docker.service in .justactions.yml; not started when its image is empty
+    services:
+      build-service:
+        image: ${{ matrix.docker_build.service_image || '' }}
+        options: ${{ matrix.docker_build.service_options || '' }}
+
     steps:
       - name: Checkout the merge commit
         uses: actions/checkout@v4
@@ -168,8 +177,20 @@ jobs:
           dockerfile: ${{ steps.dockerfile.outputs.dockerfile }}
           context: ${{ steps.dockerfile.outputs.context }}
 
+      - name: Render package build settings
+        id: build
+        uses: justAnArthur/just-github-actions-n-workflows/actions/render-docker-build@main
+        with:
+          config: ${{ toJSON(matrix.docker_build || fromJSON('{}')) }}
+          vars: ${{ toJSON(vars) }}
+          secrets: ${{ toJSON(secrets) }}
+
+      # with network: host the builder runs on the runner's network, so RUN steps reach the service on localhost
       - name: Set up docker buildx
         uses: docker/setup-buildx-action@v3
+        with:
+          driver-opts: ${{ matrix.docker_build.network == 'host' && 'network=host' || '' }}
+          buildkitd-flags: ${{ matrix.docker_build.network == 'host' && '--allow-insecure-entitlement network.host' || '' }}
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -186,6 +207,8 @@ jobs:
           push: true
           tags: ${{ matrix.image }}:${{ needs.prepare.outputs.image_tag }}
           platforms: linux/amd64
+          network: ${{ matrix.docker_build.network || '' }}
+          allow: ${{ matrix.docker_build.network == 'host' && 'network.host' || '' }}
           # one manifest per tag, so preview-cleanup leaves no untagged leftovers
           provenance: false
           cache-from: type=gha,scope=preview-${{ steps.prepare.outputs.package_image_name }}
@@ -196,8 +219,10 @@ jobs:
             TAG_NAME=${{ matrix.name }}@${{ needs.prepare.outputs.image_tag }}
             SANITIZED_IMAGE_TAG=${{ needs.prepare.outputs.image_tag }}
             NPM_TOKEN=${{ secrets.NPM_TOKEN }}
+            ${{ steps.build.outputs.build_args }}
           secrets: |
             github_token=${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+            ${{ steps.build.outputs.secrets }}
           labels: |
             org.opencontainers.image.version=${{ needs.prepare.outputs.image_tag }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

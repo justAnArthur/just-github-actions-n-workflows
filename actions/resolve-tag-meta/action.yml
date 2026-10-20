@@ -40,6 +40,9 @@ outputs:
   publish_vercel:
     description: "'true' if the tag annotation includes 'vercel' as a deploy target"
     value: ${{ steps.run.outputs.publish_vercel }}
+  docker_build:
+    description: "JSON of the package's docker build settings from .justactions.yml (modules.overrides[].docker); empty values when unset"
+    value: ${{ steps.run.outputs.docker_build }}
   has_annotation:
     description: "'true' if the tag has a valid annotation with deploy metadata"
     value: ${{ steps.run.outputs.has_annotation }}
