@@ -5,7 +5,8 @@
 #
 #   1. deletes the Dokploy compose pr-<n> and its volumes (a missing one is fine)
 #   2. runs `deploy.previews.cleanup_command` over ssh on
-#      `deploy.previews.seed.ssh_host`, if set (e.g. remove the seed dir)
+#      `deploy.previews.seed.ssh_host`, if set and the compose existed
+#      (e.g. remove the seed dir)
 #   3. deletes the ghcr.io images tagged pr-<n>-* of `deploy.previews.images`
 #
 # ```yaml
@@ -90,6 +91,7 @@ jobs:
           preview_require_open: "false"
 
       - name: Delete the Dokploy compose
+        id: compose
         uses: justAnArthur/just-github-actions-n-workflows/actions/dokploy-preview@main
         with:
           mode: delete
@@ -98,15 +100,16 @@ jobs:
           environment_id: ${{ steps.preview.outputs.preview_environment_id }}
           name: ${{ steps.preview.outputs.preview_name }}
 
+      # nothing was deployed (or seeded) without the compose
       - name: Set up SSH key
-        if: steps.preview.outputs.preview_cleanup_command != ''
+        if: steps.compose.outputs.found == 'true' && steps.preview.outputs.preview_cleanup_command != ''
         uses: justAnArthur/just-github-actions-n-workflows/actions/setup-ssh@main
         with:
           private_key: ${{ secrets.SSH_PRIVATE_KEY }}
           host: ${{ steps.preview.outputs.preview_seed_ssh_host }}
 
       - name: Run the cleanup command
-        if: steps.preview.outputs.preview_cleanup_command != ''
+        if: steps.compose.outputs.found == 'true' && steps.preview.outputs.preview_cleanup_command != ''
         uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main
         with:
           host: ${{ steps.preview.outputs.preview_seed_ssh_host }}
