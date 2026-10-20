@@ -26,9 +26,12 @@ switch (mode) {
       serverId: getEnv("DOKPLOY_SERVER_ID") || undefined
     })
     setOutput("created", String(!existing))
-    log.info(`${existing ? "found" : "created"} compose ${compose.composeId} (${compose.appName})`)
 
-    const currentEnv = existing ? (await client.getCompose(compose.composeId)).env ?? "" : ""
+    // environment.one lists composes without appName; compose.one has it
+    const full = await client.getCompose(compose.composeId)
+    log.info(`${existing ? "found" : "created"} compose ${full.composeId} (${full.appName})`)
+
+    const currentEnv = full.env ?? ""
     await client.updateCompose({
       composeId: compose.composeId,
       sourceType: "raw",
@@ -38,8 +41,8 @@ switch (mode) {
     })
     log.info(`compose file set from ${composePath}`)
 
-    setOutput("compose_id", compose.composeId)
-    setOutput("app_name", compose.appName)
+    setOutput("compose_id", full.composeId)
+    setOutput("app_name", full.appName)
 
     if (boolFromEnv("DOKPLOY_DEPLOY", true)) {
       await deployAndReport(client, compose.composeId, {
@@ -58,7 +61,7 @@ switch (mode) {
       break
     }
     setOutput("compose_id", existing.composeId)
-    setOutput("app_name", existing.appName)
+    setOutput("app_name", (await client.getCompose(existing.composeId)).appName)
     const deleteVolumes = boolFromEnv("DOKPLOY_DELETE_VOLUMES", true)
     await client.deleteCompose(existing.composeId, deleteVolumes)
     log.info(`deleted compose ${existing.composeId}${deleteVolumes ? " and its volumes" : ""}`)
@@ -69,7 +72,7 @@ switch (mode) {
     setOutput("created", "false")
     if (!existing) throw new Error(`no compose named ${name} in environment ${environmentId}`)
     setOutput("compose_id", existing.composeId)
-    setOutput("app_name", existing.appName)
+    setOutput("app_name", (await client.getCompose(existing.composeId)).appName)
     await waitAndReport(
       client,
       existing.composeId,

@@ -8,10 +8,13 @@ export interface DokployCompose {
   serverId?: string | null
 }
 
+// environment.one lists composes without appName/env; read compose.one for those
+export type DokployComposeSummary = Pick<DokployCompose, "composeId" | "name">
+
 export interface DokployEnvironment {
   environmentId: string
   name: string
-  compose: DokployCompose[]
+  compose: DokployComposeSummary[]
 }
 
 export type DeploymentStatus = "running" | "done" | "error" | (string & {})
@@ -88,7 +91,7 @@ export async function findComposeByName(
   client: Pick<DokployClient, "getEnvironment">,
   environmentId: string,
   name: string
-): Promise<DokployCompose | undefined> {
+): Promise<DokployComposeSummary | undefined> {
   const environment = await client.getEnvironment(environmentId)
   return environment.compose.find((compose) => compose.name === name)
 }
