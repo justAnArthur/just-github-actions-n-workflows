@@ -1,6 +1,6 @@
 name: Bump Manifest Versions
 description: >
-  Automated version bumping for mono-repo manifests (package.json, pom.xml).
+  Automated version bumping for mono-repo manifests (package.json, pom.xml, Cargo.toml).
   Supports push-triggered, manual dispatch, and calculated stable promotion strategies.
   Commits version changes, creates git tags, and optionally cleans up prerelease Docker images.
 

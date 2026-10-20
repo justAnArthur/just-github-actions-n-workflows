@@ -112,6 +112,7 @@ describe("toolkit templates", () => {
       .map((w) => planDispatch(w, SCOPED))
 
     expect(plans.map((p) => p?.file).sort()).toEqual([
+      "deploy-on-release.yml",
       "deploy-vercel-on-tag.yml",
       "publish-docker-on-tag.yml",
       "publish-npm-on-tag.yml",

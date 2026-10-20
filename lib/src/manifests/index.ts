@@ -4,5 +4,6 @@ export { registerAdapter, getAdapters } from "./registry"
 // importing these modules triggers their self-registration.
 import "./adapters/npm"
 import "./adapters/maven"
+import "./adapters/cargo"
 
 export { findManifests, parseManifest, findManifestByName, updateManifest, getManifestSearchDir } from "./discovery"

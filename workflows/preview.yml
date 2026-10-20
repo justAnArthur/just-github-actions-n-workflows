@@ -1,0 +1,282 @@
+# preview.yml
+# ---
+# builds a pull request and deploys it as its own Dokploy compose at
+# `deploy.previews.host` (e.g. https://pr-12.pr.example.com), then
+# comments the url on the pull request. remove it with preview-cleanup.yml.
+#
+# ```yaml
+# deploy:
+#   dokploy:
+#     url: https://dokploy.example.com
+#   previews:
+#     dokploy:
+#       environment_id: <dokploy environment for previews>
+#       server_id: <dokploy server>              # optional
+#     host: "pr-{pr}.pr.example.com"             # route it with labels in the compose
+#     compose_file: .github/preview/docker-compose.yml
+#     env:                                       # {pr}, {host}, {image_tag} are filled in
+#       PREVIEW_HOST: "{host}"
+#     images:                                    # modules built for a preview
+#       - "@scope/backend"
+#       - "@scope/frontend"
+#     seed:                                      # optional, first deploy only
+#       ssh_host: test.example.com
+#       command: "bash ~/previews/pr-{pr}/seed.sh {app_name}-postgres-1"
+#       upload:
+#         .github/preview/seed.sh: ~/previews/pr-{pr}/seed.sh
+# ```
+#
+# jobs:
+#   prepare — the pull request must be open and mergeable; the preview is
+#             built from its merge commit. the image tag is pr-<n>-<sha8>,
+#             new on every build: Dokploy doesn't re-pull a tag it has.
+#   build   — one image per `previews.images` entry, dockerfile and context
+#             from the module's manifest like publish-docker-on-tag.yml,
+#             pushed to ghcr.io/<owner>/<repo>/<image>:pr-<n>-<sha8>. the
+#             compose uses them through DOCKER_<NAME>_IMAGE_TAG.
+#   deploy  — creates or updates the compose pr-<n> and starts the deploy;
+#             on the first deploy uploads the seed files and runs the seed
+#             command over ssh while Dokploy deploys ({app_name} is the
+#             compose's app name, containers are <app_name>-<service>-1);
+#             waits for the deploy, then for https://<host> to answer.
+#
+# the compose file and the code come from the pull request, the settings
+# from the ref this workflow runs on. it builds pull request code with
+# your secrets, so don't start it automatically for pull requests from
+# forks. start it from a small workflow of your own:
+#
+#   on:
+#     pull_request:
+#       types: [ opened, synchronize, reopened ]
+#   jobs:
+#     preview:
+#       if: github.event.pull_request.head.repo.full_name == github.repository
+#       uses: ./.github/workflows/preview.yml
+#       with:
+#         pr: ${{ github.event.pull_request.number }}
+#       secrets: inherit
+#
+# actions used: resolve-deploy-config, get-dockerfile-path, prepare-docker-meta,
+#               dokploy-preview, setup-ssh, ssh-exec
+#
+# required secrets:
+#   DOKPLOY_API_KEY  — Dokploy API key
+#   SSH_PRIVATE_KEY  — ssh private key for the seed host (only with previews.seed)
+#   SERVER_USERNAME  — ssh username on the seed host (only with previews.seed)
+#   NPM_TOKEN        — npm registry token (optional, passed as docker build arg)
+# ---
+
+name: preview
+run-name: "preview — PR #${{ inputs.pr }}"
+
+on:
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "pull request number"
+        type: number
+        required: true
+  workflow_call:
+    inputs:
+      pr:
+        description: "pull request number"
+        type: number
+        required: true
+    secrets:
+      DOKPLOY_API_KEY:
+        required: true
+      SSH_PRIVATE_KEY:
+        required: false
+      SERVER_USERNAME:
+        required: false
+      NPM_TOKEN:
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+  pull-requests: write
+
+# a newer push supersedes the preview being built
+concurrency:
+  group: preview-pr-${{ inputs.pr }}
+  cancel-in-progress: true
+
+jobs:
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      dokploy_url: ${{ steps.preview.outputs.dokploy_url }}
+      name: ${{ steps.preview.outputs.preview_name }}
+      merge_sha: ${{ steps.preview.outputs.preview_merge_sha }}
+      image_tag: ${{ steps.preview.outputs.preview_image_tag }}
+      host: ${{ steps.preview.outputs.preview_host }}
+      url: ${{ steps.preview.outputs.preview_url }}
+      compose_file: ${{ steps.preview.outputs.preview_compose_file }}
+      environment_id: ${{ steps.preview.outputs.preview_environment_id }}
+      server_id: ${{ steps.preview.outputs.preview_server_id }}
+      env: ${{ steps.preview.outputs.preview_env }}
+      images: ${{ steps.preview.outputs.preview_images }}
+      seed_ssh_host: ${{ steps.preview.outputs.preview_seed_ssh_host }}
+      seed_command: ${{ steps.preview.outputs.preview_seed_command }}
+      seed_upload: ${{ steps.preview.outputs.preview_seed_upload }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+
+      - name: Resolve preview config
+        id: preview
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-deploy-config@main
+        with:
+          preview_pr: ${{ inputs.pr }}
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.images != '[]'
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.prepare.outputs.images) }}
+
+    steps:
+      - name: Checkout the merge commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.merge_sha }}
+          lfs: true
+
+      # a synthetic <module>@<image tag> tag reuses the release lookups
+      - name: Resolve dockerfile path
+        id: dockerfile
+        uses: justAnArthur/just-github-actions-n-workflows/actions/get-dockerfile-path@main
+        with:
+          tag_name: ${{ matrix.name }}@${{ needs.prepare.outputs.image_tag }}
+
+      - name: Prepare image metadata
+        id: prepare
+        uses: justAnArthur/just-github-actions-n-workflows/actions/prepare-docker-meta@main
+        with:
+          tag_name: ${{ matrix.name }}@${{ needs.prepare.outputs.image_tag }}
+          dockerfile: ${{ steps.dockerfile.outputs.dockerfile }}
+          context: ${{ steps.dockerfile.outputs.context }}
+
+      - name: Set up docker buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GitHub Container Registry
+        uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Build and push preview image
+        uses: docker/build-push-action@v6
+        with:
+          context: ${{ steps.prepare.outputs.context }}
+          file: ${{ steps.prepare.outputs.dockerfile }}
+          push: true
+          tags: ${{ matrix.image }}:${{ needs.prepare.outputs.image_tag }}
+          platforms: linux/amd64
+          # one manifest per tag, so preview-cleanup leaves no untagged leftovers
+          provenance: false
+          cache-from: type=gha,scope=preview-${{ steps.prepare.outputs.package_image_name }}
+          cache-to: type=gha,mode=max,scope=preview-${{ steps.prepare.outputs.package_image_name }}
+          build-args: |
+            USERNAME_GITHUB=${{ github.actor }}
+            TOKEN_GITHUB=${{ secrets.GITHUB_TOKEN }}
+            TAG_NAME=${{ matrix.name }}@${{ needs.prepare.outputs.image_tag }}
+            SANITIZED_IMAGE_TAG=${{ needs.prepare.outputs.image_tag }}
+            NPM_TOKEN=${{ secrets.NPM_TOKEN }}
+          labels: |
+            org.opencontainers.image.version=${{ needs.prepare.outputs.image_tag }}
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.description=Preview of ${{ matrix.name }} for PR #${{ inputs.pr }}
+
+  deploy:
+    needs: [ prepare, build ]
+    if: >-
+      !cancelled() &&
+      needs.prepare.result == 'success' &&
+      (needs.build.result == 'success' || needs.build.result == 'skipped')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout the merge commit
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.prepare.outputs.merge_sha }}
+
+      - name: Create or update the preview and start its deploy
+        id: upsert
+        uses: justAnArthur/just-github-actions-n-workflows/actions/dokploy-preview@main
+        with:
+          mode: upsert
+          url: ${{ needs.prepare.outputs.dokploy_url }}
+          api_key: ${{ secrets.DOKPLOY_API_KEY }}
+          environment_id: ${{ needs.prepare.outputs.environment_id }}
+          server_id: ${{ needs.prepare.outputs.server_id }}
+          name: ${{ needs.prepare.outputs.name }}
+          compose_file: ${{ needs.prepare.outputs.compose_file }}
+          env: ${{ needs.prepare.outputs.env }}
+          description: "preview of ${{ github.repository }}#${{ inputs.pr }}"
+          wait: "false"
+
+      - name: Set up SSH key for seeding
+        if: needs.prepare.outputs.seed_ssh_host != ''
+        uses: justAnArthur/just-github-actions-n-workflows/actions/setup-ssh@main
+        with:
+          private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ needs.prepare.outputs.seed_ssh_host }}
+
+      - name: Upload seed files
+        if: needs.prepare.outputs.seed_upload != ''
+        env:
+          TARGET: ${{ secrets.SERVER_USERNAME }}@${{ needs.prepare.outputs.seed_ssh_host }}
+          UPLOADS: ${{ needs.prepare.outputs.seed_upload }}
+        run: |
+          while IFS=$'\t' read -r src dst; do
+            [ -n "$src" ] || continue
+            ssh -n "$TARGET" "mkdir -p \"$(dirname "$dst")\""
+            scp "$src" "$TARGET:$dst"
+          done <<< "$UPLOADS"
+
+      - name: Fill in the seed command
+        id: seed
+        if: needs.prepare.outputs.seed_command != ''
+        env:
+          COMMAND: ${{ needs.prepare.outputs.seed_command }}
+          APP_NAME: ${{ steps.upsert.outputs.app_name }}
+        run: |
+          { echo "script<<SEED_EOF"; echo "${COMMAND//"{app_name}"/$APP_NAME}"; echo "SEED_EOF"; } >> "$GITHUB_OUTPUT"
+
+      - name: Seed the preview
+        if: steps.seed.outcome == 'success'
+        uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main
+        with:
+          host: ${{ needs.prepare.outputs.seed_ssh_host }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          script: ${{ steps.seed.outputs.script }}
+
+      - name: Wait for the deploy
+        uses: justAnArthur/just-github-actions-n-workflows/actions/dokploy-preview@main
+        with:
+          mode: wait
+          url: ${{ needs.prepare.outputs.dokploy_url }}
+          api_key: ${{ secrets.DOKPLOY_API_KEY }}
+          environment_id: ${{ needs.prepare.outputs.environment_id }}
+          name: ${{ needs.prepare.outputs.name }}
+          previous_deployment_id: ${{ steps.upsert.outputs.previous_deployment_id }}
+          timeout_minutes: "30"
+
+      - name: Wait for the preview to answer
+        run: curl -sS -o /dev/null --fail --retry 60 --retry-delay 10 --retry-all-errors --max-time 20 "${{ needs.prepare.outputs.url }}"
+
+      - name: Comment the preview url
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: >-
+          gh pr comment ${{ inputs.pr }} --repo "${{ github.repository }}" --edit-last --create-if-none
+          --body "preview: ${{ needs.prepare.outputs.url }} (built from ${{ needs.prepare.outputs.merge_sha }}, images tagged \`${{ needs.prepare.outputs.image_tag }}\`)"

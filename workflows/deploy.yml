@@ -1,0 +1,178 @@
+# deploy.yml
+# ---
+# deploys a release to one target from `.justactions.yml` deploy.targets,
+# with the driver the target names:
+#
+#   dokploy — resolves the image tags (DOCKER_<NAME>_IMAGE_TAG lines) and
+#             merges them into the env of an existing Dokploy compose, then
+#             redeploys it. other env lines (secrets kept in Dokploy) stay.
+#   ssh     — the default; runs deploy-docker-compose.yml unchanged.
+#
+# images are built in CI (publish-docker-on-tag.yml) and Dokploy only
+# deploys them: Dokploy can't watch a registry for new tags, and building
+# on the target server is slow and starves the running apps.
+#
+# ```yaml
+# deploy:
+#   dokploy:
+#     url: https://dokploy.example.com      # DOKPLOY_API_KEY secret holds the key
+#   targets:
+#     demo:
+#       driver: dokploy
+#       channel: canary                      # see deploy-on-release.yml
+#       dokploy:
+#         compose_id: abc123
+#     legacy-prod:
+#       host: app.example.com                # ssh, as in deploy-docker-compose.yml
+# ```
+#
+# the deploy job runs in the GitHub Environment named like the target, so
+# required reviewers or wait timers on e.g. `production` gate the deploy,
+# and environment secrets (a per-target DOKPLOY_API_KEY) are used by the
+# dokploy driver. for ssh targets the approval is a separate job, and the
+# called deploy-docker-compose.yml sees repository secrets only.
+#
+# install deploy-docker-compose.yml next to this file, even if every target
+# is dokploy: github loads every reusable workflow a file references before
+# running it.
+#
+# can also be called as a reusable workflow:
+#
+#   jobs:
+#     deploy:
+#       uses: ./.github/workflows/deploy.yml
+#       with:
+#         environment: demo
+#         module_versions: '{"@scope/backend": "1.2.3"}'
+#       secrets: inherit
+#
+# actions used: resolve-deploy-config, resolve-image-tags, dokploy-deploy
+#
+# required secrets:
+#   DOKPLOY_API_KEY  — Dokploy API key (dokploy targets)
+#   SSH_PRIVATE_KEY  — ssh private key for server access (ssh targets)
+#   SERVER_USERNAME  — ssh username on the target server (ssh targets)
+#   DOCKER_USERNAME  — container registry username (ssh targets)
+#   DOCKER_PASSWORD  — container registry password (ssh targets)
+# ---
+
+name: deploy
+run-name: >-
+  ${{
+    format('deploy ({0}) — env={1}',
+      github.event_name,
+      inputs.environment || 'unknown')
+  }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      environment:
+        type: string
+        description: "Target environment name (must match a key in .justactions.yml deploy.targets)"
+        required: true
+      module_versions:
+        type: string
+        description: >
+          JSON object of module versions to deploy.
+          keys are module names, values are version specifiers
+          (e.g. '{"@scope/backend": "stable", "@scope/frontend": "1.2.3"}').
+          leave empty to auto-discover modules and use "stable".
+        required: false
+        default: ""
+  workflow_call:
+    inputs:
+      environment:
+        type: string
+        required: true
+      module_versions:
+        type: string
+        required: false
+        default: ""
+    secrets:
+      DOKPLOY_API_KEY:
+        description: "Dokploy API key (dokploy targets)"
+        required: false
+      SSH_PRIVATE_KEY:
+        description: "ssh private key for server access (ssh targets)"
+        required: false
+      SERVER_USERNAME:
+        description: "ssh username on the target server (ssh targets)"
+        required: false
+      DOCKER_USERNAME:
+        description: "container registry username (ssh targets)"
+        required: false
+      DOCKER_PASSWORD:
+        description: "container registry password (ssh targets)"
+        required: false
+
+permissions:
+  contents: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      driver: ${{ steps.config.outputs.driver }}
+      dokploy_url: ${{ steps.config.outputs.dokploy_url }}
+      dokploy_compose_id: ${{ steps.config.outputs.dokploy_compose_id }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve deploy config from settings
+        id: config
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-deploy-config@main
+        with:
+          environment: ${{ inputs.environment }}
+
+  deploy-dokploy:
+    needs: resolve
+    if: needs.resolve.outputs.driver == 'dokploy'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    # queue deploys of one target; never cancel one that is running
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Resolve image tags
+        id: tags
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-image-tags@main
+        with:
+          repo_url: https://github.com/${{ github.repository }}.git
+          gh_token: ${{ secrets.GITHUB_TOKEN }}
+          components: ${{ inputs.module_versions }}
+
+      - name: Deploy with Dokploy
+        uses: justAnArthur/just-github-actions-n-workflows/actions/dokploy-deploy@main
+        with:
+          url: ${{ needs.resolve.outputs.dokploy_url }}
+          api_key: ${{ secrets.DOKPLOY_API_KEY }}
+          compose_id: ${{ needs.resolve.outputs.dokploy_compose_id }}
+          env: ${{ steps.tags.outputs.resolved_env_lines }}
+          title: "${{ inputs.environment }} — ${{ inputs.module_versions || 'stable' }}"
+
+  approve-ssh:
+    needs: resolve
+    if: needs.resolve.outputs.driver == 'ssh'
+    runs-on: ubuntu-latest
+    environment: ${{ inputs.environment }}
+    steps:
+      - name: Approved
+        run: echo "deploying ${{ inputs.environment }} over ssh"
+
+  deploy-ssh:
+    needs: approve-ssh
+    concurrency:
+      group: deploy-${{ inputs.environment }}
+      cancel-in-progress: false
+    uses: ./.github/workflows/deploy-docker-compose.yml
+    with:
+      environment: ${{ inputs.environment }}
+      module_versions: ${{ inputs.module_versions }}
+    secrets: inherit

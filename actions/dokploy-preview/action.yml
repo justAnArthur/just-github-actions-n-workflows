@@ -1,0 +1,125 @@
+name: Dokploy Preview
+description: >
+  Manages one Dokploy compose per preview (e.g. per pull request) inside a
+  Dokploy environment, found by its name.
+
+  mode upsert: finds the compose by name or creates it, sets it to the raw
+  compose_file from the checked-out repo, merges env into its env (other
+  lines, e.g. secrets, are kept), then deploys. compose_id and app_name are
+  set before the deploy starts; containers are named <app_name>-<service>-1.
+
+  mode delete: deletes the compose by name (and its volumes unless
+  delete_volumes is false). A missing compose is not an error (found=false).
+
+  mode wait: waits for a deployment newer than previous_deployment_id.
+  Use it to act while a deploy is pending, e.g. seed a database:
+  1) upsert with wait "false" — outputs app_name and previous_deployment_id;
+  2) your own steps against <app_name>-<service>-1;
+  3) wait with the same environment_id + name and that previous_deployment_id.
+
+inputs:
+  url:
+    description: "Dokploy base URL (e.g. https://dokploy.example.com)"
+    required: true
+  api_key:
+    description: "Dokploy API key (sent as x-api-key)"
+    required: true
+  mode:
+    description: "upsert, delete or wait"
+    required: true
+  environment_id:
+    description: "Dokploy environment that holds the preview composes"
+    required: true
+  name:
+    description: "Compose name, unique within the environment (e.g. pr-403)"
+    required: true
+  server_id:
+    description: "Dokploy server to create the compose on (upsert, only used when creating)"
+    required: false
+    default: ""
+  compose_file:
+    description: "Path to the docker compose file in the checked-out repo (upsert, required)"
+    required: false
+    default: ""
+  env:
+    description: "KEY=VALUE lines merged into the compose env (upsert)"
+    required: false
+    default: ""
+  description:
+    description: "Compose description (upsert, only used when creating)"
+    required: false
+    default: ""
+  deploy:
+    description: "Deploy after upserting (true/false)"
+    required: false
+    default: "true"
+  wait:
+    description: "Wait for the deployment to finish (upsert; true/false)"
+    required: false
+    default: "true"
+  previous_deployment_id:
+    description: "Wait for a deployment newer than this one (wait mode; the previous_deployment_id output of upsert)"
+    required: false
+    default: ""
+  timeout_minutes:
+    description: "How long to wait for the deployment before failing (upsert with wait, and wait mode)"
+    required: false
+    default: "30"
+  delete_volumes:
+    description: "Also delete the compose's volumes (delete; true/false)"
+    required: false
+    default: "true"
+
+outputs:
+  compose_id:
+    description: "ID of the compose (empty when not found in delete mode)"
+    value: ${{ steps.run.outputs.compose_id }}
+  app_name:
+    description: "Dokploy app name of the compose (includes the random suffix Dokploy adds)"
+    value: ${{ steps.run.outputs.app_name }}
+  deployment_id:
+    description: "ID of the finished deployment (empty when not waited for)"
+    value: ${{ steps.run.outputs.deployment_id }}
+  status:
+    description: "Final deployment status: done, error, cancelled, timeout, or queued when wait is false"
+    value: ${{ steps.run.outputs.status }}
+  previous_deployment_id:
+    description: "Latest deployment before upsert triggered its deploy; pass it to mode wait"
+    value: ${{ steps.run.outputs.previous_deployment_id }}
+  found:
+    description: "true when a compose with this name already existed"
+    value: ${{ steps.run.outputs.found }}
+  created:
+    description: "true when upsert created the compose"
+    value: ${{ steps.run.outputs.created }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Manage preview compose
+      id: run
+      shell: bash
+      env:
+        DOKPLOY_URL: ${{ inputs.url }}
+        DOKPLOY_API_KEY: ${{ inputs.api_key }}
+        DOKPLOY_MODE: ${{ inputs.mode }}
+        DOKPLOY_ENVIRONMENT_ID: ${{ inputs.environment_id }}
+        DOKPLOY_NAME: ${{ inputs.name }}
+        DOKPLOY_SERVER_ID: ${{ inputs.server_id }}
+        DOKPLOY_COMPOSE_FILE: ${{ inputs.compose_file }}
+        DOKPLOY_ENV: ${{ inputs.env }}
+        DOKPLOY_DESCRIPTION: ${{ inputs.description }}
+        DOKPLOY_DEPLOY: ${{ inputs.deploy }}
+        DOKPLOY_WAIT: ${{ inputs.wait }}
+        DOKPLOY_PREVIOUS_DEPLOYMENT_ID: ${{ inputs.previous_deployment_id }}
+        DOKPLOY_TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+        DOKPLOY_DELETE_VOLUMES: ${{ inputs.delete_volumes }}
+      run: bun run ${{ github.action_path }}/src/index.ts

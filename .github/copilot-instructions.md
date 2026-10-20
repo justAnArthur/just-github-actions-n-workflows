@@ -98,7 +98,8 @@ This is a **Bun workspace monorepo**. The root `package.json` defines:
 - Per-project configuration file that workflows read for deploy targets, module overrides, etc.
 - Loaded by `lib/src/settings/index.ts` — searches up from cwd to find the file.
 - Used by `resolve-deploy-config` action to replace hardcoded environment configs.
-- Schema includes `deploy.targets` (host, compose_profiles, profiles, timezone) and `modules.overrides`.
+- Schema includes `deploy.targets` (host, compose_profiles, profiles, timezone, driver `ssh`|`dokploy`, channel `manual`|`stable`|`canary`, `dokploy.compose_id`), `deploy.dokploy.url`, `deploy.previews` (see `lib/src/settings/preview.ts`) and `modules.overrides`.
+- Validation of the deploy block runs only in `resolve-deploy-config`, so a bad deploy block never breaks bump-version.
 
 ### Actions (`actions/`)
 - Every action **must** have: `action.yml`, `package.json`, `tsconfig.json`, `src/index.ts`.
