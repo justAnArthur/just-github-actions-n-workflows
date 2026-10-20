@@ -23,6 +23,12 @@
 # the Dockerfile can read the registry token as a BuildKit secret:
 #   RUN --mount=type=secret,id=github_token cat /run/secrets/github_token
 #
+# per-package build args, BuildKit secrets, build network and a service
+# container (e.g. a database a RUN step needs) come from
+# `modules.overrides[].docker` in .justactions.yml — don't edit this file.
+# called as a reusable workflow, pass `secrets: inherit` so the settings
+# can reference any repo secret.
+#
 # required secrets:
 #   NPM_TOKEN — npm registry token (optional, passed as docker build arg)
 #   GH_TOKEN  — optional PAT for private packages / cross-repo registry access;
@@ -70,6 +76,7 @@ jobs:
       is_prerelease: ${{ steps.meta.outputs.is_prerelease }}
       has_annotation: ${{ steps.meta.outputs.has_annotation }}
       publish_docker: ${{ steps.meta.outputs.publish_docker }}
+      docker_build: ${{ steps.meta.outputs.docker_build }}
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -93,6 +100,14 @@ jobs:
       needs.resolve-meta.outputs.has_annotation != 'true' ||
       needs.resolve-meta.outputs.publish_docker == 'true'
     runs-on: ubuntu-latest
+
+    # modules.overrides[].docker.service in .justactions.yml; not started when its image is empty
+    services:
+      build-service:
+        image: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).service_image }}
+        ports:
+          - ${{ fromJSON(needs.resolve-meta.outputs.docker_build).service_ports }}
+        options: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).service_options }}
 
     steps:
       - name: Checkout repo
@@ -119,6 +134,14 @@ jobs:
           dockerfile: ${{ steps.dockerfile.outputs.dockerfile }}
           context: ${{ steps.dockerfile.outputs.context }}
 
+      - name: Render package build settings
+        id: build
+        uses: justAnArthur/just-github-actions-n-workflows/actions/render-docker-build@main
+        with:
+          config: ${{ needs.resolve-meta.outputs.docker_build }}
+          vars: ${{ toJSON(vars) }}
+          secrets: ${{ toJSON(secrets) }}
+
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
         with:
@@ -134,14 +157,18 @@ jobs:
           push: true
           tags: ghcr.io/${{ steps.prepare.outputs.repository }}/${{ steps.prepare.outputs.package_image_name }}:${{ steps.prepare.outputs.image_tag }}
           platforms: linux/amd64
+          network: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).network }}
+          allow: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).network == 'host' && 'network.host' || '' }}
           build-args: |
             USERNAME_GITHUB=${{ github.actor }}
             TOKEN_GITHUB=${{ secrets.GITHUB_TOKEN }}
             TAG_NAME=${{ steps.prepare.outputs.original_tag }}
             SANITIZED_IMAGE_TAG=${{ steps.prepare.outputs.image_tag }}
             NPM_TOKEN=${{ secrets.NPM_TOKEN }}
+            ${{ steps.build.outputs.build_args }}
           secrets: |
             github_token=${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
+            ${{ steps.build.outputs.secrets }}
           labels: |
             org.opencontainers.image.version=${{ steps.prepare.outputs.original_tag }}
             org.opencontainers.image.source=https://github.com/${{ github.repository }}

@@ -1,5 +1,6 @@
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
+import type { DockerBuildSettings } from "./docker-build"
 
 // --- types ---
 
@@ -75,6 +76,7 @@ export interface VercelSettings {
 export interface ModuleOverride {
   name: string;
   docker_compose_service?: string;
+  docker?: DockerBuildSettings;
 }
 
 export interface ModuleSettings {
@@ -228,6 +230,31 @@ function strList(value: unknown): string[] | undefined {
   return s === undefined ? undefined : s.split(",").map((v) => v.trim()).filter(Boolean)
 }
 
+function parseDockerBuild(raw: any): DockerBuildSettings | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const docker: DockerBuildSettings = {
+    build_args: strMap(raw.build_args),
+    secrets: strMap(raw.secrets),
+    network: str(raw.network)
+  }
+  if (raw.service && typeof raw.service === "object") {
+    docker.service = {
+      image: str(raw.service.image) ?? "",
+      port: str(raw.service.port),
+      env: strMap(raw.service.env),
+      options: str(raw.service.options)
+    }
+  }
+  return docker
+}
+
+function parseModuleOverride(raw: any): ModuleOverride {
+  const override: ModuleOverride = { ...raw }
+  const docker = parseDockerBuild(raw?.docker)
+  if (docker) override.docker = docker
+  return override
+}
+
 function parseTarget(name: string, config: any): DeployTarget {
   const target: DeployTarget = {
     host: str(config?.host) ?? name,
@@ -316,7 +343,7 @@ export function parseSettingsYaml(content: string): Settings {
 
   if (raw.modules) {
     settings.modules = {
-      overrides: Array.isArray(raw.modules.overrides) ? raw.modules.overrides : []
+      overrides: Array.isArray(raw.modules.overrides) ? raw.modules.overrides.map(parseModuleOverride) : []
     }
   }
 
@@ -385,5 +412,6 @@ export function targetsForChannel(settings: Settings, channel: DeployChannel): s
     .map(([name]) => name)
 }
 
+export { dockerBuildFor, fillRefs, hasDockerBuild, renderDockerBuild, validateDockerBuild, type DockerBuildService, type DockerBuildSettings, type ResolvedDockerBuild } from "./docker-build"
 export { fetchMergeablePullRequest, resolvePreview, type PreviewPullRequest, type ResolvedPreview } from "./preview"
 export { releaseModuleVersions } from "./release"

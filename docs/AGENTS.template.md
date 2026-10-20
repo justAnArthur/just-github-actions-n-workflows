@@ -184,6 +184,7 @@ If you can't run the CLI for some reason (e.g. CI), re-curl the workflow files m
 | extra pre-publish steps (codegen, asset build) | the `Build` step in `publish-npm-on-tag.yml` already runs `bun run --silent build` — add a `build` script to `package.json`. don't insert new steps into the workflow |
 | bump logic / tag format / which deploy targets fire | `properties` in `package.json` (`gitCommitScopeRelatedNames`, `deployTargets`, `dockerfilePath`, `vercelProjectId`) |
 | deploy config (ssh target, compose profiles, Dokploy compose, release channel, previews) | `.justactions.yml` at the repo root |
+| extra docker build args / BuildKit secrets / build network / a service container (e.g. a database) for one package's image | `modules.overrides[].docker` in `.justactions.yml` — never edit `build-args`, `secrets` or `services` in `publish-docker-on-tag.yml` / `preview.yml` |
 | approval before deploying a target | required reviewers on the GitHub Environment named like the target |
 
 The relevant publish step in `publish-npm-on-tag.yml` is:

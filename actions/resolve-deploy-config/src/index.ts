@@ -10,6 +10,7 @@ import {
   resolvePreview,
   targetsForChannel,
   validateDeployTarget,
+  validateDockerBuild,
   validatePreviews,
   type DeployTarget,
   type Settings
@@ -141,7 +142,7 @@ async function resolveChannel(settings: Settings) {
 async function resolvePreviewConfig(settings: Settings) {
   log.group(`resolve-deploy-config (preview #${previewPr})`)
 
-  const errors = validatePreviews(settings)
+  const errors = [...validatePreviews(settings), ...validateDockerBuild(settings)]
   if (errors.length > 0) fail(errors)
 
   const repository = getEnv("GITHUB_REPOSITORY")

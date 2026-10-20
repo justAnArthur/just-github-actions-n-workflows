@@ -80,6 +80,7 @@ the workflows are immutable after install — local edits are overwritten by `up
 | bump logic / tag format | `properties` in the package's `package.json` (`gitCommitScopeRelatedNames`, `deployTargets`, `dockerfilePath`, `vercelProjectId`) |
 | which vercel projects a tag deploys to, per channel (`beta`, `stable`, …) | `vercel.targets` in `.justactions.yml` |
 | deploy config (ssh target, compose profiles, Dokploy compose, release channel, previews) | `.justactions.yml` at the repo root |
+| extra docker build args or BuildKit secrets for one package (values from repo vars / secrets), a build network, a service container a `RUN` step needs (e.g. a throwaway database) | `modules.overrides[].docker` in `.justactions.yml` — see [docker build settings](#docker-build-settings). read by `publish-docker-on-tag.yml` and `preview.yml` |
 | approval before a deploy (required reviewers, wait timer) | a GitHub Environment named like the target — `deploy.yml` runs its deploy job in it |
 | skip the bundled GitHub release that `publish-npm-on-tag.yml` creates | not currently supported without a fork — open an upstream issue. `release-on-tag.yml` is a separate workflow that *also* fires on tag push, so you can disable the bundled release by switching to a custom workflow (own the maintenance yourself) |
 
@@ -524,6 +525,13 @@ modules:
 | `vercel.targets.<name>.packages`      | list     | package names that deploy here. default: any package    |
 | `modules.overrides[].name`            | string   | module name to override                                 |
 | `modules.overrides[].docker_compose_service` | string | docker compose service name for the module         |
+| `modules.overrides[].docker.build_args.<KEY>` | string | extra build arg; may reference `${{ vars.NAME }}` / `${{ secrets.NAME }}` |
+| `modules.overrides[].docker.secrets.<id>` | string | extra BuildKit secret (`RUN --mount=type=secret,id=<id>`); same references |
+| `modules.overrides[].docker.network`  | string   | build network, e.g. `host` so `RUN` steps reach `docker.service` on localhost |
+| `modules.overrides[].docker.service.image` | string | service container started next to the build job      |
+| `modules.overrides[].docker.service.port` | number | published on the same port of the runner             |
+| `modules.overrides[].docker.service.env.<KEY>` | string | service env (no whitespace in values)            |
+| `modules.overrides[].docker.service.options` | string | extra `docker create` options, e.g. a health check  |
 
 ### vercel fan-out
 
@@ -549,6 +557,43 @@ vercel:
 ```
 
 **how hook secrets reach the action.** github expressions can't read a secret by a computed name, so the workflow passes the job's whole secrets context (`toJSON(secrets)`) to `trigger-deploy-hook`, which picks the names listed in `hook_secret` and re-masks each URL. the trade-off: every repo/org secret visible to that job is handed to the toolkit's code, not just the hook URLs. github still masks them in logs, and the job only has `contents: read`, but if you don't want the toolkit to see other secrets, pin the action/workflow ref to a release tag or commit SHA you've reviewed, or keep the vercel deploy in a repo whose secrets are only the hook URLs. when calling the workflow via `workflow_call`, use `secrets: inherit` — named secrets can't be forwarded because their names aren't declared inputs.
+
+## docker build settings
+
+`publish-docker-on-tag.yml` and `preview.yml` build every image with the same build args and secrets. a package that needs more sets them in `.justactions.yml`, so the installed workflows stay untouched:
+
+```yaml
+# .justactions.yml
+modules:
+  overrides:
+    - name: "@scope/frontend"
+      docker:
+        build_args:
+          NEXT_PUBLIC_SENTRY_DSN: ${{ vars.NEXT_PUBLIC_SENTRY_DSN }}
+          SENTRY_ORG: ${{ vars.SENTRY_ORG }}
+        secrets:                                   # RUN --mount=type=secret,id=sentry_auth_token
+          sentry_auth_token: ${{ secrets.SENTRY_AUTH_TOKEN }}
+    - name: "@scope/backend"
+      docker:
+        network: host                              # RUN steps reach the service on localhost
+        build_args:
+          TRAINING_DB_URL: jdbc:postgresql://localhost:5432/app
+        service:                                   # started next to this package's build only
+          image: postgis/postgis:16-3.4
+          port: 5432
+          env:
+            POSTGRES_PASSWORD: postgres
+            POSTGRES_DB: app
+          options: --health-cmd pg_isready --health-interval 5s --health-timeout 5s --health-retries 10
+```
+
+- the settings come from the tagged commit (`publish-docker-on-tag.yml`) or from the ref the workflow runs on (`preview.yml`, like the rest of `deploy.previews`).
+- values may reference `${{ vars.NAME }}` and `${{ secrets.NAME }}`, nothing else; an unset one is passed empty with a warning, as in a workflow. other values are passed as written.
+- they are added after the default build args (`USERNAME_GITHUB`, `TOKEN_GITHUB`, `TAG_NAME`, `SANITIZED_IMAGE_TAG`, `NPM_TOKEN`) and the `github_token` secret, which stay.
+- the service is a job service container: github starts it, waits for its health check, and publishes `port` on the runner. a package without `service` starts none.
+- packages without `docker` settings build exactly as before.
+
+**secrets.** like the vercel fan-out, the build job passes `toJSON(secrets)` to the toolkit's `render-docker-build` action, which picks the referenced ones. called through `workflow_call`, use `secrets: inherit`.
 
 ## deploy with Dokploy
 
@@ -844,6 +889,7 @@ each action is a composite GitHub Action in `actions/` with its own `action.yml`
 | `actions/ghcr-images`            | wait for images on ghcr.io, or delete tags by prefix | `mode`, `images`, `token`, `tag_prefix`                    |
 | `actions/pin-workspace-versions` | rewrite `workspace:` deps to sibling versions     | `dir`                                                         |
 | `actions/prepare-docker-meta`    | prepare docker image metadata from a git tag      | `tag_name`, `dockerfile`, `context`                           |
+| `actions/render-docker-build`    | fill a package's `docker` settings into build-args / secrets lines | `config`, `vars`, `secrets`              |
 | `actions/resolve-deploy-config`  | resolve a deploy target, a channel's targets, or a PR preview from `.justactions.yml` | `environment` / `channel` / `preview_pr` |
 | `actions/resolve-image-tags`     | resolve docker image tags from git tags           | `repo_url`, `components`, `gh_token`                          |
 | `actions/resolve-package-dir`    | resolve module directory from git tag             | `tag_name`                                                    |
@@ -881,6 +927,7 @@ the `resolve-tag-meta` action is used by all publish/deploy workflows. it parses
 | `publish_docker`     | `true` if tag has `docker` deploy target                   |
 | `publish_vercel`     | `true` if tag has `vercel` deploy target                   |
 | `has_annotation`     | `true` if the tag has a valid annotation                   |
+| `docker_build`       | JSON of the package's `modules.overrides[].docker` settings, empty values when unset |
 
 ## available workflows
 
@@ -1017,6 +1064,7 @@ all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_
 │   ├── ghcr-images/
 │   ├── pin-workspace-versions/
 │   ├── prepare-docker-meta/
+│   ├── render-docker-build/
 │   ├── resolve-deploy-config/
 │   ├── resolve-image-tags/
 │   ├── resolve-package-dir/

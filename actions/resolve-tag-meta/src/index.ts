@@ -1,6 +1,7 @@
 import { getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
 import { cleanTagRef, isPrerelease, prereleaseChannel, moduleFromTag, versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 import { readTagAnnotation } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
+import { dockerBuildFor, loadSettings, validateDockerBuild } from "@justanarthur/just-github-actions-n-workflows-lib/settings"
 
 log.group("resolve-tag-meta")
 
@@ -37,5 +38,15 @@ setOutput("publish_npm", String(deployTargets.includes("npm")))
 setOutput("publish_docker", String(deployTargets.includes("docker")))
 setOutput("publish_vercel", String(deployTargets.includes("vercel")))
 setOutput("has_annotation", String(annotation !== null))
+
+// build settings from .justactions.yml; secrets in them stay templates
+// until render-docker-build fills them in the build job
+const settings = await loadSettings(process.cwd())
+const dockerErrors = validateDockerBuild(settings)
+if (dockerErrors.length > 0) {
+  for (const e of dockerErrors) log.error(e)
+  process.exit(1)
+}
+setOutput("docker_build", JSON.stringify(dockerBuildFor(settings, pkgName)))
 
 log.groupEnd()

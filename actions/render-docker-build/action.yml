@@ -1,0 +1,47 @@
+name: Render Docker Build Settings
+description: >
+  Turns a package's docker build settings (the docker_build output of
+  resolve-tag-meta or a preview image) into the build-args and secrets
+  lines of docker/build-push-action, filling in `${{ vars.NAME }}` and
+  `${{ secrets.NAME }}` references.
+
+inputs:
+  config:
+    description: "JSON docker build settings (resolve-tag-meta's docker_build output)"
+    required: true
+  vars:
+    description: "toJSON(vars) of the calling workflow"
+    required: false
+    default: "{}"
+  secrets:
+    description: "toJSON(secrets) of the calling workflow"
+    required: false
+    default: "{}"
+
+outputs:
+  build_args:
+    description: "extra KEY=value build-arg lines (empty when none are configured)"
+    value: ${{ steps.run.outputs.build_args }}
+  secrets:
+    description: "extra id=value BuildKit secret lines (empty when none are configured)"
+    value: ${{ steps.run.outputs.secrets }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run render-docker-build
+      id: run
+      shell: bash
+      env:
+        DOCKER_BUILD: ${{ inputs.config }}
+        BUILD_VARS: ${{ inputs.vars }}
+        BUILD_SECRETS: ${{ inputs.secrets }}
+      run: bun run ${{ github.action_path }}/src/index.ts
