@@ -498,7 +498,7 @@ modules:
 
 | path                                  | type     | description                                             |
 |---------------------------------------|----------|---------------------------------------------------------|
-| `deploy.ssh_target_path`              | string   | remote path for deployment files                        |
+| `deploy.ssh_target_path`              | string   | remote path for deployment files; a leading `~/` is the remote home |
 | `deploy.targets.<name>.host`          | string   | ssh hostname for the environment                        |
 | `deploy.targets.<name>.compose_profiles` | string | comma-separated module names to deploy                 |
 | `deploy.targets.<name>.profiles`      | string   | docker compose profile names                            |

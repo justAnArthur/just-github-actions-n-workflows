@@ -2,6 +2,7 @@ import { $ } from "bun"
 import { stat } from "node:fs/promises"
 import { basename, dirname, join } from "node:path"
 import { getRequiredEnv, log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { scpRemotePath } from "@justanarthur/just-github-actions-n-workflows-lib/remote-path"
 
 async function isDirectory(path: string): Promise<boolean> {
   try {
@@ -45,7 +46,7 @@ log.group("scp-upload")
 const host = getRequiredEnv("SCP_HOST")
 const username = getRequiredEnv("SCP_USERNAME")
 const source = getRequiredEnv("SCP_SOURCE")
-const target = getRequiredEnv("SCP_TARGET")
+const target = scpRemotePath(getRequiredEnv("SCP_TARGET"))
 
 log.info(`destination: ${username}@${host}:${target}`)
 log.info(`source: ${source}`)
