@@ -10,7 +10,7 @@
     },
     "actions/bump-version": {
       "name": "@justanarthur/step-bump-manifest-versions",
-      "version": "1.0.1",
+      "version": "1.1.2",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -45,7 +45,21 @@
     },
     "actions/dispatch-tag-workflows": {
       "name": "@justanarthur/step-dispatch-tag-workflows",
-      "version": "1.0.1",
+      "version": "1.1.0",
+      "dependencies": {
+        "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
+      },
+    },
+    "actions/dokploy-deploy": {
+      "name": "@justanarthur/step-dokploy-deploy",
+      "version": "1.0.0",
+      "dependencies": {
+        "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
+      },
+    },
+    "actions/dokploy-preview": {
+      "name": "@justanarthur/step-dokploy-preview",
+      "version": "1.0.0",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -67,6 +81,13 @@
     "actions/get-dockerfile-path": {
       "name": "@justanarthur/step-resolve-dockerfile-path",
       "version": "1.0.1",
+      "dependencies": {
+        "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
+      },
+    },
+    "actions/ghcr-images": {
+      "name": "@justanarthur/step-ghcr-images",
+      "version": "1.0.0",
       "dependencies": {
         "@justanarthur/just-github-actions-n-workflows-lib": "workspace:*",
       },
@@ -164,7 +185,7 @@
     },
     "lib": {
       "name": "@justanarthur/just-github-actions-n-workflows-lib",
-      "version": "1.0.1",
+      "version": "1.2.0",
       "dependencies": {
         "fast-xml-parser": "^5.5.9",
       },
@@ -219,7 +240,13 @@
 
     "@justanarthur/step-dispatch-tag-workflows": ["@justanarthur/step-dispatch-tag-workflows@workspace:actions/dispatch-tag-workflows"],
 
+    "@justanarthur/step-dokploy-deploy": ["@justanarthur/step-dokploy-deploy@workspace:actions/dokploy-deploy"],
+
+    "@justanarthur/step-dokploy-preview": ["@justanarthur/step-dokploy-preview@workspace:actions/dokploy-preview"],
+
     "@justanarthur/step-generate-release-notes": ["@justanarthur/step-generate-release-notes@workspace:actions/generate-release-notes"],
+
+    "@justanarthur/step-ghcr-images": ["@justanarthur/step-ghcr-images@workspace:actions/ghcr-images"],
 
     "@justanarthur/step-git-fetch-and-unshallow": ["@justanarthur/step-git-fetch-and-unshallow@workspace:actions/fetch-tags"],
 

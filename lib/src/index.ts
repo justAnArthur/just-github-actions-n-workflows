@@ -1,2 +1,5 @@
 export { exec, execWithTimeout } from "./exec"
 export { log, setOutput, setEnv, getEnv, getRequiredEnv } from "./github"
+export { createDokployClient, findComposeByName, latestDeployment, triggerDeployment, waitForDeployment } from "./dokploy/client"
+export type { DokployClient, DokployCompose, DokployDeployment, DokployEnvironment } from "./dokploy/client"
+export { mergeEnv, parseEnvLines } from "./dokploy/env"

@@ -26,6 +26,37 @@
 #       compose_file: ./docker-compose.staging.yml
 #       profiles: "staging"
 #       timezone: UTC
+#     # driver dokploy: redeploy a Dokploy compose with the new image tags
+#     # (deploy.yml); channel stable/canary: deploy-on-release.yml deploys
+#     # every matching release here. "manual" (default) is dispatch only.
+#     demo:
+#       driver: dokploy
+#       channel: canary
+#       dokploy:
+#         compose_id: abc123
+#
+#   # needed by dokploy targets and previews; the DOKPLOY_API_KEY secret holds the key
+#   dokploy:
+#     url: https://dokploy.example.com
+#
+#   # PR previews (preview.yml / preview-cleanup.yml)
+#   previews:
+#     dokploy:
+#       environment_id: <dokploy environment for previews>
+#       server_id: <dokploy server>                 # optional
+#     host: "pr-{pr}.pr.example.com"                # {pr} = PR number
+#     compose_file: .github/preview/docker-compose.yml
+#     env:                                          # {pr}, {host}, {image_tag} filled in
+#       PREVIEW_HOST: "{host}"
+#     images:                                       # modules built for a preview
+#       - "@scope/backend"
+#       - "@scope/frontend"
+#     seed:                                         # optional, first deploy only
+#       ssh_host: test.example.com
+#       command: "bash ~/previews/pr-{pr}/seed.sh {app_name}-postgres-1"
+#       upload:                                     # repo path -> remote path
+#         .github/preview/seed.sh: ~/previews/pr-{pr}/seed.sh
+#     cleanup_command: "rm -rf ~/previews/pr-{pr}"  # optional, on seed.ssh_host
 #
 # modules:
 #   overrides:

@@ -1,0 +1,57 @@
+name: GHCR Images
+description: >
+  Waits for or deletes container images on ghcr.io.
+
+  mode wait: polls the registry until every image ref in `images`
+  (e.g. ghcr.io/owner/repo/backend:1.2.3) exists; fails after timeout_minutes.
+  Use it to start a deploy only after publish-docker-on-tag pushed the image.
+
+  mode delete: deletes the versions of every image in `images`
+  (e.g. ghcr.io/owner/repo/backend, no tag) whose tags all start with
+  tag_prefix. A token without permission to delete packages only warns.
+
+inputs:
+  mode:
+    description: "wait or delete"
+    required: true
+  images:
+    description: "Image refs, one per line (wait: with :tag, delete: without)"
+    required: true
+  tag_prefix:
+    description: "Delete versions whose tags all start with this (delete; e.g. pr-12-)"
+    required: false
+    default: ""
+  token:
+    description: "GitHub token (packages: read for wait, packages: write for delete)"
+    required: true
+  timeout_minutes:
+    description: "How long to wait for the images before failing (wait)"
+    required: false
+    default: "30"
+
+outputs:
+  deleted:
+    description: "Number of deleted versions (delete)"
+    value: ${{ steps.run.outputs.deleted }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Run ghcr-images
+      id: run
+      shell: bash
+      env:
+        GHCR_MODE: ${{ inputs.mode }}
+        GHCR_IMAGES: ${{ inputs.images }}
+        GHCR_TAG_PREFIX: ${{ inputs.tag_prefix }}
+        GHCR_TOKEN: ${{ inputs.token }}
+        GHCR_TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+      run: bun run ${{ github.action_path }}/src/index.ts

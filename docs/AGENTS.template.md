@@ -15,7 +15,7 @@ This repo's release machinery is wired by workflows from `justAnArthur/just-gith
 - `.github/workflows/*.yml` — workflows owned by the toolkit. Do not hand-edit.
 - `.github/workflows/.toolkit-lock.json` — tracks installed `{name, file, ref, installedAt}`. `update` reads this; deleting it forces a full re-install.
 - `.github/AGENTS.md` — this file (symlinked to `./AGENTS.md` at repo root).
-- `.justactions.yml` — deploy config (only used by `deploy-docker-compose.yml` and `deploy-vercel-on-tag.yml`).
+- `.justactions.yml` — deploy config: targets (`driver` ssh/dokploy, `channel` manual/stable/canary), Dokploy url, PR previews. read by `deploy-docker-compose.yml`, `deploy.yml`, `deploy-on-release.yml`, `preview.yml`, `preview-cleanup.yml`.
 
 The `# toolkit-ref: <ref>` comment at the top of each workflow YAML is injected by `init`. The `uses: justAnArthur/just-github-actions-n-workflows/...@main` references inside the workflow bodies are rewritten to `@<sha>` at install time.
 
@@ -117,6 +117,14 @@ git tag -l --format='%(contents)' '@myorg/api@0.2.0'
 - **JSON without the target you want** → fix `properties.deployTargets` (or the inferred source property) and trigger a new bump.
 - **JSON with the target, but workflow still skipped** → check `resolve-tag-meta.outputs.has_annotation` and the matching `publish_*` output in the workflow run logs.
 
+## 5a. Deploys, release channels and PR previews
+
+- **Images are built in CI, Dokploy only deploys.** `publish-docker-on-tag.yml` (releases) and `preview.yml` (pull requests) push to ghcr.io; Dokploy gets the new tag via the compose env (`DOCKER_<NAME>_IMAGE_TAG`). Don't add a `build:` section to a Dokploy compose or a registry webhook.
+- **Which targets a release reaches** is the target's `channel` in `.justactions.yml`: `stable` gets versions without a prerelease, `canary` gets `canary` / `beta` / `alpha` / `rc` versions, `manual` (default) only `deploy.yml` dispatches. `deploy-on-release.yml` does this; it waits for the image on ghcr.io first, so a failed docker publish shows up there as a timeout.
+- **A release deployed nothing** → check the tag has the `docker` deploy target, a target has the matching `channel`, and the `Resolve targets on the release channel` step of the `deploy-on-release` run.
+- **A deploy waits forever** → the GitHub Environment named like the target has required reviewers; approve it in the run.
+- **PR previews** are `pr-<n>` composes in `deploy.previews.dokploy.environment_id`, images tagged `pr-<n>-<sha8>`. A PR with merge conflicts gets no preview. `preview-cleanup.yml` removes it on close. Previews are started by a repo-owned caller workflow, not by `preview.yml` itself.
+
 ## 6. Manual dispatch inputs
 
 | Workflow                       | Inputs |
@@ -127,6 +135,10 @@ git tag -l --format='%(contents)' '@myorg/api@0.2.0'
 | `deploy-vercel-on-tag.yml`     | `tag` |
 | `release-on-tag.yml`           | `tag` |
 | `deploy-docker-compose.yml`    | `environment`, `module_versions` (JSON), `ssh_target_path`, `compose_file` |
+| `deploy.yml`                   | `environment` (a `deploy.targets` key), `module_versions` (JSON) |
+| `deploy-on-release.yml`        | `tag` |
+| `preview.yml`                  | `pr` (number) |
+| `preview-cleanup.yml`          | `pr` (number) |
 
 Re-dispatch is the right tool when a tag annotation is missing or the workflow errored non-deterministically.
 
@@ -136,7 +148,9 @@ Re-dispatch is the right tool when a tag annotation is missing or the workflow e
 |--------|---------|
 | `NPM_TOKEN` | `publish-npm-on-tag.yml`; optional in `publish-docker-on-tag.yml` (docker build-arg) |
 | `VERCEL_DEPLOY_HOOK_URL` | `deploy-vercel-on-tag.yml` |
-| `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` | `deploy-docker-compose.yml` |
+| `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` | `deploy-docker-compose.yml` (and `deploy.yml` for ssh targets) |
+| `DOKPLOY_API_KEY` | `deploy.yml` / `deploy-on-release.yml` for dokploy targets, `preview.yml`, `preview-cleanup.yml` |
+| `SSH_PRIVATE_KEY`, `SERVER_USERNAME` | also `preview.yml` (`previews.seed`) and `preview-cleanup.yml` (`previews.cleanup_command`) |
 
 All workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. If you need a PAT with elevated scopes for a specific run, set `GH_TOKEN` in secrets and forward it via `workflow_call`.
 
@@ -169,7 +183,8 @@ If you can't run the CLI for some reason (e.g. CI), re-curl the workflow files m
 | per-package auth token (e.g. GH Packages PAT) | `.npmrc` in the package's directory |
 | extra pre-publish steps (codegen, asset build) | the `Build` step in `publish-npm-on-tag.yml` already runs `bun run --silent build` — add a `build` script to `package.json`. don't insert new steps into the workflow |
 | bump logic / tag format / which deploy targets fire | `properties` in `package.json` (`gitCommitScopeRelatedNames`, `deployTargets`, `dockerfilePath`, `vercelProjectId`) |
-| deploy config (ssh target, compose profiles) | `.justactions.yml` at the repo root |
+| deploy config (ssh target, compose profiles, Dokploy compose, release channel, previews) | `.justactions.yml` at the repo root |
+| approval before deploying a target | required reviewers on the GitHub Environment named like the target |
 
 The relevant publish step in `publish-npm-on-tag.yml` is:
 
@@ -206,6 +221,7 @@ For repo-specific agent instructions, write a separate `CONTRIBUTING.md` or root
 - Pushing a tag like `v1.2.3` instead of `@scope/name@1.2.3` — none of the `**@*` triggers will match.
 - Running `npm version patch` directly — bypasses the conventional-commit-driven bump and produces a tag without the JSON annotation, which downstream workflows then fall back to legacy detection for.
 - Hand-editing `bump-version.yml` to change the bump logic — overwritten by `update`.
+- Adding a `workflow_run` on `publish-docker-on-tag` to deploy after the image is built — `deploy-on-release.yml` already waits for the image.
 - Adding a `workflow_run` / `gh workflow run` workflow to "publish after bump" — `bump-version.yml` already dispatches the tag workflows, so this publishes twice. Delete such a workaround after updating.
 - Copying a tag workflow (e.g. `publish-npm-on-tag.yml` → `publish-gh-packages.yml`) and removing its `workflow_dispatch` `tag` input — bump-version can then no longer start it.
 - Hand-editing `publish-npm-on-tag.yml` to swap `.npmrc` for dual-registry, comment out the release step, or hard-code a registry — overwritten by `update`. Use `publishConfig` / `.npmrc` / `.justactions.yml` instead (see section 9).
