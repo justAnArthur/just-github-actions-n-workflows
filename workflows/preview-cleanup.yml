@@ -1,0 +1,118 @@
+# preview-cleanup.yml
+# ---
+# removes the preview preview.yml deployed for a pull request when the pull
+# request is closed (merged or not):
+#
+#   1. deletes the Dokploy compose pr-<n> and its volumes (a missing one is fine)
+#   2. runs `deploy.previews.cleanup_command` over ssh on
+#      `deploy.previews.seed.ssh_host`, if set (e.g. remove the seed dir)
+#   3. deletes the ghcr.io images tagged pr-<n>-* of `deploy.previews.images`
+#
+# ```yaml
+# deploy:
+#   previews:
+#     # ...everything preview.yml needs, plus:
+#     cleanup_command: "rm -rf ~/previews/pr-{pr}"
+# ```
+#
+# deleting images needs `packages: write` and, for a package not created
+# by this repository, admin access of the repository to the package; when
+# the token lacks it, step 3 only warns.
+#
+# pull_request events from forks get no secrets, so this can't delete the
+# previews of fork pull requests — run it by hand for those (input `pr`).
+#
+# actions used: resolve-deploy-config, dokploy-preview, setup-ssh, ssh-exec,
+#               ghcr-images
+#
+# required secrets:
+#   DOKPLOY_API_KEY  — Dokploy API key
+#   SSH_PRIVATE_KEY  — ssh private key for the seed host (only with previews.cleanup_command)
+#   SERVER_USERNAME  — ssh username on the seed host (only with previews.cleanup_command)
+# ---
+
+name: preview-cleanup
+run-name: "preview-cleanup — PR #${{ inputs.pr || github.event.pull_request.number }}"
+
+on:
+  pull_request:
+    types: [ closed ]
+  workflow_dispatch:
+    inputs:
+      pr:
+        description: "pull request number"
+        type: number
+        required: true
+  workflow_call:
+    inputs:
+      pr:
+        description: "pull request number"
+        type: number
+        required: true
+    secrets:
+      DOKPLOY_API_KEY:
+        required: true
+      SSH_PRIVATE_KEY:
+        required: false
+      SERVER_USERNAME:
+        required: false
+
+permissions:
+  contents: read
+  packages: write
+
+# waits for a preview build of the same pull request instead of racing it
+concurrency:
+  group: preview-pr-${{ inputs.pr || github.event.pull_request.number }}
+  cancel-in-progress: false
+
+jobs:
+  cleanup:
+    runs-on: ubuntu-latest
+
+    steps:
+      # the merge ref of a closed pull request may be gone, read the settings from its base
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.pull_request.base.ref || github.ref }}
+
+      - name: Resolve preview config
+        id: preview
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-deploy-config@main
+        with:
+          preview_pr: ${{ inputs.pr || github.event.pull_request.number }}
+          preview_require_open: "false"
+
+      - name: Delete the Dokploy compose
+        uses: justAnArthur/just-github-actions-n-workflows/actions/dokploy-preview@main
+        with:
+          mode: delete
+          url: ${{ steps.preview.outputs.dokploy_url }}
+          api_key: ${{ secrets.DOKPLOY_API_KEY }}
+          environment_id: ${{ steps.preview.outputs.preview_environment_id }}
+          name: ${{ steps.preview.outputs.preview_name }}
+
+      - name: Set up SSH key
+        if: steps.preview.outputs.preview_cleanup_command != ''
+        uses: justAnArthur/just-github-actions-n-workflows/actions/setup-ssh@main
+        with:
+          private_key: ${{ secrets.SSH_PRIVATE_KEY }}
+          host: ${{ steps.preview.outputs.preview_seed_ssh_host }}
+
+      - name: Run the cleanup command
+        if: steps.preview.outputs.preview_cleanup_command != ''
+        uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main
+        with:
+          host: ${{ steps.preview.outputs.preview_seed_ssh_host }}
+          username: ${{ secrets.SERVER_USERNAME }}
+          script: ${{ steps.preview.outputs.preview_cleanup_command }}
+
+      - name: Delete the preview images
+        if: steps.preview.outputs.preview_image_repos != ''
+        uses: justAnArthur/just-github-actions-n-workflows/actions/ghcr-images@main
+        with:
+          mode: delete
+          images: ${{ steps.preview.outputs.preview_image_repos }}
+          tag_prefix: pr-${{ inputs.pr || github.event.pull_request.number }}-
+          token: ${{ secrets.GITHUB_TOKEN }}

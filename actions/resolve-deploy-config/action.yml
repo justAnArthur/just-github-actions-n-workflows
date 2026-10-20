@@ -4,12 +4,41 @@ description: >
   host) for a target environment. Reads from `.justactions.yml` settings file or
   a custom JSON override. Exports resolved values as environment variables.
 
+  Set exactly one of: environment (one target, as before), channel (the targets
+  deploy-on-release deploys a release to), or preview_pr (the PR preview config
+  from deploy.previews).
+
 inputs:
   environment:
     description: "Target deployment environment name (must match a key in .justactions.yml deploy.targets)"
-    required: true
+    required: false
+    default: ""
   config:
     description: "Optional JSON override for deployment configuration (keyed by environment)"
+    required: false
+    default: ""
+  channel:
+    description: "List the targets on this channel (stable or canary) as the `targets` output"
+    required: false
+    default: ""
+  release_tag:
+    description: "With channel: the released tag; fills module_versions of each target and release_images"
+    required: false
+    default: ""
+  preview_pr:
+    description: "Resolve deploy.previews for this pull request number"
+    required: false
+    default: ""
+  preview_sha:
+    description: "With preview_pr: the commit the preview is built from; empty looks up the PR's merge commit"
+    required: false
+    default: ""
+  preview_require_open:
+    description: "With preview_pr and no preview_sha: look up the PR and fail unless it is open and mergeable (false resolves names only, for cleanup)"
+    required: false
+    default: "true"
+  github_token:
+    description: "Token to read the pull request (preview_pr)"
     required: false
     default: ""
 
@@ -32,6 +61,75 @@ outputs:
   ssh_target_path:
     description: "Resolved SSH target path"
     value: ${{ steps.run.outputs.ssh_target_path }}
+  driver:
+    description: "ssh or dokploy (environment)"
+    value: ${{ steps.run.outputs.driver }}
+  channel:
+    description: "manual, stable or canary (environment)"
+    value: ${{ steps.run.outputs.channel }}
+  dokploy_url:
+    description: "deploy.dokploy.url (dokploy targets and previews)"
+    value: ${{ steps.run.outputs.dokploy_url }}
+  dokploy_compose_id:
+    description: "Compose to redeploy (dokploy targets)"
+    value: ${{ steps.run.outputs.dokploy_compose_id }}
+  targets:
+    description: 'JSON array of {"environment","module_versions"} on the channel (channel)'
+    value: ${{ steps.run.outputs.targets }}
+  has_targets:
+    description: "true when the channel has at least one target (channel)"
+    value: ${{ steps.run.outputs.has_targets }}
+  release_images:
+    description: "Image refs (one per line) the targets will run; wait for them before deploying (channel + release_tag)"
+    value: ${{ steps.run.outputs.release_images }}
+  preview_name:
+    description: "Dokploy compose name of the preview, pr-<n>"
+    value: ${{ steps.run.outputs.preview_name }}
+  preview_merge_sha:
+    description: "Commit the preview is built from"
+    value: ${{ steps.run.outputs.preview_merge_sha }}
+  preview_head_ref:
+    description: "Head branch of the pull request"
+    value: ${{ steps.run.outputs.preview_head_ref }}
+  preview_image_tag:
+    description: "Image tag of this preview build, pr-<n>-<sha8>"
+    value: ${{ steps.run.outputs.preview_image_tag }}
+  preview_host:
+    description: "Preview hostname"
+    value: ${{ steps.run.outputs.preview_host }}
+  preview_url:
+    description: "https://<preview_host>"
+    value: ${{ steps.run.outputs.preview_url }}
+  preview_compose_file:
+    description: "Compose file for the preview"
+    value: ${{ steps.run.outputs.preview_compose_file }}
+  preview_environment_id:
+    description: "Dokploy environment that holds the previews"
+    value: ${{ steps.run.outputs.preview_environment_id }}
+  preview_server_id:
+    description: "Dokploy server for new previews"
+    value: ${{ steps.run.outputs.preview_server_id }}
+  preview_env:
+    description: "KEY=VALUE lines for the preview compose: DOCKER_*_IMAGE_TAG of every preview image plus deploy.previews.env"
+    value: ${{ steps.run.outputs.preview_env }}
+  preview_images:
+    description: 'JSON array of {"name","image"} to build (image is ghcr.io/<repo>/<name>, no tag)'
+    value: ${{ steps.run.outputs.preview_images }}
+  preview_image_repos:
+    description: "Image repos of the preview images, one per line"
+    value: ${{ steps.run.outputs.preview_image_repos }}
+  preview_seed_ssh_host:
+    description: "Host the seed and cleanup commands run on"
+    value: ${{ steps.run.outputs.preview_seed_ssh_host }}
+  preview_seed_command:
+    description: "Seed command ({app_name} still to be replaced)"
+    value: ${{ steps.run.outputs.preview_seed_command }}
+  preview_seed_upload:
+    description: "Files to upload before seeding, one <repo path><TAB><remote path> per line"
+    value: ${{ steps.run.outputs.preview_seed_upload }}
+  preview_cleanup_command:
+    description: "Command run over ssh when the preview is removed"
+    value: ${{ steps.run.outputs.preview_cleanup_command }}
 
 runs:
   using: composite
@@ -50,4 +148,10 @@ runs:
       env:
         DEPLOY_ENVIRONMENT: ${{ inputs.environment }}
         DEPLOY_CONFIG: ${{ inputs.config }}
+        DEPLOY_CHANNEL: ${{ inputs.channel }}
+        DEPLOY_RELEASE_TAG: ${{ inputs.release_tag }}
+        DEPLOY_PREVIEW_PR: ${{ inputs.preview_pr }}
+        DEPLOY_PREVIEW_SHA: ${{ inputs.preview_sha }}
+        DEPLOY_PREVIEW_REQUIRE_OPEN: ${{ inputs.preview_require_open }}
+        DEPLOY_GITHUB_TOKEN: ${{ inputs.github_token }}
       run: bun run ${{ github.action_path }}/src/index.ts

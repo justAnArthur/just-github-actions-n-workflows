@@ -1,0 +1,147 @@
+# deploy-on-release.yml
+# ---
+# deploys a release tag to every target in `.justactions.yml` whose
+# `channel` matches the tag: a version with a canary / beta / alpha / rc
+# prerelease goes to `channel: canary` targets, any other version to
+# `channel: stable` targets. targets with `channel: manual` (the default)
+# are never touched — deploy them with deploy.yml.
+#
+# ```yaml
+# deploy:
+#   dokploy:
+#     url: https://dokploy.example.com
+#   targets:
+#     demo:
+#       driver: dokploy
+#       channel: canary
+#       dokploy:
+#         compose_id: abc123
+#     production:
+#       driver: dokploy
+#       channel: stable
+#       dokploy:
+#         compose_id: def456
+# ```
+#
+# each target gets every docker module at its newest version on the
+# channel, with the released module pinned to the tag. so when one bump
+# releases several modules at once, whichever deploy runs last still has
+# all of them, and the per-target queue in deploy.yml can drop a pending
+# run without losing a version.
+#
+# it starts like the other tag workflows: on a tag push, and dispatched by
+# bump-version.yml (that's what the `tag` input is for). so it starts at
+# the same time as publish-docker-on-tag.yml, before the image exists. it
+# therefore polls ghcr.io until every image it is about to deploy is there
+# (ghcr-images, mode wait), then deploys. that holds however the tag got
+# here — bump-version dispatch, a hand-pushed tag, a manual re-run —
+# unlike a `workflow_run` chain, which only fires from the default branch,
+# depends on the publish workflow's name and fires for tags that built no
+# image too. a publish that fails makes this run fail after the timeout.
+#
+# install deploy.yml (and deploy-docker-compose.yml for ssh targets) next
+# to this file; each target is deployed by calling ./.github/workflows/deploy.yml.
+#
+# actions used: fetch-tags, resolve-tag-meta, resolve-deploy-config, ghcr-images
+#
+# required secrets:
+#   DOKPLOY_API_KEY  — Dokploy API key (dokploy targets)
+#   SSH_PRIVATE_KEY  — ssh private key for server access (ssh targets)
+#   SERVER_USERNAME  — ssh username on the target server (ssh targets)
+#   DOCKER_USERNAME  — container registry username (ssh targets)
+#   DOCKER_PASSWORD  — container registry password (ssh targets)
+# ---
+
+name: deploy-on-release
+run-name: "deploy-on-release — ${{ inputs.tag || github.ref_name }}"
+
+on:
+  push:
+    tags: [ "**@*" ]
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'released tag (e.g. "@scope/pkg@1.2.3")'
+        type: string
+        required: true
+  workflow_call:
+    inputs:
+      tag:
+        description: 'released tag (e.g. "@scope/pkg@1.2.3")'
+        type: string
+        required: true
+      image_timeout_minutes:
+        description: "how long to wait for the images on ghcr.io"
+        type: string
+        required: false
+        default: "45"
+    secrets:
+      DOKPLOY_API_KEY:
+        required: false
+      SSH_PRIVATE_KEY:
+        required: false
+      SERVER_USERNAME:
+        required: false
+      DOCKER_USERNAME:
+        required: false
+      DOCKER_PASSWORD:
+        required: false
+
+permissions:
+  contents: read
+  packages: read
+
+jobs:
+  resolve:
+    runs-on: ubuntu-latest
+    outputs:
+      targets: ${{ steps.targets.outputs.targets }}
+      has_targets: ${{ steps.targets.outputs.has_targets }}
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          ref: ${{ inputs.tag || github.ref_name }}
+
+      - name: Fetch all tags
+        uses: justAnArthur/just-github-actions-n-workflows/actions/fetch-tags@main
+
+      - name: Resolve tag metadata
+        id: meta
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-tag-meta@main
+        with:
+          tag: ${{ inputs.tag || github.ref_name }}
+
+      # tags without a docker image (npm-only packages) deploy nothing
+      - name: Resolve targets on the release channel
+        id: targets
+        if: >-
+          steps.meta.outputs.has_annotation != 'true' ||
+          steps.meta.outputs.publish_docker == 'true'
+        uses: justAnArthur/just-github-actions-n-workflows/actions/resolve-deploy-config@main
+        with:
+          channel: ${{ steps.meta.outputs.is_prerelease == 'true' && 'canary' || 'stable' }}
+          release_tag: ${{ steps.meta.outputs.tag }}
+
+      - name: Wait for the images on ghcr.io
+        if: steps.targets.outputs.has_targets == 'true'
+        uses: justAnArthur/just-github-actions-n-workflows/actions/ghcr-images@main
+        with:
+          mode: wait
+          images: ${{ steps.targets.outputs.release_images }}
+          token: ${{ secrets.GITHUB_TOKEN }}
+          timeout_minutes: ${{ inputs.image_timeout_minutes || '45' }}
+
+  deploy:
+    needs: resolve
+    if: needs.resolve.outputs.has_targets == 'true'
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJson(needs.resolve.outputs.targets) }}
+    uses: ./.github/workflows/deploy.yml
+    with:
+      environment: ${{ matrix.environment }}
+      module_versions: ${{ matrix.module_versions }}
+    secrets: inherit

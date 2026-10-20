@@ -1,0 +1,69 @@
+name: Dokploy Deploy
+description: >
+  Redeploys an existing Dokploy compose. Optionally merges KEY=VALUE lines
+  (e.g. new image tags) into the compose's env first — only the given keys
+  are replaced or appended, every other line (including secrets set in
+  Dokploy) is kept. By default waits for the new deployment and fails the
+  step if it errors or times out.
+
+inputs:
+  url:
+    description: "Dokploy base URL (e.g. https://dokploy.example.com)"
+    required: true
+  api_key:
+    description: "Dokploy API key (sent as x-api-key)"
+    required: true
+  compose_id:
+    description: "ID of the compose to deploy"
+    required: true
+  env:
+    description: "KEY=VALUE lines merged into the compose env; empty leaves the env unchanged"
+    required: false
+    default: ""
+  title:
+    description: "Deployment title shown in Dokploy"
+    required: false
+    default: ""
+  wait:
+    description: "Wait for the deployment to finish (true/false)"
+    required: false
+    default: "true"
+  timeout_minutes:
+    description: "How long to wait for the deployment before failing"
+    required: false
+    default: "15"
+
+outputs:
+  deployment_id:
+    description: "ID of the finished deployment (empty when wait is false)"
+    value: ${{ steps.run.outputs.deployment_id }}
+  status:
+    description: "Final deployment status: done, error, cancelled, timeout, or queued when wait is false"
+    value: ${{ steps.run.outputs.status }}
+  previous_deployment_id:
+    description: "Latest deployment before this one was triggered; pass it to dokploy-preview mode wait to wait later"
+    value: ${{ steps.run.outputs.previous_deployment_id }}
+
+runs:
+  using: composite
+  steps:
+    - name: Setup Bun
+      uses: oven-sh/setup-bun@v2
+
+    - name: Install dependencies
+      shell: bash
+      run: bun install --frozen-lockfile
+      working-directory: ${{ github.action_path }}/../..
+
+    - name: Deploy compose
+      id: run
+      shell: bash
+      env:
+        DOKPLOY_URL: ${{ inputs.url }}
+        DOKPLOY_API_KEY: ${{ inputs.api_key }}
+        DOKPLOY_COMPOSE_ID: ${{ inputs.compose_id }}
+        DOKPLOY_ENV: ${{ inputs.env }}
+        DOKPLOY_TITLE: ${{ inputs.title }}
+        DOKPLOY_WAIT: ${{ inputs.wait }}
+        DOKPLOY_TIMEOUT_MINUTES: ${{ inputs.timeout_minutes }}
+      run: bun run ${{ github.action_path }}/src/index.ts

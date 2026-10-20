@@ -6,7 +6,7 @@
 
 > **v1.0.1 — stable release.** tags use the `@scope/name@1.0.1` per-package format. pin a specific major by referencing `@v1` after release; see *Repo-level tag* below. **CLI v1.0.2+** is installable from npm — the lib workspace dep is rewritten to a concrete version at publish time, so `npx` and `npm install -g` both work.
 
-generic, versioned CI/CD workflow toolkit — version bumping, npm publishing, docker publishing, vercel deployment, docker compose deployment.  
+generic, versioned CI/CD workflow toolkit — version bumping, npm publishing, docker publishing, vercel deployment, docker compose and Dokploy deployment, PR previews.  
 built as **composite GitHub Actions** powered by [Bun](https://bun.sh).
 
 ```bash
@@ -19,14 +19,18 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 
 ### what's in this repo
 
-- **6 workflow templates** in `workflows/` (the source of truth). each fires on tag push, manual dispatch, or as a reusable workflow:
+- **10 workflow templates** in `workflows/` (the source of truth). each fires on tag push, pull request, manual dispatch, or as a reusable workflow:
   - `bump-version.yml` — auto-bumps package versions on push to main via conventional commits, then dispatches the tag workflows below for each new tag
   - `publish-npm-on-tag.yml` — runs `bun publish` for the npm registry
   - `publish-docker-on-tag.yml` — builds and pushes a docker image to ghcr.io
   - `release-on-tag.yml` — creates a github release with notes
   - `deploy-vercel-on-tag.yml` — POSTs a deploy hook to vercel
   - `deploy-docker-compose.yml` — runs `docker compose` on a remote SSH host
-- **20 composite actions** in `actions/` (each is `action.yml` + `src/index.ts`; see [available actions](#available-actions) for the full list)
+  - `deploy.yml` — deploys a release to one `.justactions.yml` target, by its `driver`: Dokploy, or ssh through `deploy-docker-compose.yml`
+  - `deploy-on-release.yml` — on a release tag, deploys to every target whose `channel` (`stable` / `canary`) matches the tag, once the image is on ghcr.io
+  - `preview.yml` — builds a pull request and deploys it as its own Dokploy compose at `pr-<n>.<your domain>`
+  - `preview-cleanup.yml` — removes that preview and its images when the pull request closes
+- **23 composite actions** in `actions/` (each is `action.yml` + `src/index.ts`; see [available actions](#available-actions) for the full list)
 - **a CLI** in `cli/` with `init` / `update` / `status` commands. it scaffolds workflows into a target repo, tracks them in a lockfile, and also writes `.github/AGENTS.md` so the downstream repo's own AI agents learn the conventions.
 
 ### three ways to adopt
@@ -48,6 +52,8 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 | bump + npm publish + docker image + release | `bump-version.yml`, `publish-npm-on-tag.yml`, `publish-docker-on-tag.yml`, `release-on-tag.yml` | `NPM_TOKEN` |
 | bump + npm + GitHub Packages (`npm.pkg.github.com`) + release | `bump-version.yml`, `publish-npm-on-tag.yml`, `release-on-tag.yml`, **+ a copy of `publish-npm-on-tag.yml` renamed to `publish-gh-packages.yml` with a `.npmrc` step pointing at `https://npm.pkg.github.com` before `bun publish`** | `NPM_TOKEN` (public), `GH_TOKEN` (with `write:packages`) |
 | bump + vercel deploy | `bump-version.yml`, `deploy-vercel-on-tag.yml` | `VERCEL_DEPLOY_HOOK_URL` |
+| bump + docker image + auto-deploy to Dokploy | `bump-version.yml`, `publish-docker-on-tag.yml`, `deploy-on-release.yml`, `deploy.yml`, `deploy-docker-compose.yml` (loaded by `deploy.yml` even when unused) | `DOKPLOY_API_KEY` |
+| PR previews on Dokploy | `preview.yml` + a small `pull_request` caller (see [PR previews](#pr-previews)), `preview-cleanup.yml` | `DOKPLOY_API_KEY` (+ `SSH_PRIVATE_KEY`, `SERVER_USERNAME` for seeding) |
 
 ### anti-patterns
 
@@ -56,6 +62,8 @@ if you're an LLM helping a user adopt this toolkit, read this section first. it 
 - **don't write a manual `.npmrc` swap inside a publish step.** the toolkit doesn't do that, and any change you make inside a fork won't reach other consumers. put the `.npmrc` in the package directory at install time, or add a `.npmrc` step before the `bun publish` step in a *copy* of the workflow, not a fork.
 - **don't add a "publish on bump" glue workflow.** tags pushed with `GITHUB_TOKEN` never start `on: push: tags` workflows, so `bump-version.yml` itself dispatches every installed workflow whose `push.tags` filter matches a new tag (see [how release tags reach the tag workflows](#how-release-tags-reach-the-tag-workflows)). an extra `workflow_run` → `gh workflow run` workflow on top of that publishes twice.
 - **don't drop the `workflow_dispatch` `tag` input from a copied tag workflow.** that input is how `bump-version.yml` starts it — a copy without it (or with another required input) is skipped with a warning.
+- **don't build images on the Dokploy server.** Dokploy only deploys here: `publish-docker-on-tag.yml` / `preview.yml` build in CI and push to ghcr.io, `deploy.yml` / `preview.yml` hand Dokploy the new tag. don't point a Dokploy compose at the git repo with a `build:` section, and don't add a registry-watching webhook — Dokploy can't watch a registry.
+- **don't reuse an image tag for a new preview build.** Dokploy doesn't pull a tag it already has, which is why `preview.yml` tags `pr-<n>-<sha8>`.
 - **don't modify the workflows after they're installed in `.github/workflows/`.** the `init` / `update` commands will overwrite local edits on the next run. adding `# local-edit:` or `# toolkit-ref:` comments does not protect them. the only safe places to customize behavior are at the package level — see [where to override](#where-to-override) below.
 - **don't tell the user to clone the toolkit to use the CLI.** since CLI v1.0.2, `npx @justanarthur/just-github-actions-n-workflows-cli@1.0.2 init` works from any directory and resolves the lib dep correctly. the local-clone path is only needed for development on the toolkit itself.
 
@@ -69,7 +77,8 @@ the workflows are immutable after install — local edits are overwritten by `up
 | per-package auth token (e.g. GH Packages) | `.npmrc` in the package's directory |
 | pre-publish steps (build, generate assets, etc.) | the existing `Build` step in `publish-npm-on-tag.yml` already runs `bun run --silent build` — add a `build` script to `package.json`, no workflow edit needed |
 | bump logic / tag format | `properties` in the package's `package.json` (`gitCommitScopeRelatedNames`, `deployTargets`, `dockerfilePath`, `vercelProjectId`) |
-| deploy config (ssh target, compose profiles) | `.justactions.yml` at the repo root |
+| deploy config (ssh target, compose profiles, Dokploy compose, release channel, previews) | `.justactions.yml` at the repo root |
+| approval before a deploy (required reviewers, wait timer) | a GitHub Environment named like the target — `deploy.yml` runs its deploy job in it |
 | skip the bundled GitHub release that `publish-npm-on-tag.yml` creates | not currently supported without a fork — open an upstream issue. `release-on-tag.yml` is a separate workflow that *also* fires on tag push, so you can disable the bundled release by switching to a custom workflow (own the maintenance yourself) |
 
 the `publish-npm-on-tag.yml` step that runs the actual publish is:
@@ -116,6 +125,9 @@ the most reliable option right now. each workflow file in `workflows/` is self-c
    | `deploy-vercel-on-tag.yml`        | `VERCEL_DEPLOY_HOOK_URL`                                    |
    | `release-on-tag.yml`              | (none)                                                      |
    | `deploy-docker-compose.yml`       | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` |
+   | `deploy.yml`, `deploy-on-release.yml` | `DOKPLOY_API_KEY` (dokploy targets); the `deploy-docker-compose.yml` secrets (ssh targets) |
+   | `preview.yml`                     | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.seed`; optional `NPM_TOKEN` build-arg |
+   | `preview-cleanup.yml`             | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.cleanup_command` |
 
 3. **configure each package's manifest** with a `properties` block so the bump-version workflow knows which package to bump on which commit scope. see [manifest configuration](#manifest-configuration) for the schema.
 
@@ -445,7 +457,7 @@ shows which workflows are up to date and which can be updated. resolves `.github
 
 ## settings file
 
-create a `.justactions.yml` in your repo root to configure deploy targets and module overrides. the `init` command scaffolds this file automatically. only needed if you use one of the deploy workflows (`deploy-docker-compose.yml`, `deploy-vercel-on-tag.yml`).
+create a `.justactions.yml` in your repo root to configure deploy targets and module overrides. the `init` command scaffolds this file automatically. only needed if you use one of the deploy workflows (`deploy-docker-compose.yml`, `deploy.yml`, `deploy-on-release.yml`, `preview.yml`, `preview-cleanup.yml`).
 
 ```yaml
 # .justactions.yml
@@ -478,8 +490,118 @@ modules:
 | `deploy.targets.<name>.compose_profiles` | string | comma-separated module names to deploy                 |
 | `deploy.targets.<name>.profiles`      | string   | docker compose profile names                            |
 | `deploy.targets.<name>.timezone`      | string   | timezone for the environment (default: `UTC`)           |
+| `deploy.targets.<name>.driver`        | string   | `ssh` (default) or `dokploy`                            |
+| `deploy.targets.<name>.channel`       | string   | `manual` (default), `stable` or `canary` — what `deploy-on-release.yml` deploys here |
+| `deploy.targets.<name>.dokploy.compose_id` | string | Dokploy compose to redeploy (required for `dokploy`) |
+| `deploy.dokploy.url`                  | string   | Dokploy base url (required by `dokploy` targets and previews); the key is the `DOKPLOY_API_KEY` secret |
+| `deploy.previews.dokploy.environment_id` | string | Dokploy environment that holds the previews         |
+| `deploy.previews.dokploy.server_id`   | string   | Dokploy server for new previews (optional)              |
+| `deploy.previews.host`                | string   | preview hostname, `{pr}` is the PR number               |
+| `deploy.previews.compose_file`        | string   | compose file of a preview, read from the PR's merge commit |
+| `deploy.previews.env.<KEY>`           | string   | extra env lines; `{pr}`, `{host}`, `{image_tag}` are filled in |
+| `deploy.previews.images[]`            | string   | manifest names of the modules built for a preview       |
+| `deploy.previews.seed.ssh_host`       | string   | host the seed and cleanup commands run on               |
+| `deploy.previews.seed.command`        | string   | run on every deploy while it is pending, so it must be idempotent (skip when already seeded); also `{app_name}` |
+| `deploy.previews.seed.upload.<repo path>` | string | remote path the file is copied to before seeding     |
+| `deploy.previews.cleanup_command`     | string   | run by `preview-cleanup.yml` on `seed.ssh_host`         |
 | `modules.overrides[].name`            | string   | module name to override                                 |
 | `modules.overrides[].docker_compose_service` | string | docker compose service name for the module         |
+
+## deploy with Dokploy
+
+`deploy.yml` deploys one target from `.justactions.yml`. the target's `driver` picks how:
+
+- **`ssh`** (default) — today's path, it calls `deploy-docker-compose.yml` unchanged. install that file next to `deploy.yml` even if every target is Dokploy: github loads every reusable workflow a file references before it runs.
+- **`dokploy`** — resolves the image tags with `resolve-image-tags` and merges the `DOCKER_<NAME>_IMAGE_TAG` lines into the env of an existing Dokploy compose, then redeploys it and waits. env lines it doesn't set (secrets you keep in Dokploy) stay.
+
+```yaml
+# .justactions.yml
+deploy:
+  dokploy:
+    url: https://dokploy.example.com       # DOKPLOY_API_KEY secret holds the key
+  targets:
+    demo:
+      driver: dokploy
+      channel: canary
+      dokploy:
+        compose_id: abc123
+    production:
+      driver: dokploy
+      channel: stable
+      dokploy:
+        compose_id: def456
+    legacy-prod:
+      host: app.example.com                # ssh, as before
+```
+
+the compose in Dokploy references the images by tag, e.g. `image: ghcr.io/owner/repo/scope-backend:${DOCKER_SCOPE_BACKEND_IMAGE_TAG}`.
+
+**why images are built in CI and Dokploy only deploys:** Dokploy can't watch a registry for new tags, and building on the target server is slow and takes cpu and memory from the apps running there. so `publish-docker-on-tag.yml` builds and pushes to ghcr.io as before, and Dokploy gets the tag to pull.
+
+**channels.** a target's `channel` says which releases `deploy-on-release.yml` deploys to it:
+
+| channel | gets |
+|---------|------|
+| `manual` (default) | nothing automatic — run `deploy.yml` from the Actions tab |
+| `stable` | every release without a prerelease (`1.2.3`) |
+| `canary` | every release with a `canary` / `beta` / `alpha` / `rc` prerelease |
+
+`deploy-on-release.yml` starts like the other tag workflows (tag push, or dispatched by `bump-version.yml`), so it runs alongside `publish-docker-on-tag.yml`. it polls ghcr.io until the images exist, then calls `deploy.yml` for each matching target. each target gets every docker module at its newest version on the channel, with the released one pinned — so a bump that releases several modules at once ends with all of them deployed, whatever order the runs finish in. tags without the `docker` deploy target deploy nothing.
+
+**approvals.** `deploy.yml` runs its deploy job in the GitHub Environment named like the target. add required reviewers to `production` under Settings → Environments and every deploy there waits for a click, automatic ones included. environment secrets work too, e.g. a different `DOKPLOY_API_KEY` per target (dokploy driver only — the ssh path reads repository secrets).
+
+## PR previews
+
+`preview.yml` builds a pull request and runs it as its own Dokploy compose named `pr-<n>`, at `deploy.previews.host`:
+
+1. **prepare** — the PR must be open and mergeable. the preview is built from its merge commit; images are tagged `pr-<n>-<sha8>`, new on every build, because Dokploy doesn't pull a tag it already has.
+2. **build** — one job per `previews.images` entry; dockerfile and build context come from the module's manifest like in `publish-docker-on-tag.yml`. pushed to `ghcr.io/<owner>/<repo>/<image>:pr-<n>-<sha8>` with the GitHub Actions cache.
+3. **deploy** — creates or updates the compose with the PR's `compose_file` and the env (`DOCKER_<NAME>_IMAGE_TAG` of every preview image plus `previews.env`), starts the deploy, and uploads `seed.upload` and runs `seed.command` over ssh while Dokploy deploys (on every deploy — make the command a no-op once the preview is seeded, so a re-run after a failed first deploy still seeds). then waits for the deploy and for `https://<host>` to answer, and comments the url on the PR.
+
+```yaml
+# .justactions.yml
+deploy:
+  dokploy:
+    url: https://dokploy.example.com
+  previews:
+    dokploy:
+      environment_id: <dokploy environment for previews>
+      server_id: <dokploy server>          # optional
+    host: "pr-{pr}.pr.example.com"
+    compose_file: .github/preview/docker-compose.yml
+    env:                                   # {pr}, {host}, {image_tag} are filled in
+      PREVIEW_HOST: "{host}"
+      PREVIEW_DIR: /home/app/previews/pr-{pr}
+    images:
+      - "@scope/backend"
+      - "@scope/frontend"
+    seed:                                  # optional
+      ssh_host: test.example.com
+      command: "bash ~/previews/pr-{pr}/seed.sh {app_name}-postgres-1"
+      upload:
+        .github/preview/seed.sh: ~/previews/pr-{pr}/seed.sh
+    cleanup_command: "rm -rf ~/previews/pr-{pr}"   # optional, run by preview-cleanup.yml
+```
+
+route the host in the preview compose file (e.g. Traefik labels using `${PREVIEW_HOST}`) and point a wildcard DNS record at the Dokploy server. containers are named `<app_name>-<service>-1`, `{app_name}` in `seed.command` is that prefix.
+
+`preview.yml` has no `pull_request` trigger of its own: it builds PR code with your secrets, so you decide when it runs. a small caller in your repo (not overwritten by `update`):
+
+```yaml
+# .github/workflows/pr-preview.yml
+on:
+  pull_request:
+    types: [ opened, synchronize, reopened ]
+jobs:
+  preview:
+    if: github.event.pull_request.head.repo.full_name == github.repository   # no forks
+    uses: ./.github/workflows/preview.yml
+    with:
+      pr: ${{ github.event.pull_request.number }}
+    secrets: inherit
+```
+
+`preview-cleanup.yml` runs when the PR closes: it deletes the compose and its volumes, runs `cleanup_command`, and deletes the `pr-<n>-*` images from ghcr.io (only a warning if the token can't delete packages).
 
 ## manifest configuration
 
@@ -654,12 +776,15 @@ each action is a composite GitHub Action in `actions/` with its own `action.yml`
 | `actions/create-env-file`        | write a `.env` file from key=value pairs          | `variables`, `filename`, `path`                               |
 | `actions/deploy-compose-remote`  | generate docker compose deploy script for SSH     | `target_path`, `registry_username`, `registry_password`       |
 | `actions/dispatch-tag-workflows` | dispatch installed tag workflows for new tags     | `tags`, `github_token`                                        |
+| `actions/dokploy-deploy`         | merge env into a Dokploy compose and redeploy it  | `url`, `api_key`, `compose_id`, `env`                          |
+| `actions/dokploy-preview`        | create/update, wait for or delete a preview compose | `mode`, `url`, `api_key`, `environment_id`, `name`           |
 | `actions/fetch-tags`             | fetch all tags + unshallow if needed              | —                                                             |
 | `actions/generate-release-notes` | markdown release notes between tags               | `tag_name`, `root_dir`                                        |
 | `actions/get-dockerfile-path`    | resolve dockerfile from module metadata           | `tag_name`                                                    |
+| `actions/ghcr-images`            | wait for images on ghcr.io, or delete tags by prefix | `mode`, `images`, `token`, `tag_prefix`                    |
 | `actions/pin-workspace-versions` | rewrite `workspace:` deps to sibling versions     | `dir`                                                         |
 | `actions/prepare-docker-meta`    | prepare docker image metadata from a git tag      | `tag_name`, `dockerfile`, `context`                           |
-| `actions/resolve-deploy-config`  | resolve deploy config from `.justactions.yml`     | `environment`                                                 |
+| `actions/resolve-deploy-config`  | resolve a deploy target, a channel's targets, or a PR preview from `.justactions.yml` | `environment` / `channel` / `preview_pr` |
 | `actions/resolve-image-tags`     | resolve docker image tags from git tags           | `repo_url`, `components`, `gh_token`                          |
 | `actions/resolve-package-dir`    | resolve module directory from git tag             | `tag_name`                                                    |
 | `actions/resolve-tag-meta`       | parse git tag into version + deploy metadata      | `tag`                                                         |
@@ -709,12 +834,16 @@ ready-to-copy workflow files in `workflows/`:
 | `deploy-vercel-on-tag.yml`       | deploy to vercel (production or preview)       | tag push, dispatch, call |
 | `release-on-tag.yml`             | create github release with notes               | tag push, dispatch, call |
 | `deploy-docker-compose.yml`      | deploy docker compose to remote server         | dispatch, call           |
+| `deploy.yml`                     | deploy a release to a target (Dokploy or ssh)  | dispatch, call           |
+| `deploy-on-release.yml`          | deploy a release tag to its channel's targets  | tag push, dispatch, call |
+| `preview.yml`                    | build + deploy a PR preview on Dokploy         | dispatch, call           |
+| `preview-cleanup.yml`            | remove a PR preview and its images             | PR closed, dispatch, call |
 
 the tag workflows are started by `bump-version.yml` via dispatch for the tags it creates (see [how release tags reach the tag workflows](#how-release-tags-reach-the-tag-workflows)); the `tag push` trigger covers tags you push yourself.
 
 ## how it works
 
-one push to main, end to end. the npm, docker and vercel workflows read the tag annotation with `resolve-tag-meta` and skip when their target isn't in it; `release-on-tag.yml` runs for every tag. `deploy-docker-compose.yml` has no tag trigger: it runs on manual dispatch or `workflow_call`.
+one push to main, end to end. the npm, docker and vercel workflows read the tag annotation with `resolve-tag-meta` and skip when their target isn't in it; `release-on-tag.yml` runs for every tag. `deploy-docker-compose.yml` and `deploy.yml` have no tag trigger: they run on manual dispatch, `workflow_call`, or from `deploy-on-release.yml`.
 
 ```mermaid
 flowchart LR
@@ -725,7 +854,11 @@ flowchart LR
   D --> K[publish-docker-on-tag: ghcr.io]
   D --> R[release-on-tag: GitHub release]
   D --> V[deploy-vercel-on-tag: deploy hook]
-  M[manual dispatch or workflow_call] --> C[deploy-docker-compose: SSH host]
+  D --> O[deploy-on-release: waits for the image]
+  O -->|stable / canary targets| Y[deploy]
+  M[manual dispatch or workflow_call] --> Y
+  Y -->|driver dokploy| DK[Dokploy compose]
+  Y -->|driver ssh| C[deploy-docker-compose: SSH host]
 ```
 
 1. **modules** are discovered by scanning the repo for manifest files (`package.json`,
@@ -764,6 +897,8 @@ flowchart LR
 | `SERVER_USERNAME`     | `deploy-docker-compose.yml` (ssh/scp username)                       |
 | `DOCKER_USERNAME`     | `deploy-docker-compose.yml` (ghcr login)                             |
 | `DOCKER_PASSWORD`     | `deploy-docker-compose.yml` (ghcr login)                             |
+| `DOKPLOY_API_KEY`     | `deploy.yml` / `deploy-on-release.yml` (dokploy targets), `preview.yml`, `preview-cleanup.yml` |
+| `SSH_PRIVATE_KEY`, `SERVER_USERNAME` | also `preview.yml` (`previews.seed`) and `preview-cleanup.yml` (`previews.cleanup_command`) |
 
 all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_TOKEN` and forward it via `workflow_call` only if a specific step needs a PAT with elevated scopes.
 
@@ -784,7 +919,8 @@ all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_
 │       ├── codecs/               # file format codecs (xml)
 │       ├── git/                  # git utilities (tags, commits, parsing)
 │       │   └── tag-n-push.ts     # annotated tag creation + reading
-│       ├── ghcr/                 # container registry utilities
+│       ├── dokploy/              # Dokploy api client + env merge
+│       ├── ghcr/                 # container registry utilities (wait, delete)
 │       ├── manifests/            # pluggable manifest system
 │       │   ├── registry.ts       # Manifest + DeployTarget types + adapter registry
 │       │   ├── index.ts          # re-exports + adapter auto-registration
@@ -796,7 +932,9 @@ all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_
 │       ├── modules/              # unified module abstraction
 │       │   └── index.ts          # Module type + discovery
 │       ├── settings/             # project settings (.justactions.yml)
-│       │   └── index.ts          # settings loader + types
+│       │   ├── index.ts          # settings loader + types + validation
+│       │   ├── preview.ts        # PR preview config + merge commit lookup
+│       │   └── release.ts        # module versions for a channel release
 │       └── version/              # semver utilities
 │           ├── parse-semver.ts   # semver parser + formatter
 │           ├── compare-semver.ts # semver comparison
@@ -809,9 +947,12 @@ all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_
 │   ├── create-env-file/
 │   ├── deploy-compose-remote/
 │   ├── dispatch-tag-workflows/
+│   ├── dokploy-deploy/
+│   ├── dokploy-preview/
 │   ├── fetch-tags/
 │   ├── generate-release-notes/
 │   ├── get-dockerfile-path/
+│   ├── ghcr-images/
 │   ├── pin-workspace-versions/
 │   ├── prepare-docker-meta/
 │   ├── resolve-deploy-config/
@@ -839,7 +980,11 @@ all workflows use the auto-provided `GITHUB_TOKEN` — no PAT required. set `GH_
 │   ├── publish-docker-on-tag.yml
 │   ├── deploy-vercel-on-tag.yml
 │   ├── release-on-tag.yml
-│   └── deploy-docker-compose.yml
+│   ├── deploy-docker-compose.yml
+│   ├── deploy.yml
+│   ├── deploy-on-release.yml
+│   ├── preview.yml
+│   └── preview-cleanup.yml
 │
 ├── .githooks/                    # git hooks (run: git config core.hooksPath .githooks)
 │   └── pre-commit                # syncs workflows/ → .github/workflows/
