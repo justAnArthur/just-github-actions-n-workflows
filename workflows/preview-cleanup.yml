@@ -74,7 +74,8 @@ concurrency:
 
 jobs:
   cleanup:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
 
     steps:
       # the merge ref of a closed pull request may be gone, read the settings from its base

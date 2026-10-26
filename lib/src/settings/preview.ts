@@ -53,7 +53,7 @@ export function resolvePreview(
     images: imageNames.map((name) => ({
       name,
       image: `ghcr.io/${repository}/${manifestNameToImageName(name)}`,
-      ...(hasDockerBuild(settings, name) && { docker_build: dockerBuildFor(settings, name) })
+      ...(hasDockerBuild(settings, name) && { docker_build: dockerBuildFor(settings, name, { preview: true }) })
     })),
     seed_ssh_host: previews.seed?.ssh_host ?? "",
     seed_command: fill(previews.seed?.command ?? ""),

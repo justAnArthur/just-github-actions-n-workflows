@@ -32,6 +32,11 @@ modules:
             POSTGRES_HOST_AUTH_METHOD: trust
             POSTGRES_DB: app
           options: --health-cmd pg_isready --health-interval 5s
+        preview:
+          build_args:
+            CDS_TRAINING_DB_URL: ~
+            PREVIEW: "true"
+          service: false
     - name: "@scope/other"
       docker_compose_service: other
 
@@ -86,9 +91,18 @@ describe("docker build settings", () => {
     expect(validateDockerBuild(s)).toEqual([])
   })
 
+  test("preview settings drop args and the service for previews only", () => {
+    expect(dockerBuildFor(s, "@scope/backend", { preview: true })).toEqual({
+      ...EMPTY,
+      build_args: { PREVIEW: "true" },
+      network: "host"
+    })
+    expect(dockerBuildFor(s, "@scope/frontend", { preview: true })).toEqual(dockerBuildFor(s, "@scope/frontend"))
+  })
+
   test("previews carry docker_build only for configured modules", () => {
     const p = resolvePreview(s, { pr: 1, sha: "0123456789abcdef", repository: "o/r" })
-    expect(p.images[0].docker_build).toEqual(dockerBuildFor(s, "@scope/backend"))
+    expect(p.images[0].docker_build).toEqual(dockerBuildFor(s, "@scope/backend", { preview: true }))
     expect(p.images[1]).toEqual({ name: "@scope/other", image: "ghcr.io/o/r/scope-other" })
   })
 

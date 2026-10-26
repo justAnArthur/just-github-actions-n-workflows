@@ -111,7 +111,8 @@ permissions:
 
 jobs:
   resolve:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
     outputs:
       driver: ${{ steps.config.outputs.driver }}
       dokploy_url: ${{ steps.config.outputs.dokploy_url }}
@@ -129,7 +130,8 @@ jobs:
   deploy-dokploy:
     needs: resolve
     if: needs.resolve.outputs.driver == 'dokploy'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 30
     environment: ${{ inputs.environment }}
     # queue deploys of one target; never cancel one that is running
     concurrency:
@@ -160,7 +162,8 @@ jobs:
   approve-ssh:
     needs: resolve
     if: needs.resolve.outputs.driver == 'ssh'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 5
     environment: ${{ inputs.environment }}
     steps:
       - name: Approved

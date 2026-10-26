@@ -224,6 +224,17 @@ function strMap(value: unknown): Record<string, string> | undefined {
   return out
 }
 
+// keeps null values, they mean "unset"
+function nullableStrMap(value: unknown): Record<string, string | null> | undefined {
+  if (!value || typeof value !== "object" || Array.isArray(value)) return undefined
+  const out: Record<string, string | null> = {}
+  for (const [k, v] of Object.entries(value)) {
+    const s = v === null ? null : str(v)
+    if (s !== undefined) out[k] = s
+  }
+  return out
+}
+
 function strList(value: unknown): string[] | undefined {
   if (Array.isArray(value)) return value.map(str).filter((v): v is string => v !== undefined)
   const s = str(value)
@@ -236,6 +247,13 @@ function parseDockerBuild(raw: any): DockerBuildSettings | undefined {
     build_args: strMap(raw.build_args),
     secrets: strMap(raw.secrets),
     network: str(raw.network)
+  }
+  if (raw.preview && typeof raw.preview === "object") {
+    docker.preview = {
+      build_args: nullableStrMap(raw.preview.build_args),
+      network: str(raw.preview.network)
+    }
+    if (raw.preview.service === false || raw.preview.service === null) docker.preview.service = false
   }
   if (raw.service && typeof raw.service === "object") {
     docker.service = {
@@ -412,6 +430,6 @@ export function targetsForChannel(settings: Settings, channel: DeployChannel): s
     .map(([name]) => name)
 }
 
-export { dockerBuildFor, fillRefs, hasDockerBuild, renderDockerBuild, validateDockerBuild, type DockerBuildService, type DockerBuildSettings, type ResolvedDockerBuild } from "./docker-build"
+export { dockerBuildFor, fillRefs, hasDockerBuild, renderDockerBuild, validateDockerBuild, type DockerBuildPreview, type DockerBuildService, type DockerBuildSettings, type ResolvedDockerBuild } from "./docker-build"
 export { fetchMergeablePullRequest, resolvePreview, type PreviewPullRequest, type ResolvedPreview } from "./preview"
 export { releaseModuleVersions } from "./release"
