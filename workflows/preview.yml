@@ -155,6 +155,11 @@ jobs:
       fail-fast: false
       matrix:
         include: ${{ fromJson(needs.prepare.outputs.images) }}
+    # a module that starts a service builds one preview at a time (its port is
+    # taken on a shared docker host); without a service previews of all PRs build at once
+    concurrency:
+      group: ${{ matrix.docker_build.service_image && format('preview-build-{0}-{1}', github.repository, matrix.name) || format('preview-build-{0}-{1}', github.run_id, matrix.name) }}
+      cancel-in-progress: false
 
     # modules.overrides[].docker.service in .justactions.yml; not started when its image is empty
     services:

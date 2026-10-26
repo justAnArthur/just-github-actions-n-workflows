@@ -106,6 +106,12 @@ jobs:
       needs.resolve-meta.outputs.publish_docker == 'true'
     runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
+    # one build per package at a time: on runners sharing a docker host, two
+    # builds of a package would start its service on the same host port.
+    # github keeps one waiting run per group, a newer one replaces it
+    concurrency:
+      group: publish-docker-${{ github.repository }}-${{ needs.resolve-meta.outputs.pkg_name || inputs.tag || github.ref_name }}
+      cancel-in-progress: false
 
     # modules.overrides[].docker.service in .justactions.yml; not started when its image is empty
     services:
