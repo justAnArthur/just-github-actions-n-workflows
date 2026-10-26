@@ -10,6 +10,16 @@ export interface DockerBuildSettings {
   network?: string
   /** a container started next to the build job, e.g. a throwaway database */
   service?: DockerBuildService
+  /** changes for preview.yml builds only, e.g. skip a slow training step */
+  preview?: DockerBuildPreview
+}
+
+export interface DockerBuildPreview {
+  /** overrides `build_args`; a null value drops the arg */
+  build_args?: Record<string, string | null>
+  network?: string
+  /** false drops the service container */
+  service?: false
 }
 
 export interface DockerBuildService {
@@ -43,8 +53,13 @@ export function hasDockerBuild(settings: Settings, moduleName: string): boolean 
   return overrideFor(settings, moduleName)?.docker !== undefined
 }
 
-export function dockerBuildFor(settings: Settings, moduleName: string): ResolvedDockerBuild {
-  const docker = overrideFor(settings, moduleName)?.docker ?? {}
+export function dockerBuildFor(
+  settings: Settings,
+  moduleName: string,
+  opts: { preview?: boolean } = {}
+): ResolvedDockerBuild {
+  const base = overrideFor(settings, moduleName)?.docker ?? {}
+  const docker = opts.preview ? applyPreview(base) : base
   const service = docker.service
   // the port goes into the options too: a workflow can't leave an empty `ports` entry
   const port = service?.port ? [`-p ${service.port}:${service.port}`] : []
@@ -56,6 +71,23 @@ export function dockerBuildFor(settings: Settings, moduleName: string): Resolved
     network: docker.network ?? "",
     service_image: service?.image ?? "",
     service_options: [...port, ...env, service?.options ?? ""].join(" ").trim()
+  }
+}
+
+function applyPreview(docker: DockerBuildSettings): DockerBuildSettings {
+  const preview = docker.preview
+  if (!preview) return docker
+
+  const buildArgs = { ...docker.build_args }
+  for (const [k, v] of Object.entries(preview.build_args ?? {})) {
+    if (v === null) delete buildArgs[k]
+    else buildArgs[k] = v
+  }
+  return {
+    ...docker,
+    build_args: buildArgs,
+    network: preview.network ?? docker.network,
+    service: preview.service === false ? undefined : docker.service
   }
 }
 

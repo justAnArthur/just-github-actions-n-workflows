@@ -52,7 +52,8 @@ permissions:
 
 jobs:
   resolve-meta:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
       pkg_name: ${{ steps.meta.outputs.pkg_name }}
@@ -73,7 +74,8 @@ jobs:
     if: >-
       needs.resolve-meta.outputs.has_annotation != 'true' ||
       needs.resolve-meta.outputs.publish_npm == 'true'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 20
 
     steps:
       - name: Checkout repo

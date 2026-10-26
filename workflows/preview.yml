@@ -36,7 +36,9 @@
 #             compose uses them through DOCKER_<NAME>_IMAGE_TAG. build
 #             args, secrets, network and service container per module
 #             come from `modules.overrides[].docker`, as in
-#             publish-docker-on-tag.yml.
+#             publish-docker-on-tag.yml, with `docker.preview` applied
+#             on top. the layer cache is :buildcache-preview, seeded
+#             from the release cache :buildcache.
 #   deploy  — creates or updates the compose pr-<n> and starts the deploy;
 #             on the first deploy uploads the seed files and runs the seed
 #             command over ssh while Dokploy deploys ({app_name} is the
@@ -58,6 +60,9 @@
 #       with:
 #         pr: ${{ github.event.pull_request.number }}
 #       secrets: inherit
+#
+# jobs run on the JSON `runs-on` in the JUSTACTIONS_RUNS_ON repo variable
+# (default "ubuntu-latest").
 #
 # actions used: resolve-deploy-config, get-dockerfile-path, prepare-docker-meta,
 #               dokploy-preview, setup-ssh, ssh-exec
@@ -113,7 +118,8 @@ concurrency:
 
 jobs:
   prepare:
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 10
     outputs:
       dokploy_url: ${{ steps.preview.outputs.dokploy_url }}
       name: ${{ steps.preview.outputs.preview_name }}
@@ -143,7 +149,8 @@ jobs:
   build:
     needs: prepare
     if: needs.prepare.outputs.images != '[]'
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 30
     strategy:
       fail-fast: false
       matrix:
@@ -211,8 +218,12 @@ jobs:
           allow: ${{ matrix.docker_build.network == 'host' && 'network.host' || '' }}
           # one manifest per tag, so preview-cleanup leaves no untagged leftovers
           provenance: false
-          cache-from: type=gha,scope=preview-${{ steps.prepare.outputs.package_image_name }}
-          cache-to: type=gha,mode=max,scope=preview-${{ steps.prepare.outputs.package_image_name }}
+          # reads the release cache too; writes its own tag so previews never overwrite it.
+          # neither cache tag starts with pr-, so preview-cleanup keeps them
+          cache-from: |
+            type=registry,ref=${{ matrix.image }}:buildcache-preview
+            type=registry,ref=${{ matrix.image }}:buildcache
+          cache-to: type=registry,ref=${{ matrix.image }}:buildcache-preview,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
           build-args: |
             USERNAME_GITHUB=${{ github.actor }}
             TOKEN_GITHUB=${{ secrets.GITHUB_TOKEN }}
@@ -234,7 +245,8 @@ jobs:
       !cancelled() &&
       needs.prepare.result == 'success' &&
       (needs.build.result == 'success' || needs.build.result == 'skipped')
-    runs-on: ubuntu-latest
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    timeout-minutes: 45
 
     steps:
       - name: Checkout the merge commit

@@ -532,6 +532,15 @@ modules:
 | `modules.overrides[].docker.service.port` | number | published on the same port of the runner             |
 | `modules.overrides[].docker.service.env.<KEY>` | string | service env (no whitespace in values)            |
 | `modules.overrides[].docker.service.options` | string | extra `docker create` options, e.g. a health check  |
+| `modules.overrides[].docker.preview.build_args.<KEY>` | string \| null | `preview.yml` only: overrides the build arg; `~` (null) drops it |
+| `modules.overrides[].docker.preview.network` | string | `preview.yml` only: overrides `docker.network`         |
+| `modules.overrides[].docker.preview.service` | `false` | `preview.yml` only: starts no service container       |
+
+one setting is a repository variable instead, because a job's runner is picked before any step can read `.justactions.yml`:
+
+| variable              | description                                             |
+|-----------------------|---------------------------------------------------------|
+| `JUSTACTIONS_RUNS_ON` | JSON `runs-on` of every job of every workflow, e.g. `["self-hosted","ryde"]`; default `"ubuntu-latest"`. see [runners, caches and timeouts](#runners-caches-and-timeouts) |
 
 ### vercel fan-out
 
@@ -593,7 +602,43 @@ modules:
 - the service is a job service container: github starts it, waits for its health check, and publishes `port` on the runner. a package without `service` starts none.
 - packages without `docker` settings build exactly as before.
 
+**preview builds.** `docker.preview` changes a package's build for `preview.yml` only, e.g. to skip a slow step a release needs but a preview doesn't:
+
+```yaml
+    - name: "@scope/backend"
+      docker:
+        network: host
+        build_args:
+          TRAINING_DB_URL: jdbc:postgresql://localhost:5432/app
+        service: { image: postgis/postgis:16-3.4, port: 5432 }
+        preview:
+          build_args:
+            TRAINING_DB_URL: ~                     # ~ drops the arg, a string replaces it
+          service: false                           # no database next to preview builds
+```
+
 **secrets.** like the vercel fan-out, the build job passes `toJSON(secrets)` to the toolkit's `render-docker-build` action, which picks the referenced ones. called through `workflow_call`, use `secrets: inherit`.
+
+## runners, caches and timeouts
+
+**docker layer cache.** `publish-docker-on-tag.yml` and `preview.yml` keep their BuildKit cache in the registry, next to the image, instead of the GitHub Actions cache (10 GB per repository, evicted when full):
+
+| workflow                    | reads                                   | writes                |
+|-----------------------------|-----------------------------------------|-----------------------|
+| `publish-docker-on-tag.yml` | `<image>:buildcache`                    | `<image>:buildcache`  |
+| `preview.yml`               | `<image>:buildcache-preview`, `<image>:buildcache` | `<image>:buildcache-preview` |
+
+`<image>` is `ghcr.io/<owner>/<repo>/<package image name>`. the cache is exported with `mode=max` (every stage) and `ignore-error=true`, so a failed export never fails a build. `preview-cleanup.yml` only deletes versions whose tags all start with `pr-<n>-`, and the prerelease cleanup of `bump-version.yml` only semver prerelease tags, so both keep the cache tags. nothing to configure.
+
+**runners.** every job runs on `ubuntu-latest` unless the repository (or organization) variable `JUSTACTIONS_RUNS_ON` is set to a JSON `runs-on` value:
+
+```bash
+gh variable set JUSTACTIONS_RUNS_ON --body '["self-hosted","ryde"]'
+```
+
+a self-hosted runner needs `git` and `git-lfs`, `curl`, `unzip` (for `oven-sh/setup-bun`, which downloads Bun), `openssh-client` (ssh deploys and preview seeding), the `gh` CLI (`preview.yml` comments the url) and a Docker daemon with buildx — e.g. the `myoung34/github-runner` image with the host's Docker socket. no Maven, Java or Node is needed: the toolkit reads `pom.xml` itself, and builds happen inside the Dockerfiles. on a runner that keeps its home between jobs (not `EPHEMERAL`), the ssh key of `setup-ssh` and the `docker login` of the build jobs stay there. the `docker.service` of a build publishes its port on the Docker host, so two builds of a package with a service can't run at once on runners sharing one host.
+
+**timeouts.** every job has a `timeout-minutes`: 30 for image builds and deploys, 45 for the preview deploy (it waits for Dokploy and the preview url), 60 for `deploy-on-release.yml`'s image wait, 10–20 for the rest.
 
 ## deploy with Dokploy
 
@@ -643,7 +688,7 @@ the compose in Dokploy references the images by tag, e.g. `image: ghcr.io/owner/
 `preview.yml` builds a pull request and runs it as its own Dokploy compose named `pr-<n>`, at `deploy.previews.host`:
 
 1. **prepare** — the PR must be open and mergeable. the preview is built from its merge commit; images are tagged `pr-<n>-<sha8>`, new on every build, because Dokploy doesn't pull a tag it already has.
-2. **build** — one job per `previews.images` entry; dockerfile and build context come from the module's manifest like in `publish-docker-on-tag.yml`. pushed to `ghcr.io/<owner>/<repo>/<image>:pr-<n>-<sha8>` with the GitHub Actions cache.
+2. **build** — one job per `previews.images` entry; dockerfile and build context come from the module's manifest like in `publish-docker-on-tag.yml`. pushed to `ghcr.io/<owner>/<repo>/<image>:pr-<n>-<sha8>`. `modules.overrides[].docker.preview` changes the build for previews only (see [docker build settings](#docker-build-settings)); the layer cache is described in [runners, caches and timeouts](#runners-caches-and-timeouts).
 3. **deploy** — creates or updates the compose with the PR's `compose_file` and the env (`DOCKER_<NAME>_IMAGE_TAG` of every preview image plus `previews.env`), starts the deploy, and uploads `seed.upload` and runs `seed.command` over ssh while Dokploy deploys (on every deploy — make the command a no-op once the preview is seeded, so a re-run after a failed first deploy still seeds). then waits for the deploy and for `https://<host>` to answer, and comments the url on the PR.
 
 ```yaml
