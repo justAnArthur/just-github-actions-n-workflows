@@ -70,5 +70,22 @@ runs:
         GITHUB_EVENT: ${{ inputs.github_event }}
         CO_AUTHOR_NAME: ${{ inputs.co_author_name }}
         CO_AUTHOR_EMAIL: ${{ inputs.co_author_email }}
-      run: bun run ${{ github.action_path }}/src/index.ts
+        SCRIPT: ${{ github.action_path }}/src/index.ts
+      # runs started by pushes close together (or waiting for a runner) start from an older
+      # commit than the branch tip, and another run's bump commit then rejects their push.
+      # each run bumps from the tip instead, and starts over when the tip moved meanwhile.
+      # the bump only reads the run's own pushed commits, so nothing is counted twice.
+      run: |
+        if [[ "$GITHUB_REF" != refs/heads/* ]]; then exec bun run "$SCRIPT"; fi
+        branch=${GITHUB_REF#refs/heads/}
+        for attempt in 1 2 3 4 5; do
+          git fetch --quiet --force --tags origin "$branch"
+          git reset --quiet --hard "origin/$branch"
+          bun run "$SCRIPT" && exit 0
+          git fetch --quiet origin "$branch"
+          # the tip didn't move past this attempt: a real failure, not a lost race
+          if git merge-base --is-ancestor "origin/$branch" HEAD; then exit 1; fi
+          echo "::warning::$branch moved during the bump, retrying from its tip ($attempt/5)"
+        done
+        exit 1
 

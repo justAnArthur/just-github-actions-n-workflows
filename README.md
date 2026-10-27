@@ -885,6 +885,8 @@ jobs:
 
 called from a push it behaves like a direct push run: `github.event` is the caller's push, so the bump comes from the pushed commits and a head commit with `[skip bump]` skips it; the checkout is the pushed branch, so the bump commit goes back to that branch; the new tags are dispatched as usual. the caller must grant the three permissions above. the file's own `push: main` trigger stays — if `main` also gets pushes that must not bump, don't push release commits there.
 
+runs of pushes that land close together (several merges in a row) don't race: each run bumps from the branch tip rather than its pushed commit, and starts over from the new tip when another bump commit lands before its push (up to 5 times). no `concurrency` group is needed — GitHub would cancel all but one waiting run, and their pushes would release nothing.
+
 after a stable promotion (`bump_to_calculated_stable`), only the ghcr.io images of the promoted prerelease channel (the channel of the version being promoted, else `bump_prerelease_channel`) and of the same major are deleted — promoting `5.2.0-canary.3` to `5.2.0` removes `5.x` canary images and keeps `6.0.0-beta.4`.
 
 ### how modules work
