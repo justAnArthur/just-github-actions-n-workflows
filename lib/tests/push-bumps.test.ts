@@ -1,16 +1,17 @@
 import { describe, expect, test } from "bun:test"
 import type { Manifest } from "../src/manifests"
+import { findManifestByName, findManifestsByScope } from "../src/manifests/discovery"
 import { SEMVER } from "../src/version/calculate-semver"
 import { collectPushBumps } from "../src/version/push-bumps"
 
-function manifest(name: string, version?: string): Manifest {
+function manifest(name: string, version?: string, scopeAliases: string[] = []): Manifest {
   return {
     name,
     version: version as string,
     priority: undefined,
     dockerfilePath: undefined,
     dockerContext: undefined,
-    scopeAliases: [],
+    scopeAliases,
     deployTargets: []
   }
 }
@@ -39,5 +40,63 @@ describe("collectPushBumps", () => {
     )
     expect([...bumps]).toEqual([[app, SEMVER.MINOR]])
     expect(unversioned).toEqual([docs])
+  })
+
+  test("a scope another manifest lists as an alias bumps the package it names", () => {
+    const files = manifest("@acme/files", "0.11.0", ["files", "canvas"])
+    const canvas = manifest("@acme/canvas", "0.9.0", ["canvas"])
+    const agent = manifest("@acme/canvas-agent", "0.4.0", ["canvas-agent", "canvas"])
+    const { bumps } = collectPushBumps(["feat(canvas): agent sheet (#213)"], [files, canvas, agent])
+    expect([...bumps]).toEqual([[canvas, SEMVER.MINOR]])
+  })
+
+  test("an alias only shared manifests list bumps each of them", () => {
+    const playbook = manifest("@acme/playbook", "0.3.0", ["playbook", "extension"])
+    const product = manifest("@acme/product", "0.2.0", ["product", "extension"])
+    const { bumps } = collectPushBumps(["fix(extension): typo"], [playbook, product])
+    expect([...bumps]).toEqual([
+      [playbook, SEMVER.PATCH],
+      [product, SEMVER.PATCH]
+    ])
+  })
+
+  test("an unversioned manifest does not take a scope from a versioned one", () => {
+    const site = manifest("@acme/site")
+    const web = manifest("@acme/web", "2.0.0", ["site"])
+    const { bumps, unversioned } = collectPushBumps(["fix(site): footer"], [site, web])
+    expect([...bumps]).toEqual([[web, SEMVER.PATCH]])
+    expect(unversioned).toEqual([])
+  })
+})
+
+describe("findManifestsByScope", () => {
+  // discovery order puts files first, as it did in the repo where `canvas` bumped files
+  const files = manifest("@acme/files", "1.0.0", ["files", "canvas"])
+  const canvas = manifest("@acme/canvas", "1.0.0")
+  const agent = manifest("@acme/canvas-agent", "1.0.0", ["canvas"])
+  const manifests = [files, canvas, agent]
+
+  test("a full name beats every alias", () => {
+    expect(findManifestsByScope(manifests, "@acme/canvas")).toEqual([canvas])
+  })
+
+  test("a name without its npm scope beats an alias", () => {
+    expect(findManifestsByScope(manifests, "canvas")).toEqual([canvas])
+    expect(findManifestByName(manifests, "canvas")).toBe(canvas)
+  })
+
+  test("an alias names every manifest that lists it", () => {
+    expect(findManifestsByScope([files, agent], "canvas")).toEqual([files, agent])
+  })
+
+  test("a short name two packages share falls through to the aliases", () => {
+    const other = manifest("@other/canvas", "1.0.0")
+    expect(findManifestsByScope([files, canvas, other], "canvas")).toEqual([files])
+    expect(findManifestsByScope([canvas, other], "canvas")).toEqual([])
+  })
+
+  test("an unknown scope names nothing", () => {
+    expect(findManifestsByScope(manifests, "docs")).toEqual([])
+    expect(findManifestByName(manifests, "docs")).toBeUndefined()
   })
 })

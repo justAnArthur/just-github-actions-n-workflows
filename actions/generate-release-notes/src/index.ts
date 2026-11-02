@@ -3,7 +3,7 @@ import { execWithTimeout } from "@justanarthur/just-github-actions-n-workflows-l
 import { parseCommitMessage } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
 import { isPrerelease, moduleFromTag, versionFromTag } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-utils"
 import { compareSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/compare-semver"
-import { discoverModules, findModuleByScope } from "@justanarthur/just-github-actions-n-workflows-lib/modules"
+import { discoverModules, findManifestsByScope, findModuleByScope } from "@justanarthur/just-github-actions-n-workflows-lib/modules"
 import type { ParsedVersion } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 import { parseSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 
@@ -103,7 +103,10 @@ async function generateReleaseNotes(
 
   if (mod) {
     relevantScopes.add(moduleName)
-    mod.scopeAliases.forEach((s: string) => relevantScopes.add(s))
+    // an alias that names another package first is that package's change, not this one's
+    for (const alias of mod.scopeAliases) {
+      if (findManifestsByScope(modules, alias).includes(mod)) relevantScopes.add(alias)
+    }
   } else {
     for (const scope of commitsByScope.keys()) {
       if (scope !== "general") relevantScopes.add(scope)

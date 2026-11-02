@@ -57,16 +57,22 @@ export async function parseManifest(filePath: string): Promise<Manifest | null> 
   return adapter.parseManifest(content)
 }
 
-export function findManifestByName(
-  manifests: Manifest[],
-  name: string
-): Manifest | undefined {
-  return manifests.find(
-    (m) =>
-      m.name === name ||
-      m.scopeAliases.includes(name) ||
-      m.gitCommitScopeRelatedNames?.includes(name)
-  )
+type Scoped = Pick<Manifest, "name" | "scopeAliases">
+
+// the first tier with a match wins, so a scope that is one package's own name never
+// bumps another package that lists it as an alias
+export function findManifestsByScope<M extends Scoped>(manifests: M[], scope: string): M[] {
+  const byName = manifests.filter((m) => m.name === scope)
+  if (byName.length > 0) return byName
+
+  const byShortName = manifests.filter((m) => m.name.split("/").pop() === scope)
+  if (byShortName.length === 1) return byShortName
+
+  return manifests.filter((m) => m.scopeAliases.includes(scope))
+}
+
+export function findManifestByName<M extends Scoped>(manifests: M[], name: string): M | undefined {
+  return findManifestsByScope(manifests, name)[0]
 }
 
 export async function updateManifest(

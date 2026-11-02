@@ -12,3 +12,9 @@ describe("npm adapter setManifestVersion", () => {
     expect(updated).toBe('{\n  "version": "1.0.1"\n}\n')
   })
 })
+
+describe("npm adapter parseManifest", () => {
+  test("skips a package.json without a name", async () => {
+    expect(await npmAdapter.parseManifest('{ "private": true, "workspaces": ["a"] }')).toBeNull()
+  })
+})
