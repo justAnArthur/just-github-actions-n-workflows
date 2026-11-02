@@ -68,7 +68,7 @@ gitCommitScopeRelatedNames = ["core", "client", "server"]
 
 Then `feat(client): ...` bumps the whole workspace, tagged `my-game@0.2.0`. Member crates that inherit the workspace version are not modules of their own — use one of the workspace's scopes for them.
 
-Then `feat(api): ...` AND `feat(backend): ...` both bump `@myorg/api`. Match logic is in the toolkit: a scope matches if it equals the manifest `name` or any value in `gitCommitScopeRelatedNames` (see `lib/src/manifests/discovery.ts` and `lib/src/modules/index.ts`).
+Then `feat(api): ...` AND `feat(backend): ...` both bump `@myorg/api`. Match logic is in the toolkit (`findManifestsByScope` in `lib/src/manifests/discovery.ts`), in three tiers, and the first tier with a match wins: the full `name` (`@myorg/api`); the name without its npm scope (`api`), when exactly one package has it; then every manifest listing the scope in `gitCommitScopeRelatedNames`. So a scope that is one package's own name bumps only that package, even if another lists it as an alias, and an alias several manifests share bumps them all. Manifests without a version are skipped before matching.
 
 **Before editing code in this repo:** read every `package.json`, `pom.xml` or `Cargo.toml` under the path you'll touch, plus the root `Cargo.toml` in a Rust workspace. Check its `gitCommitScopeRelatedNames`. Use one of those values as your commit scope.
 

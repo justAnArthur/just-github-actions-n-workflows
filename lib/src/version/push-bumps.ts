@@ -14,6 +14,9 @@ export function collectPushBumps<M extends Manifest>(
 ): { bumps: Map<M, number>; unversioned: M[] } {
   const bumps = new Map<M, number>()
   const unversioned = new Set<M>()
+  // an unversioned manifest never takes a scope from a versioned one it shares a tier with
+  const versioned = manifests.filter((m) => m.version)
+  const nonVersioned = manifests.filter((m) => !m.version)
 
   const items = commitMessages.map(parseCommitMessage).flatMap((c) => c.items)
 
@@ -27,17 +30,15 @@ export function collectPushBumps<M extends Manifest>(
     }
 
     for (const scope of item.scopes) {
-      const named = findManifestsByScope(manifests, scope)
-      if (named.length === 0) log.debug(`skipping commit item with unknown scope: ${scope}`)
-
+      const named = findManifestsByScope(versioned, scope)
       for (const manifest of named) {
-        if (!manifest.version) {
-          unversioned.add(manifest)
-          continue
-        }
-
         if ((bumps.get(manifest) ?? -1) < level) bumps.set(manifest, level)
       }
+      if (named.length > 0) continue
+
+      const skipped = findManifestsByScope(nonVersioned, scope)
+      for (const manifest of skipped) unversioned.add(manifest)
+      if (skipped.length === 0) log.debug(`skipping commit item with unknown scope: ${scope}`)
     }
   }
 

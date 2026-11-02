@@ -3,8 +3,10 @@ import { registerAdapter, type Manifest, type ManifestAdapter } from "../registr
 const npmAdapter: ManifestAdapter = {
   fileName: "package.json",
 
-  async parseManifest(fileContent: string): Promise<Manifest> {
+  async parseManifest(fileContent: string): Promise<Manifest | null> {
     const pkg = JSON.parse(fileContent)
+    // a nameless package.json (a workspace root) has nothing to tag
+    if (!pkg.name) return null
     const props = pkg.properties ?? {}
 
     const scopeAliases = props.gitCommitScopeRelatedNames

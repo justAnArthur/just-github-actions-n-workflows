@@ -903,7 +903,13 @@ each module is discovered by scanning the repo for manifest files. the unified `
 | `deployTargets`  | inferred deployment targets (`npm`, `docker`, `vercel`) |
 | `scopeAliases`   | commit scope aliases for version bumping           |
 
-modules are matched to conventional commit scopes — when a commit like `feat(backend): add feature` is pushed, the bump-version workflow finds the module whose name or scope alias matches `backend` and bumps its version.
+modules are matched to conventional commit scopes — when a commit like `feat(backend): add feature` is pushed, the bump-version workflow finds the modules the scope `backend` names and bumps their versions. a scope is matched in three tiers, and the first tier with a match wins:
+
+1. the full manifest name (`@myorg/backend`);
+2. the name without its npm scope (`backend`), when exactly one manifest has it;
+3. every manifest whose scope aliases (`gitCommitScopeRelatedNames`) list it.
+
+so a scope that is one package's own name bumps only that package, even when another manifest lists it as an alias, and an alias several manifests share bumps all of them. manifests without a version are left out before matching, and `bump_manifest_names` on a manual dispatch resolves each name by the same rule. before this order, a scope bumped the first manifest in discovery order whose name or alias held it, and a short scope like `backend` matched only through an alias.
 
 ### adding a new manifest adapter
 

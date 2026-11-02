@@ -1,6 +1,6 @@
 import * as path from "node:path"
 import type { Manifest } from "../manifests"
-import { findManifests, findManifestByName } from "../manifests"
+import { findManifests, findManifestsByScope } from "../manifests"
 
 // --- types ---
 
@@ -55,14 +55,10 @@ export function findModuleByScope(
   modules: Module[],
   scope: string
 ): Module | undefined {
-  return modules.find(
-    (m) =>
-      m.name === scope ||
-      m.scopeAliases.includes(scope)
-  )
+  return findManifestsByScope(modules, scope)[0]
 }
 
 // --- re-exports ---
 
-export { findManifestByName } from "../manifests"
+export { findManifestByName, findManifestsByScope } from "../manifests"
 export type { Manifest } from "../manifests"

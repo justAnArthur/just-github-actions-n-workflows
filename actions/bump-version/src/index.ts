@@ -1,7 +1,7 @@
 import { parseCommitMessage } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
 import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
 import type { Manifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
-import { findManifestByName, findManifestsByScope, findManifests, getManifestSearchDir, updateManifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
+import { findManifestsByScope, findManifests, getManifestSearchDir, updateManifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
 import { commitAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/commit-n-push"
 import { tagAndPush, type TagAnnotation } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n-workflows-lib/git/get-commits-from-the-last-stable"
@@ -46,14 +46,14 @@ log.debug(`prerelease channel: ${prereleaseChannel}`)
 
 const bumpManifests =
   handleBumpManifestNamesEnv && handleBumpManifestNamesEnv.length > 0
-    ? handleBumpManifestNamesEnv.map((name) => {
-      const manifest = findManifestByName(manifests, name)
-      if (!manifest) {
+    ? [...new Set(handleBumpManifestNamesEnv.flatMap((name) => {
+      const named = findManifestsByScope(manifests, name)
+      if (named.length === 0) {
         log.error(`manifest with name "${name}" not found among discovered manifests`)
         throw new Error(`manifest with name "${name}" not found`)
       }
-      return manifest
-    })
+      return named
+    }))]
     : manifests
 
 const manifestNextVersions: [Manifest, string][] = []
@@ -62,6 +62,9 @@ const manifestNextVersions: [Manifest, string][] = []
 
 if (bumpToCalculatedStableEnv) {
   log.group("bumping to calculated stable versions...")
+
+  // the same rule a push bump uses: unversioned manifests never take a scope
+  const versionedManifests = manifests.filter((m) => m.version)
 
   for (const manifest of bumpManifests) {
     if (!manifest.version) {
@@ -78,7 +81,7 @@ if (bumpToCalculatedStableEnv) {
         .flatMap((c) => c.items)
         .filter((i) =>
           i.scopes.length > 0 &&
-          i.scopes.some((s) => findManifestsByScope(manifests, s).includes(manifest))
+          i.scopes.some((s) => findManifestsByScope(versionedManifests, s).includes(manifest))
         )
 
       let semver = -1

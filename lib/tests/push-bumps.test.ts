@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import type { Manifest } from "../src/manifests"
+import { findManifestByName, findManifestsByScope } from "../src/manifests/discovery"
 import { SEMVER } from "../src/version/calculate-semver"
 import { collectPushBumps } from "../src/version/push-bumps"
 
@@ -57,5 +58,45 @@ describe("collectPushBumps", () => {
       [playbook, SEMVER.PATCH],
       [product, SEMVER.PATCH]
     ])
+  })
+
+  test("an unversioned manifest does not take a scope from a versioned one", () => {
+    const site = manifest("@acme/site")
+    const web = manifest("@acme/web", "2.0.0", ["site"])
+    const { bumps, unversioned } = collectPushBumps(["fix(site): footer"], [site, web])
+    expect([...bumps]).toEqual([[web, SEMVER.PATCH]])
+    expect(unversioned).toEqual([])
+  })
+})
+
+describe("findManifestsByScope", () => {
+  // discovery order puts files first, as it did in the repo where `canvas` bumped files
+  const files = manifest("@acme/files", "1.0.0", ["files", "canvas"])
+  const canvas = manifest("@acme/canvas", "1.0.0")
+  const agent = manifest("@acme/canvas-agent", "1.0.0", ["canvas"])
+  const manifests = [files, canvas, agent]
+
+  test("a full name beats every alias", () => {
+    expect(findManifestsByScope(manifests, "@acme/canvas")).toEqual([canvas])
+  })
+
+  test("a name without its npm scope beats an alias", () => {
+    expect(findManifestsByScope(manifests, "canvas")).toEqual([canvas])
+    expect(findManifestByName(manifests, "canvas")).toBe(canvas)
+  })
+
+  test("an alias names every manifest that lists it", () => {
+    expect(findManifestsByScope([files, agent], "canvas")).toEqual([files, agent])
+  })
+
+  test("a short name two packages share falls through to the aliases", () => {
+    const other = manifest("@other/canvas", "1.0.0")
+    expect(findManifestsByScope([files, canvas, other], "canvas")).toEqual([files])
+    expect(findManifestsByScope([canvas, other], "canvas")).toEqual([])
+  })
+
+  test("an unknown scope names nothing", () => {
+    expect(findManifestsByScope(manifests, "docs")).toEqual([])
+    expect(findManifestByName(manifests, "docs")).toBeUndefined()
   })
 })
