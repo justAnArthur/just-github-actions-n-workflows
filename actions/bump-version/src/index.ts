@@ -1,7 +1,7 @@
 import { parseCommitMessage } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
 import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
 import type { Manifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
-import { findManifestByName, findManifests, getManifestSearchDir, updateManifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
+import { findManifestByName, findManifestsByScope, findManifests, getManifestSearchDir, updateManifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
 import { commitAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/commit-n-push"
 import { tagAndPush, type TagAnnotation } from "@justanarthur/just-github-actions-n-workflows-lib/git/tag-n-push"
 import { getCommitsFromTheLastStable } from "@justanarthur/just-github-actions-n-workflows-lib/git/get-commits-from-the-last-stable"
@@ -78,7 +78,7 @@ if (bumpToCalculatedStableEnv) {
         .flatMap((c) => c.items)
         .filter((i) =>
           i.scopes.length > 0 &&
-          i.scopes.some((s) => findManifestByName([manifest], s))
+          i.scopes.some((s) => findManifestsByScope(manifests, s).includes(manifest))
         )
 
       let semver = -1

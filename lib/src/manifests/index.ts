@@ -6,4 +6,4 @@ import "./adapters/npm"
 import "./adapters/maven"
 import "./adapters/cargo"
 
-export { findManifests, parseManifest, findManifestByName, updateManifest, getManifestSearchDir } from "./discovery"
+export { findManifests, parseManifest, findManifestByName, findManifestsByScope, updateManifest, getManifestSearchDir } from "./discovery"

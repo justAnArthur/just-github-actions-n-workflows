@@ -57,16 +57,25 @@ export async function parseManifest(filePath: string): Promise<Manifest | null> 
   return adapter.parseManifest(content)
 }
 
-export function findManifestByName(
-  manifests: Manifest[],
-  name: string
-): Manifest | undefined {
-  return manifests.find(
-    (m) =>
-      m.name === name ||
-      m.scopeAliases.includes(name) ||
-      m.gitCommitScopeRelatedNames?.includes(name)
-  )
+// a scope names a manifest by its full name, then by its name without the npm scope
+// (`canvas` for `@acme/canvas`), then by an alias. the first tier with a match wins,
+// so a scope another manifest also lists as an alias still names its own package;
+// an alias several manifests share names them all.
+export function findManifestsByScope<M extends Manifest>(manifests: M[], scope: string): M[] {
+  const tiers: ((m: M) => boolean)[] = [
+    (m) => m.name === scope,
+    (m) => m.name.split("/").pop() === scope,
+    (m) => m.scopeAliases.includes(scope) || !!m.gitCommitScopeRelatedNames?.includes(scope)
+  ]
+  for (const matches of tiers) {
+    const found = manifests.filter(matches)
+    if (found.length > 0) return found
+  }
+  return []
+}
+
+export function findManifestByName<M extends Manifest>(manifests: M[], name: string): M | undefined {
+  return findManifestsByScope(manifests, name)[0]
 }
 
 export async function updateManifest(
