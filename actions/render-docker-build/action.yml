@@ -3,7 +3,7 @@ description: >
   Turns a package's docker build settings (the docker_build output of
   resolve-tag-meta or a preview image) into the build-args and secrets
   lines of docker/build-push-action, filling in the vars.NAME and
-  secrets.NAME references.
+  secrets.NAME references, and picks the registry cache export mode.
 
 inputs:
   config:
@@ -25,6 +25,11 @@ outputs:
   secrets:
     description: "extra id=value BuildKit secret lines (empty when none are configured)"
     value: ${{ steps.run.outputs.secrets }}
+  cache_to:
+    description: >
+      registry cache export mode: "max" (default), or with a persistent
+      docker.builder on a self-hosted runner its cache_to ("min" / "off")
+    value: ${{ steps.run.outputs.cache_to }}
 
 runs:
   using: composite

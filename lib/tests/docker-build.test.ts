@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import {
+  cacheExportFor,
   dockerBuildFor,
   fillRefs,
   parseSettingsYaml,
@@ -52,7 +53,9 @@ const EMPTY = {
   secrets: {},
   network: "",
   service_image: "",
-  service_options: ""
+  service_options: "",
+  builder: "",
+  cache_to: "max"
 }
 
 describe("docker build settings", () => {
@@ -86,7 +89,9 @@ describe("docker build settings", () => {
       secrets: {},
       network: "host",
       service_image: "postgis/postgis:16-3.4",
-      service_options: "-p 127.0.0.1:5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=app --health-cmd pg_isready --health-interval 5s"
+      service_options: "-p 127.0.0.1:5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=app --health-cmd pg_isready --health-interval 5s",
+      builder: "",
+      cache_to: "max"
     })
     expect(validateDockerBuild(s)).toEqual([])
   })
@@ -121,6 +126,58 @@ modules:
       "modules.overrides[@scope/backend].docker.service.image is required",
       'modules.overrides[@scope/backend].docker.service.port must be a number, got "db"',
       "modules.overrides[@scope/backend].docker.service.env.LABEL must not contain whitespace"
+    ])
+  })
+})
+
+describe("persistent builder", () => {
+  const withBuilder = (builder: string) => parseSettingsYaml(`${SETTINGS}
+docker:
+  builder:
+${builder}
+`)
+
+  test("without docker.builder every build gets a throwaway builder", () => {
+    const s = parseSettingsYaml(SETTINGS)
+    expect(s.docker).toBeUndefined()
+    expect(dockerBuildFor(s, "@scope/frontend").builder).toBe("")
+    expect(cacheExportFor(dockerBuildFor(s, "@scope/frontend"), "self-hosted")).toBe("max")
+  })
+
+  test("a named builder per network, cache_to min by default", () => {
+    const s = withBuilder("    persistent: true")
+    expect(dockerBuildFor(s, "@scope/frontend")).toMatchObject({ builder: "justactions", cache_to: "min" })
+    expect(dockerBuildFor(s, "@scope/backend")).toMatchObject({ builder: "justactions-host", cache_to: "min" })
+    expect(dockerBuildFor(s, "@scope/other")).toEqual({ ...EMPTY, builder: "justactions", cache_to: "min" })
+    expect(validateDockerBuild(s)).toEqual([])
+  })
+
+  test("name and cache_to are configurable", () => {
+    const s = withBuilder("    persistent: true\n    name: ci\n    cache_to: off")
+    expect(dockerBuildFor(s, "@scope/backend")).toMatchObject({ builder: "ci-host", cache_to: "off" })
+    expect(dockerBuildFor(s, "@scope/backend", { preview: true }).builder).toBe("ci-host")
+  })
+
+  test("persistent: false keeps the throwaway builder", () => {
+    expect(dockerBuildFor(withBuilder("    persistent: false\n    name: ci"), "@scope/frontend").builder).toBe("")
+  })
+
+  test("every preview image gets docker_build with a persistent builder", () => {
+    const p = resolvePreview(withBuilder("    persistent: true"), { pr: 1, sha: "0123456789abcdef", repository: "o/r" })
+    expect(p.images[1].docker_build).toEqual({ ...EMPTY, builder: "justactions", cache_to: "min" })
+  })
+
+  test("the cache export drops only on self-hosted runners", () => {
+    const build = { builder: "justactions", cache_to: "off" as const }
+    expect(cacheExportFor(build, "self-hosted")).toBe("off")
+    expect(cacheExportFor(build, "github-hosted")).toBe("max")
+    expect(cacheExportFor(build, "")).toBe("max")
+  })
+
+  test("validation", () => {
+    expect(validateDockerBuild(withBuilder("    persistent: true\n    name: a b\n    cache_to: none"))).toEqual([
+      'docker.builder.name must be letters, digits, ".", "_" or "-", got "a b"',
+      'docker.builder.cache_to must be "max", "min" or "off", got "none"'
     ])
   })
 })

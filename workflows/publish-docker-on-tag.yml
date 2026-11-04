@@ -31,7 +31,9 @@
 #
 # the layer cache is the image's :buildcache tag on ghcr.io. jobs run on
 # the JSON `runs-on` in the JUSTACTIONS_RUNS_ON repo variable (default
-# "ubuntu-latest").
+# "ubuntu-latest"). on persistent self-hosted runners, `docker.builder`
+# in .justactions.yml keeps one buildx builder (and its local cache)
+# between jobs instead of a new one per job.
 #
 # required secrets:
 #   NPM_TOKEN — npm registry token (optional, passed as docker build arg)
@@ -154,10 +156,32 @@ jobs:
 
       # with network: host the builder runs on the runner's network, so RUN steps reach the service on localhost
       - name: Set up docker buildx
+        if: ${{ !fromJSON(needs.resolve-meta.outputs.docker_build).builder }}
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).network == 'host' && 'network=host' || '' }}
           buildkitd-flags: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).network == 'host' && '--allow-insecure-entitlement network.host' || '' }}
+
+      # docker.builder.persistent in .justactions.yml: a named builder that outlives the job, so on a
+      # persistent self-hosted runner BuildKit's local cache and RUN --mount=type=cache mounts stay.
+      # created once per runner (docker host); a host-network build has a builder of its own
+      - name: Set up persistent docker buildx builder
+        if: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).builder }}
+        shell: bash
+        env:
+          BUILDER: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).builder }}
+          NETWORK: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).network }}
+        run: |
+          if ! docker buildx inspect "$BUILDER" --bootstrap > /dev/null 2>&1; then
+            opts=()
+            if [ "$NETWORK" = host ]; then
+              opts=(--driver-opt network=host --buildkitd-flags "--allow-insecure-entitlement network.host")
+            fi
+            # another job on the same docker host may have created it meanwhile
+            docker buildx create --name "$BUILDER" --driver docker-container "${opts[@]}" --bootstrap \
+              || docker buildx inspect "$BUILDER" --bootstrap
+          fi
+          docker buildx inspect "$BUILDER"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -174,11 +198,13 @@ jobs:
           push: true
           tags: ghcr.io/${{ steps.prepare.outputs.repository }}/${{ steps.prepare.outputs.package_image_name }}:${{ steps.prepare.outputs.image_tag }}
           platforms: linux/amd64
+          builder: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).builder }}
           network: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).network }}
           allow: ${{ fromJSON(needs.resolve-meta.outputs.docker_build).network == 'host' && 'network.host' || '' }}
-          # the cache lives next to the image as its :buildcache tag; a failed cache export never fails the publish
+          # the cache lives next to the image as its :buildcache tag; a failed cache export never fails the publish.
+          # mode=max, or docker.builder.cache_to (min / off) with a persistent builder on a self-hosted runner
           cache-from: type=registry,ref=ghcr.io/${{ steps.prepare.outputs.repository }}/${{ steps.prepare.outputs.package_image_name }}:buildcache
-          cache-to: type=registry,ref=ghcr.io/${{ steps.prepare.outputs.repository }}/${{ steps.prepare.outputs.package_image_name }}:buildcache,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
+          cache-to: ${{ steps.build.outputs.cache_to != 'off' && format('type=registry,ref=ghcr.io/{0}/{1}:buildcache,mode={2},image-manifest=true,oci-mediatypes=true,ignore-error=true', steps.prepare.outputs.repository, steps.prepare.outputs.package_image_name, steps.build.outputs.cache_to || 'max') || '' }}
           build-args: |
             USERNAME_GITHUB=${{ github.actor }}
             TOKEN_GITHUB=${{ secrets.GITHUB_TOKEN }}

@@ -535,6 +535,9 @@ modules:
 | `modules.overrides[].docker.preview.build_args.<KEY>` | string \| null | `preview.yml` only: overrides the build arg; `~` (null) drops it |
 | `modules.overrides[].docker.preview.network` | string | `preview.yml` only: overrides `docker.network`         |
 | `modules.overrides[].docker.preview.service` | `false` | `preview.yml` only: starts no service container       |
+| `docker.builder.persistent`           | boolean  | build with a named buildx builder that outlives the job (persistent self-hosted runners). default `false`: a new builder per job |
+| `docker.builder.name`                 | string   | builder name, default `justactions`; a build with `network: host` uses `<name>-host` |
+| `docker.builder.cache_to`             | string   | registry cache export with the persistent builder on a self-hosted runner: `min` (default), `max` or `off`. github-hosted runs export `max` |
 
 one setting is a repository variable instead, because a job's runner is picked before any step can read `.justactions.yml`:
 
@@ -617,6 +620,23 @@ modules:
           service: false                           # no database next to preview builds
 ```
 
+**persistent builder.** `docker/setup-buildx-action` creates a new builder for every build job and removes it afterwards, so BuildKit's local cache and `RUN --mount=type=cache` mounts (a pnpm store, the Maven repository) are gone after each job, and every build re-imports the registry cache. on self-hosted runners that keep their Docker daemon between jobs, `docker.builder` keeps one builder instead:
+
+```yaml
+# .justactions.yml — top level, applies to every module
+docker:
+  builder:
+    persistent: true
+    name: justactions          # optional; network: host builds use justactions-host
+    cache_to: min              # optional: min (default), max or off
+```
+
+- the first build on a runner creates the builder (`docker buildx create --driver docker-container --bootstrap`); later builds reuse it, with its cache and cache mounts. it is never removed by the workflows.
+- driver options are fixed when a builder is created, so a module with `docker.network: host` gets a builder of its own, `<name>-host`, started with `network=host` and the `network.host` entitlement.
+- the registry cache is still read (`cache-from`), so a new runner or a pruned builder starts warm. the export (`cache-to`) is `mode=min` by default (final image layers only), since the builder keeps the rest itself; `cache_to: off` skips it, `max` keeps the full export. the export mode only changes on self-hosted runners (`RUNNER_ENVIRONMENT`); github-hosted runs export `mode=max` as before.
+- BuildKit garbage-collects the builder's cache by its default policy. to free space by hand: `docker buildx prune --builder justactions`. to start over: `docker buildx rm justactions` (the next build creates it again).
+- without `docker.builder` (or with `persistent: false`) builds run exactly as before.
+
 **secrets.** like the vercel fan-out, the build job passes `toJSON(secrets)` to the toolkit's `render-docker-build` action, which picks the referenced ones. called through `workflow_call`, use `secrets: inherit`.
 
 ## runners, caches and timeouts
@@ -628,7 +648,7 @@ modules:
 | `publish-docker-on-tag.yml` | `<image>:buildcache`                    | `<image>:buildcache`  |
 | `preview.yml`               | `<image>:buildcache-preview`, `<image>:buildcache` | `<image>:buildcache-preview` |
 
-`<image>` is `ghcr.io/<owner>/<repo>/<package image name>`. the cache is exported with `mode=max` (every stage) and `ignore-error=true`, so a failed export never fails a build. `preview-cleanup.yml` only deletes versions whose tags all start with `pr-<n>-`, and the prerelease cleanup of `bump-version.yml` only semver prerelease tags, so both keep the cache tags. nothing to configure.
+`<image>` is `ghcr.io/<owner>/<repo>/<package image name>`. the cache is exported with `mode=max` (every stage) and `ignore-error=true`, so a failed export never fails a build. on persistent self-hosted runners, a [persistent builder](#docker-build-settings) (`docker.builder`) keeps the local cache between jobs and exports less. `preview-cleanup.yml` only deletes versions whose tags all start with `pr-<n>-`, and the prerelease cleanup of `bump-version.yml` only semver prerelease tags, so both keep the cache tags. nothing to configure.
 
 **runners.** every job runs on `ubuntu-latest` unless the repository (or organization) variable `JUSTACTIONS_RUNS_ON` is set to a JSON `runs-on` value:
 
