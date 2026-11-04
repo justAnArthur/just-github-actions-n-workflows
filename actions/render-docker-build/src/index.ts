@@ -1,5 +1,5 @@
 import { getEnv, getRequiredEnv, log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
-import { renderDockerBuild } from "@justanarthur/just-github-actions-n-workflows-lib/settings"
+import { cacheExportFor, renderDockerBuild } from "@justanarthur/just-github-actions-n-workflows-lib/settings"
 
 log.group("render-docker-build")
 
@@ -17,7 +17,14 @@ log.info(`build args: ${Object.keys(config.build_args ?? {}).join(", ") || "(non
 log.info(`secrets: ${Object.keys(config.secrets ?? {}).join(", ") || "(none)"}`)
 for (const ref of rendered.missing) log.warn(`${ref} is not set — passed as an empty value`)
 
+const cacheTo = cacheExportFor(
+  { builder: config.builder ?? "", cache_to: config.cache_to ?? "max" },
+  getEnv("RUNNER_ENVIRONMENT")
+)
+if (config.builder) log.info(`builder: ${config.builder}, cache export: ${cacheTo}`)
+
 setOutput("build_args", rendered.build_args)
 setOutput("secrets", rendered.secrets)
+setOutput("cache_to", cacheTo)
 
 log.groupEnd()

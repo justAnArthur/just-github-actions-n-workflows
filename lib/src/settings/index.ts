@@ -1,6 +1,6 @@
 import * as fs from "node:fs/promises"
 import * as path from "node:path"
-import type { DockerBuildSettings } from "./docker-build"
+import type { CacheExport, DockerBuildSettings, DockerSettings } from "./docker-build"
 
 // --- types ---
 
@@ -94,6 +94,7 @@ export interface Settings {
   vercel?: VercelSettings;
   modules?: ModuleSettings;
   git?: GitSettings;
+  docker?: DockerSettings;
 }
 
 export const STABLE_CHANNEL = "stable"
@@ -266,6 +267,21 @@ function parseDockerBuild(raw: any): DockerBuildSettings | undefined {
   return docker
 }
 
+function parseDocker(raw: any): DockerSettings | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  const docker: DockerSettings = {}
+  const builder = raw.builder
+  if (builder && typeof builder === "object") {
+    docker.builder = {
+      persistent: builder.persistent === true || str(builder.persistent) === "true",
+      name: str(builder.name),
+      // a YAML 1.1 reader takes a bare `off` for false
+      cache_to: (builder.cache_to === false ? "off" : str(builder.cache_to)) as CacheExport | undefined
+    }
+  }
+  return docker
+}
+
 function parseModuleOverride(raw: any): ModuleOverride {
   const override: ModuleOverride = { ...raw }
   const docker = parseDockerBuild(raw?.docker)
@@ -365,6 +381,9 @@ export function parseSettingsYaml(content: string): Settings {
     }
   }
 
+  const docker = parseDocker(raw.docker)
+  if (docker) settings.docker = docker
+
   if (raw.git) {
     settings.git = {
       committer_name: str(raw.git.committer_name),
@@ -430,6 +449,6 @@ export function targetsForChannel(settings: Settings, channel: DeployChannel): s
     .map(([name]) => name)
 }
 
-export { dockerBuildFor, fillRefs, hasDockerBuild, renderDockerBuild, validateDockerBuild, type DockerBuildPreview, type DockerBuildService, type DockerBuildSettings, type ResolvedDockerBuild } from "./docker-build"
+export { cacheExportFor, DEFAULT_BUILDER_NAME, dockerBuildFor, fillRefs, hasDockerBuild, renderDockerBuild, validateDockerBuild, type CacheExport, type DockerBuilderSettings, type DockerBuildPreview, type DockerBuildService, type DockerBuildSettings, type DockerSettings, type ResolvedDockerBuild } from "./docker-build"
 export { fetchMergeablePullRequest, resolvePreview, type PreviewPullRequest, type ResolvedPreview } from "./preview"
 export { releaseModuleVersions } from "./release"

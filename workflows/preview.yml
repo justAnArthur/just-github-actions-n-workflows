@@ -38,7 +38,9 @@
 #             come from `modules.overrides[].docker`, as in
 #             publish-docker-on-tag.yml, with `docker.preview` applied
 #             on top. the layer cache is :buildcache-preview, seeded
-#             from the release cache :buildcache.
+#             from the release cache :buildcache; `docker.builder`
+#             keeps one buildx builder between jobs on persistent
+#             self-hosted runners.
 #   deploy  — creates or updates the compose pr-<n> and starts the deploy;
 #             on the first deploy uploads the seed files and runs the seed
 #             command over ssh while Dokploy deploys ({app_name} is the
@@ -199,10 +201,32 @@ jobs:
 
       # with network: host the builder runs on the runner's network, so RUN steps reach the service on localhost
       - name: Set up docker buildx
+        if: ${{ !matrix.docker_build.builder }}
         uses: docker/setup-buildx-action@v3
         with:
           driver-opts: ${{ matrix.docker_build.network == 'host' && 'network=host' || '' }}
           buildkitd-flags: ${{ matrix.docker_build.network == 'host' && '--allow-insecure-entitlement network.host' || '' }}
+
+      # docker.builder.persistent in .justactions.yml: a named builder that outlives the job, so on a
+      # persistent self-hosted runner BuildKit's local cache and RUN --mount=type=cache mounts stay.
+      # created once per runner (docker host); a host-network build has a builder of its own
+      - name: Set up persistent docker buildx builder
+        if: ${{ matrix.docker_build.builder }}
+        shell: bash
+        env:
+          BUILDER: ${{ matrix.docker_build.builder }}
+          NETWORK: ${{ matrix.docker_build.network || '' }}
+        run: |
+          if ! docker buildx inspect "$BUILDER" --bootstrap > /dev/null 2>&1; then
+            opts=()
+            if [ "$NETWORK" = host ]; then
+              opts=(--driver-opt network=host --buildkitd-flags "--allow-insecure-entitlement network.host")
+            fi
+            # another job on the same docker host may have created it meanwhile
+            docker buildx create --name "$BUILDER" --driver docker-container "${opts[@]}" --bootstrap \
+              || docker buildx inspect "$BUILDER" --bootstrap
+          fi
+          docker buildx inspect "$BUILDER"
 
       - name: Log in to GitHub Container Registry
         uses: docker/login-action@v3
@@ -219,16 +243,18 @@ jobs:
           push: true
           tags: ${{ matrix.image }}:${{ needs.prepare.outputs.image_tag }}
           platforms: linux/amd64
+          builder: ${{ matrix.docker_build.builder || '' }}
           network: ${{ matrix.docker_build.network || '' }}
           allow: ${{ matrix.docker_build.network == 'host' && 'network.host' || '' }}
           # one manifest per tag, so preview-cleanup leaves no untagged leftovers
           provenance: false
           # reads the release cache too; writes its own tag so previews never overwrite it.
-          # neither cache tag starts with pr-, so preview-cleanup keeps them
+          # neither cache tag starts with pr-, so preview-cleanup keeps them.
+          # mode=max, or docker.builder.cache_to (min / off) with a persistent builder on a self-hosted runner
           cache-from: |
             type=registry,ref=${{ matrix.image }}:buildcache-preview
             type=registry,ref=${{ matrix.image }}:buildcache
-          cache-to: type=registry,ref=${{ matrix.image }}:buildcache-preview,mode=max,image-manifest=true,oci-mediatypes=true,ignore-error=true
+          cache-to: ${{ steps.build.outputs.cache_to != 'off' && format('type=registry,ref={0}:buildcache-preview,mode={1},image-manifest=true,oci-mediatypes=true,ignore-error=true', matrix.image, steps.build.outputs.cache_to || 'max') || '' }}
           build-args: |
             USERNAME_GITHUB=${{ github.actor }}
             TOKEN_GITHUB=${{ secrets.GITHUB_TOKEN }}

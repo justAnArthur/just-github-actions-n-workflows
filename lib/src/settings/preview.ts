@@ -11,7 +11,7 @@ export interface ResolvedPreview {
   environment_id: string
   server_id: string
   env: string
-  /** docker_build only for modules with `modules.overrides[].docker`, so other matrix entries stay as they were */
+  /** docker_build only for modules with `modules.overrides[].docker` (or all with a persistent `docker.builder`), so other matrix entries stay as they were */
   images: { name: string; image: string; docker_build?: ResolvedDockerBuild }[]
   seed_ssh_host: string
   seed_command: string
