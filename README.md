@@ -124,12 +124,12 @@ the most reliable option right now. each workflow file in `workflows/` is self-c
    |-----------------------------------|-------------------------------------------------------------|
    | `bump-version.yml`                | (none — needs `actions: write`, already granted in the file); optional `GH_TOKEN` |
    | `publish-npm-on-tag.yml`          | `NPM_TOKEN`                                                 |
-   | `publish-docker-on-tag.yml`       | (optional `NPM_TOKEN` build-arg); optional `GH_TOKEN`       |
+   | `publish-docker-on-tag.yml`       | optional `NPM_TOKEN` (as a BuildKit secret via `docker.secrets`); optional `GH_TOKEN` |
    | `deploy-vercel-on-tag.yml`        | `VERCEL_DEPLOY_HOOK_URL`, or one secret per `vercel.targets` entry |
    | `release-on-tag.yml`              | (none)                                                      |
    | `deploy-docker-compose.yml`       | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`; optional `DOCKER_USERNAME`, `DOCKER_PASSWORD` (registry login skipped when empty) |
    | `deploy.yml`, `deploy-on-release.yml` | `DOKPLOY_API_KEY` (dokploy targets); the `deploy-docker-compose.yml` secrets (ssh targets); optional `GH_TOKEN` (`deploy-on-release.yml`) |
-   | `preview.yml`                     | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.seed`; optional `NPM_TOKEN` build-arg; optional `GH_TOKEN` |
+   | `preview.yml`                     | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.seed`; optional `NPM_TOKEN` (BuildKit secret via `docker.secrets`); optional `GH_TOKEN` |
    | `preview-cleanup.yml`             | `DOKPLOY_API_KEY`; `SSH_PRIVATE_KEY`, `SERVER_USERNAME` with `previews.cleanup_command`; optional `GH_TOKEN` |
 
    `GH_TOKEN` is an optional PAT for private packages / cross-repo registry access. when set, it replaces `GITHUB_TOKEN` for the ghcr.io login, the `github_token` BuildKit secret of docker builds (`RUN --mount=type=secret,id=github_token cat /run/secrets/github_token`), and the GitHub packages API calls (prerelease cleanup, image checks, preview image deletion).
@@ -601,7 +601,8 @@ modules:
 
 - the settings come from the tagged commit (`publish-docker-on-tag.yml`) or from the ref the workflow runs on (`preview.yml`, like the rest of `deploy.previews`).
 - values may reference `${{ vars.NAME }}` and `${{ secrets.NAME }}`, nothing else; an unset one is passed empty with a warning, as in a workflow. other values are passed as written.
-- they are added after the default build args (`USERNAME_GITHUB`, `TOKEN_GITHUB`, `TAG_NAME`, `SANITIZED_IMAGE_TAG`, `NPM_TOKEN`) and the `github_token` secret, which stay.
+- they are added after the default build args (`USERNAME_GITHUB`, `TAG_NAME`, `SANITIZED_IMAGE_TAG`) and the `github_token` secret, which stay.
+- tokens are never build args: build args are kept in the image history and show in the runner host's process list. the registry token is the `github_token` BuildKit secret; an npm token is one you add, e.g. `npm_token: ${{ secrets.NPM_TOKEN }}` under `docker.secrets`, read with `RUN --mount=type=secret,id=npm_token`. (until 1.6.0 the workflows also passed `TOKEN_GITHUB` and `NPM_TOKEN` as build args; a Dockerfile with `ARG TOKEN_GITHUB` / `ARG NPM_TOKEN` now gets them empty.)
 - the service is a job service container: github starts it, waits for its health check, and publishes `port` on the runner. a package without `service` starts none.
 - packages without `docker` settings build exactly as before.
 
@@ -1071,7 +1072,7 @@ flowchart LR
 
 | secret                | used by                                                              |
 |-----------------------|----------------------------------------------------------------------|
-| `NPM_TOKEN`           | `publish-npm-on-tag.yml`; optional build-arg in `publish-docker-on-tag.yml` |
+| `NPM_TOKEN`           | `publish-npm-on-tag.yml`; optional BuildKit secret in `publish-docker-on-tag.yml` / `preview.yml` via `docker.secrets` |
 | `VERCEL_DEPLOY_HOOK_URL` | `deploy-vercel-on-tag.yml` (single hook mode)                     |
 | `<hook_secret>` per `vercel.targets` entry | `deploy-vercel-on-tag.yml` (fan-out mode)       |
 | `SSH_PRIVATE_KEY`     | `deploy-docker-compose.yml` (ssh authentication)                     |

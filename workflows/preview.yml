@@ -73,7 +73,7 @@
 #   DOKPLOY_API_KEY  — Dokploy API key
 #   SSH_PRIVATE_KEY  — ssh private key for the seed host (only with previews.seed)
 #   SERVER_USERNAME  — ssh username on the seed host (only with previews.seed)
-#   NPM_TOKEN        — npm registry token (optional, passed as docker build arg)
+#   NPM_TOKEN        — npm registry token (optional; pass it as a BuildKit secret via .justactions.yml)
 #   GH_TOKEN         — optional PAT for private packages / cross-repo registry access;
 #                      used for the ghcr login and the github_token build secret
 #                      instead of GITHUB_TOKEN when set
@@ -257,10 +257,8 @@ jobs:
           cache-to: ${{ steps.build.outputs.cache_to != 'off' && format('type=registry,ref={0}:buildcache-preview,mode={1},image-manifest=true,oci-mediatypes=true,ignore-error=true', matrix.image, steps.build.outputs.cache_to || 'max') || '' }}
           build-args: |
             USERNAME_GITHUB=${{ github.actor }}
-            TOKEN_GITHUB=${{ secrets.GITHUB_TOKEN }}
             TAG_NAME=${{ matrix.name }}@${{ needs.prepare.outputs.image_tag }}
             SANITIZED_IMAGE_TAG=${{ needs.prepare.outputs.image_tag }}
-            NPM_TOKEN=${{ secrets.NPM_TOKEN }}
             ${{ steps.build.outputs.build_args }}
           secrets: |
             github_token=${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
