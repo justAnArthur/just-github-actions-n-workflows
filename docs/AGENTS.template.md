@@ -146,7 +146,7 @@ Re-dispatch is the right tool when a tag annotation is missing or the workflow e
 
 | Secret | Used by |
 |--------|---------|
-| `NPM_TOKEN` | `publish-npm-on-tag.yml`; optional in `publish-docker-on-tag.yml` (docker build-arg) |
+| `NPM_TOKEN` | `publish-npm-on-tag.yml`; optional in `publish-docker-on-tag.yml` (BuildKit secret via `.justactions.yml` `docker.secrets`, never a build arg) |
 | `VERCEL_DEPLOY_HOOK_URL` | `deploy-vercel-on-tag.yml` |
 | `SSH_PRIVATE_KEY`, `SERVER_USERNAME`, `DOCKER_USERNAME`, `DOCKER_PASSWORD` | `deploy-docker-compose.yml` (and `deploy.yml` for ssh targets) |
 | `DOKPLOY_API_KEY` | `deploy.yml` / `deploy-on-release.yml` for dokploy targets, `preview.yml`, `preview-cleanup.yml` |

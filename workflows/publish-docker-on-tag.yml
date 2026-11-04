@@ -36,7 +36,7 @@
 # between jobs instead of a new one per job.
 #
 # required secrets:
-#   NPM_TOKEN — npm registry token (optional, passed as docker build arg)
+#   NPM_TOKEN — npm registry token (optional; pass it as a BuildKit secret via .justactions.yml)
 #   GH_TOKEN  — optional PAT for private packages / cross-repo registry access;
 #               used for the ghcr login and the github_token build secret
 #               instead of GITHUB_TOKEN when set
@@ -62,7 +62,7 @@ on:
         required: true
     secrets:
       NPM_TOKEN:
-        description: "npm registry token (passed as docker build arg)"
+        description: "npm registry token (optional; referenced as a BuildKit secret from .justactions.yml docker.secrets)"
         required: false
       GH_TOKEN:
         description: "optional PAT for private packages / cross-repo registry access (falls back to GITHUB_TOKEN)"
@@ -207,10 +207,8 @@ jobs:
           cache-to: ${{ steps.build.outputs.cache_to != 'off' && format('type=registry,ref=ghcr.io/{0}/{1}:buildcache,mode={2},image-manifest=true,oci-mediatypes=true,ignore-error=true', steps.prepare.outputs.repository, steps.prepare.outputs.package_image_name, steps.build.outputs.cache_to || 'max') || '' }}
           build-args: |
             USERNAME_GITHUB=${{ github.actor }}
-            TOKEN_GITHUB=${{ secrets.GITHUB_TOKEN }}
             TAG_NAME=${{ steps.prepare.outputs.original_tag }}
             SANITIZED_IMAGE_TAG=${{ steps.prepare.outputs.image_tag }}
-            NPM_TOKEN=${{ secrets.NPM_TOKEN }}
             ${{ steps.build.outputs.build_args }}
           secrets: |
             github_token=${{ secrets.GH_TOKEN || secrets.GITHUB_TOKEN }}
