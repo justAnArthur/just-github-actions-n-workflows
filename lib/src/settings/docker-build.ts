@@ -24,7 +24,7 @@ export interface DockerBuildPreview {
 
 export interface DockerBuildService {
   image: string
-  /** published on the same port of the runner */
+  /** published on the same port of the runner's loopback */
   port?: string
   env?: Record<string, string>
   /** extra `docker create` options, e.g. a health check */
@@ -61,8 +61,10 @@ export function dockerBuildFor(
   const base = overrideFor(settings, moduleName)?.docker ?? {}
   const docker = opts.preview ? applyPreview(base) : base
   const service = docker.service
-  // the port goes into the options too: a workflow can't leave an empty `ports` entry
-  const port = service?.port ? [`-p ${service.port}:${service.port}`] : []
+  // the port goes into the options too: a workflow can't leave an empty `ports` entry.
+  // loopback only: a self-hosted runner's host may have a public IP, and the service is a
+  // throwaway with a weak password (an open postgres gets a cryptominer within minutes)
+  const port = service?.port ? [`-p 127.0.0.1:${service.port}:${service.port}`] : []
   const env = Object.entries(service?.env ?? {}).map(([k, v]) => `-e ${k}=${v}`)
 
   return {
