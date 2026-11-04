@@ -86,7 +86,7 @@ describe("docker build settings", () => {
       secrets: {},
       network: "host",
       service_image: "postgis/postgis:16-3.4",
-      service_options: "-p 5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=app --health-cmd pg_isready --health-interval 5s"
+      service_options: "-p 127.0.0.1:5432:5432 -e POSTGRES_HOST_AUTH_METHOD=trust -e POSTGRES_DB=app --health-cmd pg_isready --health-interval 5s"
     })
     expect(validateDockerBuild(s)).toEqual([])
   })

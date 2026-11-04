@@ -529,7 +529,7 @@ modules:
 | `modules.overrides[].docker.secrets.<id>` | string | extra BuildKit secret (`RUN --mount=type=secret,id=<id>`); same references |
 | `modules.overrides[].docker.network`  | string   | build network, e.g. `host` so `RUN` steps reach `docker.service` on localhost |
 | `modules.overrides[].docker.service.image` | string | service container started next to the build job      |
-| `modules.overrides[].docker.service.port` | number | published on the same port of the runner             |
+| `modules.overrides[].docker.service.port` | number | published on the same port of the runner, on 127.0.0.1 only |
 | `modules.overrides[].docker.service.env.<KEY>` | string | service env (no whitespace in values)            |
 | `modules.overrides[].docker.service.options` | string | extra `docker create` options, e.g. a health check  |
 | `modules.overrides[].docker.preview.build_args.<KEY>` | string \| null | `preview.yml` only: overrides the build arg; `~` (null) drops it |
