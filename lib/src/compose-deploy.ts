@@ -5,6 +5,12 @@ export interface ComposeDeployOptions {
   registries: string[]
   username?: string
   password?: string
+  /**
+   * run in the target path instead of the generated prune + pull + up + prune
+   * (e.g. a script with health checks and rollback, uploaded via deploy.ssh.upload).
+   * DOCKER_BIN and DOCKER_COMPOSE_CMD are exported for it.
+   */
+  command?: string
 }
 
 const DETECT_DOCKER = [
@@ -44,7 +50,7 @@ function loginLines(registry: string, username: string, password: string): strin
   ]
 }
 
-export function composeDeployScript({ targetPath, registries, username, password }: ComposeDeployOptions): string {
+export function composeDeployScript({ targetPath, registries, username, password, command }: ComposeDeployOptions): string {
   const dir = remoteShellPath(targetPath)
   const lines = [
     "set -euo pipefail",
@@ -60,10 +66,22 @@ export function composeDeployScript({ targetPath, registries, username, password
     for (const registry of [...new Set(registries)]) lines.push(...loginLines(registry, username, password), "")
   }
 
+  lines.push(...DETECT_COMPOSE, "", 'echo "Using compose command: $DOCKER_COMPOSE_CMD"')
+
+  if (command) {
+    // no image prune before it: the command may need the previous images (rollback)
+    lines.push(
+      "export DOCKER_BIN DOCKER_COMPOSE_CMD",
+      "",
+      'echo "Running the deploy command"',
+      command,
+      "",
+      'echo "Deployment finished."'
+    )
+    return lines.join("\n")
+  }
+
   lines.push(
-    ...DETECT_COMPOSE,
-    "",
-    'echo "Using compose command: $DOCKER_COMPOSE_CMD"',
     // frees disk before the pull; images of running containers are kept
     'echo "Removing unused images..."',
     "$DOCKER_BIN image prune -af || true",

@@ -11,6 +11,16 @@ export interface DokployTargetSettings {
   compose_id: string;
 }
 
+/** how the ssh driver deploys; set under deploy.ssh (all targets) or deploy.targets.<name>.ssh */
+export interface SshDeploySettings {
+  /** repo paths (files or directories) copied next to the compose file */
+  upload?: string[];
+  /** remote command run in the target path instead of the generated pull + up */
+  command?: string;
+  /** extra .env lines; `{environment}` and `${{ vars.NAME }}` / `${{ secrets.NAME }}` are filled in */
+  env?: Record<string, string>;
+}
+
 export interface DeployTarget {
   host: string;
   /** "ssh" (default) deploys with docker compose over ssh, "dokploy" redeploys a Dokploy compose */
@@ -23,6 +33,8 @@ export interface DeployTarget {
   /** path to docker-compose file (overrides deploy-level compose_file) */
   compose_file?: string;
   dokploy?: DokployTargetSettings;
+  /** overrides deploy.ssh: env is merged (the target wins), upload and command replace */
+  ssh?: SshDeploySettings;
 }
 
 export interface DokploySettings {
@@ -55,6 +67,8 @@ export interface DeploySettings {
   /** default path to docker-compose file for all targets */
   compose_file?: string;
   dokploy?: DokploySettings;
+  /** defaults of every ssh target */
+  ssh?: SshDeploySettings;
   targets: Record<string, DeployTarget>;
   previews?: PreviewSettings;
 }
@@ -289,6 +303,11 @@ function parseModuleOverride(raw: any): ModuleOverride {
   return override
 }
 
+function parseSsh(raw: any): SshDeploySettings | undefined {
+  if (!raw || typeof raw !== "object") return undefined
+  return { upload: strList(raw.upload), command: str(raw.command), env: strMap(raw.env) }
+}
+
 function parseTarget(name: string, config: any): DeployTarget {
   const target: DeployTarget = {
     host: str(config?.host) ?? name,
@@ -302,6 +321,8 @@ function parseTarget(name: string, config: any): DeployTarget {
   if (config?.dokploy && typeof config.dokploy === "object") {
     target.dokploy = { compose_id: str(config.dokploy.compose_id) ?? "" }
   }
+  const ssh = parseSsh(config?.ssh)
+  if (ssh) target.ssh = ssh
   return target
 }
 
@@ -343,6 +364,9 @@ export function parseSettingsYaml(content: string): Settings {
 
     const dokployUrl = str(raw.deploy.dokploy?.url)
     if (dokployUrl) deploy.dokploy = { url: dokployUrl }
+
+    const ssh = parseSsh(raw.deploy.ssh)
+    if (ssh) deploy.ssh = ssh
 
     // each key under deploy.targets is an environment name
     for (const [envName, envConfig] of Object.entries(raw.deploy.targets ?? {})) {
@@ -402,6 +426,28 @@ export function resolveDeployTarget(
   return settings.deploy?.targets?.[environment]
 }
 
+export interface ResolvedSshDeploy {
+  upload: string[];
+  /** empty: the generated pull + up */
+  command: string;
+  /** vars/secrets references still unfilled */
+  env: Record<string, string>;
+}
+
+/** deploy.ssh merged with the target's ssh block, `{environment}` filled in */
+export function resolveSshDeploy(settings: Settings, environment: string): ResolvedSshDeploy {
+  const defaults = settings.deploy?.ssh ?? {}
+  const own = resolveDeployTarget(settings, environment)?.ssh ?? {}
+  const env = Object.fromEntries(
+    Object.entries({ ...defaults.env, ...own.env }).map(([k, v]) => [k, v.replaceAll("{environment}", environment)])
+  )
+  return {
+    upload: own.upload ?? defaults.upload ?? [],
+    command: own.command ?? defaults.command ?? "",
+    env
+  }
+}
+
 // validation is separate from loading so a broken deploy block never
 // breaks unrelated readers of the file (e.g. configure-git-user)
 export function validateDeployTarget(settings: Settings, environment: string): string[] {
@@ -422,6 +468,16 @@ export function validateDeployTarget(settings: Settings, environment: string): s
     if (!target.dokploy?.compose_id) errors.push(`${at}.dokploy.compose_id is required for driver dokploy`)
   }
   if (target.driver === "ssh" && !target.host) errors.push(`${at}.host is required for driver ssh`)
+
+  const ssh = resolveSshDeploy(settings, environment)
+  for (const [key, value] of Object.entries(ssh.env)) {
+    if (!/^[A-Za-z_][A-Za-z0-9_]*$/.test(key)) errors.push(`ssh.env key "${key}" of ${at} is not a valid variable name`)
+    if (value.includes("\n")) errors.push(`ssh.env.${key} of ${at} must be a single line`)
+  }
+  for (const p of ssh.upload) {
+    if (/\s/.test(p)) errors.push(`ssh.upload "${p}" of ${at} must not contain whitespace`)
+    if (p.startsWith("/") || p.split("/").includes("..")) errors.push(`ssh.upload "${p}" of ${at} must be a path inside the repository`)
+  }
 
   return errors
 }
@@ -452,3 +508,4 @@ export function targetsForChannel(settings: Settings, channel: DeployChannel): s
 export { cacheExportFor, DEFAULT_BUILDER_NAME, dockerBuildFor, fillRefs, hasDockerBuild, renderDockerBuild, validateDockerBuild, type CacheExport, type DockerBuilderSettings, type DockerBuildPreview, type DockerBuildService, type DockerBuildSettings, type DockerSettings, type ResolvedDockerBuild } from "./docker-build"
 export { fetchMergeablePullRequest, resolvePreview, type PreviewPullRequest, type ResolvedPreview } from "./preview"
 export { releaseModuleVersions } from "./release"
+export { fillEnvLines, type FilledEnvLines } from "./env-lines"

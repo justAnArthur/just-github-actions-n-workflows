@@ -8,6 +8,7 @@ import {
   releaseModuleVersions,
   resolveDeployTarget,
   resolvePreview,
+  resolveSshDeploy,
   targetsForChannel,
   validateDeployTarget,
   validateDockerBuild,
@@ -100,6 +101,16 @@ async function resolveEnvironment(settings: Settings) {
   if (settings.deploy?.ssh_target_path) setOutput("ssh_target_path", settings.deploy.ssh_target_path)
   setOutput("driver", driver)
   setOutput("channel", config.channel ?? "manual")
+  if (driver === "ssh") {
+    const ssh = resolveSshDeploy(settings, environment)
+    if (ssh.upload.length) log.info(`ssh upload: ${ssh.upload.join(" ")}`)
+    if (ssh.command) log.info(`ssh command: ${ssh.command}`)
+    // names only, the values may reference secrets
+    if (Object.keys(ssh.env).length) log.info(`ssh env: ${Object.keys(ssh.env).join(", ")}`)
+    setOutput("ssh_upload", ssh.upload.join(" "))
+    setOutput("ssh_command", ssh.command)
+    setOutput("ssh_env", Object.entries(ssh.env).map(([k, v]) => `${k}=${v}`).join("\n"))
+  }
   if (driver === "dokploy") {
     setOutput("dokploy_url", settings.deploy?.dokploy?.url ?? "")
     setOutput("dokploy_compose_id", config.dokploy?.compose_id ?? "")

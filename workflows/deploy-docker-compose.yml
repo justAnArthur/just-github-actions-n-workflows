@@ -30,6 +30,15 @@
 # unused images, pulls, runs `compose up`, then `docker system prune -af`
 # (never --volumes). a target path like ~/my-app is relative to the remote home.
 #
+# `deploy.ssh` (all targets) or `deploy.targets.<name>.ssh` change that:
+#   upload:  [ deploy ]               # repo paths copied next to the compose file
+#   command: bash deploy/deploy.sh    # run instead of prune + pull + up (no prune)
+#   env:                              # extra .env lines
+#     SENTRY_ENVIRONMENT: "{environment}"
+#     SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+# env values may reference any repo variable or secret: when called as a
+# reusable workflow, pass `secrets: inherit`. filled-in secrets are masked.
+#
 # required secrets:
 #   SSH_PRIVATE_KEY  — ssh private key for server access
 #   SERVER_USERNAME  — ssh username on the target server
@@ -138,13 +147,16 @@ jobs:
             PROFILES=${{ env.PROFILES }}
             APP_TZ=${{ env.APP_TZ }}
             ${{ steps.resolve_image_tags.outputs.resolved_env_lines }}
+            ${{ steps.deploy_config.outputs.ssh_env }}
+          vars: ${{ toJSON(vars) }}
+          secrets: ${{ toJSON(secrets) }}
 
       - name: Transfer compose and env files to server
         uses: justAnArthur/just-github-actions-n-workflows/actions/scp-transfer@main
         with:
           host: ${{ steps.deploy_config.outputs.host }}
           username: ${{ secrets.SERVER_USERNAME }}
-          source: "${{ env.COMPOSE_FILE || './docker-compose.yml' }} ./.env"
+          source: "${{ env.COMPOSE_FILE || './docker-compose.yml' }} ./.env ${{ steps.deploy_config.outputs.ssh_upload }}"
           target: ${{ inputs.ssh_target_path || env.SSH_TARGET_PATH || '~/app' }}
 
       - name: Generate deployment script
@@ -155,6 +167,7 @@ jobs:
           registry_username: ${{ secrets.DOCKER_USERNAME }}
           registry_password: ${{ secrets.DOCKER_PASSWORD }}
           additional_registries: docker.io
+          command: ${{ steps.deploy_config.outputs.ssh_command }}
 
       - name: Execute deployment on remote server
         uses: justAnArthur/just-github-actions-n-workflows/actions/ssh-exec@main
