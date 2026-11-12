@@ -97,6 +97,15 @@ export interface ModuleSettings {
   overrides?: ModuleOverride[];
 }
 
+export interface ReleaseSettings {
+  /**
+   * branch (or glob, e.g. `versions/**`) -> channel a push to it releases on:
+   * `stable` or a prerelease id (`canary`, `beta`, …). unlisted branches keep the
+   * channel of the manifest's current version
+   */
+  branches?: Record<string, string>;
+}
+
 export interface GitSettings {
   committer_name?: string;
   committer_email?: string;
@@ -109,6 +118,7 @@ export interface Settings {
   modules?: ModuleSettings;
   git?: GitSettings;
   docker?: DockerSettings;
+  release?: ReleaseSettings;
 }
 
 export const STABLE_CHANNEL = "stable"
@@ -408,6 +418,9 @@ export function parseSettingsYaml(content: string): Settings {
   const docker = parseDocker(raw.docker)
   if (docker) settings.docker = docker
 
+  const branches = strMap(raw.release?.branches)
+  if (branches) settings.release = { branches }
+
   if (raw.git) {
     settings.git = {
       committer_name: str(raw.git.committer_name),
@@ -496,6 +509,16 @@ export function validatePreviews(settings: Settings): string[] {
     errors.push("deploy.previews.cleanup_command runs on deploy.previews.seed.ssh_host, which is not set")
   }
   return errors
+}
+
+/** channel a push to `branch` releases on, from release.branches; undefined = from the manifest's version */
+export function releaseChannelFor(settings: Settings, branch: string): string | undefined {
+  const branches = settings.release?.branches ?? {}
+  if (branches[branch]) return branches[branch]
+  for (const [pattern, channel] of Object.entries(branches)) {
+    if (pattern.includes("*") && new Bun.Glob(pattern).match(branch)) return channel
+  }
+  return undefined
 }
 
 export function targetsForChannel(settings: Settings, channel: DeployChannel): string[] {

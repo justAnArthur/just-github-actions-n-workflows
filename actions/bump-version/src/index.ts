@@ -10,6 +10,7 @@ import { detectChannel } from "@justanarthur/just-github-actions-n-workflows-lib
 import { parseSemver } from "@justanarthur/just-github-actions-n-workflows-lib/version/parse-semver"
 import { collectPushBumps } from "@justanarthur/just-github-actions-n-workflows-lib/version/push-bumps"
 import { log, setOutput } from "@justanarthur/just-github-actions-n-workflows-lib/github"
+import { loadSettings, releaseChannelFor } from "@justanarthur/just-github-actions-n-workflows-lib/settings"
 import { GITHUB_ACTIONS_BOT, withCoAuthors, type CoAuthor } from "@justanarthur/just-github-actions-n-workflows-lib/git/co-authors"
 
 const coAuthor: CoAuthor = {
@@ -140,8 +141,12 @@ if (bumpToCalculatedStableEnv) {
     log.info(`${manifest.name}: no version field, skipping`)
   }
 
+  const branch = process.env.GITHUB_REF_NAME ?? ""
+  const channel = releaseChannelFor(await loadSettings(process.cwd()), branch)
+  log.info(channel ? `${branch} releases on ${channel} (release.branches)` : `${branch}: channel of each manifest's version`)
+
   for (const [manifest, semver] of bumps) {
-    const nextVersion = calculateNextSemver(manifest.version, semver)
+    const nextVersion = calculateNextSemver(manifest.version, semver, channel)
     log.info(`${manifest.name}: ${manifest.version} → ${nextVersion}`)
     manifestNextVersions.push([manifest, nextVersion])
   }

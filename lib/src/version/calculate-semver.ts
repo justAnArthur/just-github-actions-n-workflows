@@ -76,10 +76,25 @@ export function detectChannel(prerelease: string | null): string | null {
 
 // --- bump strategies ---
 
+// with a bump level, the prerelease leads to a version above the last release:
+// a stable 1.2.3 goes to 1.2.4-<channel>.0 (patch) or 1.3.0-<channel>.0 (minor),
+// and a prerelease whose core is too low for the level is raised
+// (1.2.4-canary.2 + feat -> 1.3.0-canary.0). without a level only the counter moves.
 function bumpPrerelease(
   version: ParsedVersion,
-  channel: string = "canary"
+  channel: string = "canary",
+  semver?: SEMVER
 ) {
+  if (semver !== undefined) {
+    const raise = !version.prerelease
+      || (semver === SEMVER.MINOR && version.patch !== 0)
+      || (semver === SEMVER.MAJOR && (version.minor !== 0 || version.patch !== 0))
+    if (raise) {
+      bumpStable(version, semver)
+      version.prerelease = `${channel}.0`
+      return
+    }
+  }
   version.prerelease = incrementPrerelease(version.prerelease, channel)
 }
 
@@ -108,7 +123,8 @@ function bumpStable(version: ParsedVersion, semver: SEMVER | undefined) {
 // `channel` accepts:
 //   - `"stable"` — strip prerelease, bump core version
 //   - any other string (`"canary"`, `"beta"`, `"alpha"`, `"rc"`, …)
-//       — bump the prerelease counter for that channel
+//       — bump the prerelease counter for that channel; with `semver`, first
+//         raise the core version so it is above the last release (see bumpPrerelease)
 //   - `undefined` — auto-detect from the current version's prerelease
 //       identifier; falls back to a stable bump when there is none.
 
@@ -123,7 +139,7 @@ export function calculateNextSemver(
   if (channel === "stable") {
     bumpStable(parsed, semver)
   } else if (channel) {
-    bumpPrerelease(parsed, channel)
+    bumpPrerelease(parsed, channel, semver)
   } else {
     // auto-detect channel from the current version
     if (parsed.prerelease) {
