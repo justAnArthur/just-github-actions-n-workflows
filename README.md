@@ -524,6 +524,7 @@ modules:
 | `deploy.previews.seed.command`        | string   | run on every deploy while it is pending, so it must be idempotent (skip when already seeded); also `{app_name}` |
 | `deploy.previews.seed.upload.<repo path>` | string | remote path the file is copied to before seeding     |
 | `deploy.previews.cleanup_command`     | string   | run by `preview-cleanup.yml` on `seed.ssh_host`         |
+| `release.branches.<branch>`           | string   | channel a push to that branch releases on: `stable` or a prerelease id (`canary`, `beta`, …); the key may be a glob (`versions/**`). unlisted branches keep the channel of the manifest's current version. see [release branches other than main](#release-branches-other-than-main) |
 | `vercel.targets.<name>.hook_secret`   | string   | **required.** name of the repo secret holding this target's deploy hook URL |
 | `vercel.targets.<name>.channels`      | list     | release channels that deploy here: `stable` and/or prerelease ids (`beta`, `rc`, …). default: `[stable]` |
 | `vercel.targets.<name>.packages`      | list     | package names that deploy here. default: any package    |
@@ -931,6 +932,18 @@ jobs:
 ```
 
 called from a push it behaves like a direct push run: `github.event` is the caller's push, so the bump comes from the pushed commits and a head commit with `[skip bump]` skips it; the checkout is the pushed branch, so the bump commit goes back to that branch; the new tags are dispatched as usual. the caller must grant the three permissions above. the file's own `push: main` trigger stays — if `main` also gets pushes that must not bump, don't push release commits there.
+
+a push bumps on the channel of each manifest's current version (`1.2.3-canary.4` stays on canary, `1.2.3` releases stable), so a branch that should only ever release prereleases drifts to stable once a stable version lands on it. pin the channel per branch instead:
+
+```yaml
+# .justactions.yml
+release:
+  branches:
+    canary: canary          # 5.66.6 + fix: → 5.66.7-canary.0, then -canary.1, …; a feat: raises it to 5.67.0-canary.0
+    "versions/**": stable
+```
+
+on a prerelease channel the commits' bump level still counts: from a stable version the core goes up first (`patch` → `x.y.z+1-canary.0`), and a prerelease whose core is too low for a `feat:` / breaking change is raised. a manual `patch:canary` dispatch on `1.7.0` gives `1.7.1-canary.0` the same way. promote with `bump_to_calculated_stable` as before.
 
 runs of pushes that land close together (several merges in a row) don't race: each run bumps from the branch tip rather than its pushed commit, and starts over from the new tip when another bump commit lands before its push (up to 5 times). no `concurrency` group is needed — GitHub would cancel all but one waiting run, and their pushes would release nothing.
 
