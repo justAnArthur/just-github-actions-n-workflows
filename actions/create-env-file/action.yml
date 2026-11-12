@@ -2,7 +2,7 @@ name: Create Dotenv
 description: >
   Creates a .env file from the provided variables.
   Strips comments and blank lines, writes to the specified path.
-  `${{ vars.NAME }}` / `${{ secrets.NAME }}` written literally in a value
+  vars.NAME / secrets.NAME references (in the usual expression braces) written literally in a value
   (e.g. passed through from .justactions.yml) are filled from the vars and
   secrets inputs; filled secrets are masked and never logged.
 
