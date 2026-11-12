@@ -1,5 +1,4 @@
 import { getEnv, getRequiredEnv, log } from "@justanarthur/just-github-actions-n-workflows-lib/github"
-import { exec } from "@justanarthur/just-github-actions-n-workflows-lib/exec"
 
 log.group("ssh-remote-exec")
 
@@ -17,21 +16,26 @@ log.info(`script: ${scriptLines.length} line(s)`)
 for (const line of scriptLines) {
   log.debug(`  > ${line}`)
 }
-
-const sshCommand = [
-  "ssh",
-  "-o", "StrictHostKeyChecking=no",
-  "-o", `ServerAliveInterval=${aliveInterval}`,
-  "-o", `ServerAliveCountMax=${aliveCountMax}`,
-  `${username}@${host}`,
-  "bash -s"
-].join(" ")
-
-const fullCommand = `${sshCommand} << 'ENDSSH'\n${script}\nENDSSH`
-
-log.info("executing remote script...")
-await exec(fullCommand)
-
-log.info(`remote execution on ${host} complete`)
 log.groupEnd()
 
+// the script goes in on stdin and the remote output streams into the job log,
+// so a failing deploy shows why
+log.info(`executing remote script on ${host}...`)
+const ssh = Bun.spawn(
+  [
+    "ssh",
+    "-o", "StrictHostKeyChecking=no",
+    "-o", `ServerAliveInterval=${aliveInterval}`,
+    "-o", `ServerAliveCountMax=${aliveCountMax}`,
+    `${username}@${host}`,
+    "bash -s"
+  ],
+  { stdin: new Blob([script + "\n"]), stdout: "inherit", stderr: "inherit" }
+)
+const code = await ssh.exited
+
+if (code !== 0) {
+  log.error(`remote script on ${host} failed with exit code ${code}`)
+  process.exit(code)
+}
+log.info(`remote execution on ${host} complete`)
