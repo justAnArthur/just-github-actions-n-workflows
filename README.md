@@ -502,6 +502,10 @@ modules:
 | path                                  | type     | description                                             |
 |---------------------------------------|----------|---------------------------------------------------------|
 | `deploy.ssh_target_path`              | string   | remote path for deployment files; a leading `~/` is the remote home |
+| `deploy.ssh.upload`                   | list     | ssh targets: repo paths (files or directories) copied next to the compose file |
+| `deploy.ssh.command`                  | string   | ssh targets: remote command run in `ssh_target_path` instead of the generated prune + pull + up, see [custom ssh deploys](#custom-ssh-deploys) |
+| `deploy.ssh.env.<KEY>`                | string   | ssh targets: extra `.env` line; `{environment}`, `${{ vars.NAME }}`, `${{ secrets.NAME }}` are filled in |
+| `deploy.targets.<name>.ssh.*`         | —        | per-target `upload` / `command` / `env`; `env` is merged with `deploy.ssh.env` (the target wins), `upload` and `command` replace |
 | `deploy.targets.<name>.host`          | string   | ssh hostname for the environment                        |
 | `deploy.targets.<name>.compose_profiles` | string | comma-separated module names to deploy                 |
 | `deploy.targets.<name>.profiles`      | string   | docker compose profile names                            |
@@ -660,6 +664,28 @@ gh variable set JUSTACTIONS_RUNS_ON --body '["self-hosted","ryde"]'
 a self-hosted runner needs `git` and `git-lfs`, `curl`, `unzip` (for `oven-sh/setup-bun`, which downloads Bun), `openssh-client` (ssh deploys and preview seeding), the `gh` CLI (`preview.yml` comments the url) and a Docker daemon with buildx — e.g. the `myoung34/github-runner` image with the host's Docker socket. no Maven, Java or Node is needed: the toolkit reads `pom.xml` itself, and builds happen inside the Dockerfiles. on a runner that keeps its home between jobs (not `EPHEMERAL`), the ssh key of `setup-ssh` and the `docker login` of the build jobs stay there. the `docker.service` of a build publishes its port on the Docker host, so builds of one package queue instead of running at once: `publish-docker-on-tag.yml` per package, `preview.yml` per package with a service (across pull requests). GitHub keeps only one waiting run per queue — a third run of the same package replaces the waiting one, which is then cancelled; dispatch it again with its tag.
 
 **timeouts.** every job has a `timeout-minutes`: 30 for image builds and deploys, 45 for the preview deploy (it waits for Dokploy and the preview url), 60 for `deploy-on-release.yml`'s image wait, 10–20 for the rest.
+
+## custom ssh deploys
+
+by default an ssh deploy copies the compose file and `.env`, then prunes unused images, pulls, runs `compose up --force-recreate` and prunes again. to deploy with your own script instead (health checks, restarting only what changed, rollback), and to put secrets into the server's `.env`:
+
+```yaml
+# .justactions.yml
+deploy:
+  ssh_target_path: ~/my-app
+  ssh:                                   # every ssh target; deploy.targets.<name>.ssh overrides it
+    upload: [ deploy ]                   # copied next to docker-compose.yml
+    command: bash deploy/deploy.sh       # run in ~/my-app after the registry login
+    env:
+      SENTRY_ENVIRONMENT: "{environment}"
+      SENTRY_DSN: ${{ secrets.SENTRY_DSN }}
+  targets:
+    production:
+      host: app.example.com
+```
+
+- `command` runs under `set -euo pipefail`, with `DOCKER_BIN` (`docker` or `sudo docker`) and `DOCKER_COMPOSE_CMD` exported. nothing is pruned before it, so the previous images stay available for a rollback; the job fails when the command fails.
+- `env` values may reference any repo variable or secret; they are filled in on the runner, masked in the log, and written to `.env` only. `deploy.yml` passes `secrets: inherit` to `deploy-docker-compose.yml`; call it the same way from your own workflows. environment secrets are not visible there.
 
 ## deploy with Dokploy
 

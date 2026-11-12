@@ -1,7 +1,8 @@
 name: Deploy Compose Remote
 description: >
   Generates a deployment script for docker compose on a remote server.
-  Handles registry login, image prune, compose pull, compose up, and cleanup.
+  Handles registry login, image prune, compose pull, compose up, and cleanup,
+  or, with `command`, registry login and then that command (no prune).
   A failed registry login only warns. A target path starting with `~/` is
   resolved against the remote $HOME.
   Outputs the script for use with the ssh-exec action.
@@ -22,6 +23,13 @@ inputs:
     description: "Container registry URL"
     required: false
     default: "ghcr.io"
+  command:
+    description: >
+      Remote command run in target_path after the registry login, instead of the
+      generated prune + pull + up (e.g. "bash deploy/deploy.sh"). It runs under
+      `set -euo pipefail` with DOCKER_BIN and DOCKER_COMPOSE_CMD exported. Empty = generated.
+    required: false
+    default: ""
   additional_registries:
     description: >
       Space-separated registries to also log in to with the same credentials
@@ -54,5 +62,6 @@ runs:
         REGISTRY_PASSWORD: ${{ inputs.registry_password }}
         REGISTRY: ${{ inputs.registry }}
         ADDITIONAL_REGISTRIES: ${{ inputs.additional_registries }}
+        DEPLOY_COMMAND: ${{ inputs.command }}
       run: bun run ${{ github.action_path }}/src/index.ts
 

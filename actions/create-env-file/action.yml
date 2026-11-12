@@ -2,6 +2,9 @@ name: Create Dotenv
 description: >
   Creates a .env file from the provided variables.
   Strips comments and blank lines, writes to the specified path.
+  `${{ vars.NAME }}` / `${{ secrets.NAME }}` written literally in a value
+  (e.g. passed through from .justactions.yml) are filled from the vars and
+  secrets inputs; filled secrets are masked and never logged.
 
 inputs:
   variables:
@@ -15,6 +18,14 @@ inputs:
     description: "Directory path where the env file should be created"
     required: false
     default: "./"
+  vars:
+    description: "toJSON(vars) of the calling workflow (only needed for vars.NAME references)"
+    required: false
+    default: "{}"
+  secrets:
+    description: "toJSON(secrets) of the calling workflow (only needed for secrets.NAME references)"
+    required: false
+    default: "{}"
 
 runs:
   using: composite
@@ -33,5 +44,7 @@ runs:
         ENV_FILE_VARIABLES: ${{ inputs.variables }}
         ENV_FILE_NAME: ${{ inputs.file_name }}
         ENV_FILE_PATH: ${{ inputs.file_path }}
+        ENV_FILE_VARS: ${{ inputs.vars }}
+        ENV_FILE_SECRETS: ${{ inputs.secrets }}
       run: bun run ${{ github.action_path }}/src/index.ts
 

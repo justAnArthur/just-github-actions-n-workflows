@@ -15,7 +15,7 @@ This repo's release machinery is wired by workflows from `justAnArthur/just-gith
 - `.github/workflows/*.yml` — workflows owned by the toolkit. Do not hand-edit.
 - `.github/workflows/.toolkit-lock.json` — tracks installed `{name, file, ref, installedAt}`. `update` reads this; deleting it forces a full re-install.
 - `.github/AGENTS.md` — this file (symlinked to `./AGENTS.md` at repo root).
-- `.justactions.yml` — deploy config: targets (`driver` ssh/dokploy, `channel` manual/stable/canary), Dokploy url, PR previews. read by `deploy-docker-compose.yml`, `deploy.yml`, `deploy-on-release.yml`, `preview.yml`, `preview-cleanup.yml`.
+- `.justactions.yml` — deploy config: targets (`driver` ssh/dokploy, `channel` manual/stable/canary), ssh deploy `upload` / `command` / `env`, Dokploy url, PR previews. read by `deploy-docker-compose.yml`, `deploy.yml`, `deploy-on-release.yml`, `preview.yml`, `preview-cleanup.yml`.
 
 The `# toolkit-ref: <ref>` comment at the top of each workflow YAML is injected by `init`. The `uses: justAnArthur/just-github-actions-n-workflows/...@main` references inside the workflow bodies are rewritten to `@<sha>` at install time.
 

@@ -67,6 +67,15 @@ outputs:
   channel:
     description: "manual, stable or canary (environment)"
     value: ${{ steps.run.outputs.channel }}
+  ssh_upload:
+    description: "Space-separated repo paths to copy next to the compose file (ssh targets, deploy.ssh.upload)"
+    value: ${{ steps.run.outputs.ssh_upload }}
+  ssh_command:
+    description: "Remote command replacing the generated pull + up; empty = generated (ssh targets, deploy.ssh.command)"
+    value: ${{ steps.run.outputs.ssh_command }}
+  ssh_env:
+    description: "Extra KEY=value .env lines, vars/secrets references unfilled (ssh targets, deploy.ssh.env)"
+    value: ${{ steps.run.outputs.ssh_env }}
   dokploy_url:
     description: "deploy.dokploy.url (dokploy targets and previews)"
     value: ${{ steps.run.outputs.dokploy_url }}
