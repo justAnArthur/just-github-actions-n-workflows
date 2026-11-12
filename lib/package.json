@@ -1,6 +1,6 @@
 {
   "name": "@justanarthur/just-github-actions-n-workflows-lib",
-  "version": "1.7.0",
+  "version": "1.7.1-canary.0",
   "private": true,
   "type": "module",
   "exports": {
