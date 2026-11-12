@@ -1,6 +1,6 @@
 {
   "name": "@justanarthur/step-ssh-remote-exec",
-  "version": "1.0.1",
+  "version": "1.0.1-canary.0",
   "private": true,
   "type": "module",
   "dependencies": {
