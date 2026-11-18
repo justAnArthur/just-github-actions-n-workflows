@@ -34,9 +34,12 @@ Type → version bump:
 | `feat`  | minor |
 | `fix`   | patch |
 | `perf`  | minor |
-| `feat!` | major |
-| `BREAKING CHANGE:` in body | major |
+| `feat(x)!:` or `feat!(x):` (any type) | major |
+| `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer | major, for the scope of the line above it |
+| `BREAKING-CHANGE(x): …` line | major, for `x` |
 | anything else | patch |
+
+Breaking is major on `0.x` too: `0.4.3` → `1.0.0`. A breaking commit still needs a scope.
 
 Multiple scopes (comma-separated) bump multiple packages at once. To suppress a bump entirely, include `[skip bump]` anywhere in the commit message.
 

@@ -34,11 +34,16 @@ fix(cli,lib): shared fix across cli and lib
 | `ci`       | patch        | CI/CD pipeline changes                           |
 | `revert`   | patch        | Reverting a previous commit                      |
 
-Append `!` after the type (before the scope) for **breaking changes** → triggers a **major** bump:
+Mark **breaking changes** → **major** bump (on `0.x` too, so `0.4.3` → `1.0.0`) any of these ways:
 ```
-feat!(cli): redesign authentication flow
-feat!(lib): remove deprecated API
+feat(cli)!: redesign authentication flow      # "!" after the scope (the spec form)
+feat!(lib): remove deprecated API             # "!" before the scope
+fix(lib): rename export
+
+BREAKING CHANGE: renamed foo to bar           # footer; BREAKING-CHANGE: works too
 ```
+A footer breaks the conventional line above it. `BREAKING-CHANGE(<scope>): …` on a line
+of its own breaks that scope. The scope is still required.
 
 ## Scope
 

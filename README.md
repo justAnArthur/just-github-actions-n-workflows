@@ -275,6 +275,8 @@ git commit -m "feat(frontend): redesign dashboard"    # bumps @myorg/web only
 git push                                              # bump-version.yml auto-bumps on push to main
 ```
 
+the type sets the bump: `feat` / `perf` → minor, anything else → patch. a breaking change → major, also on `0.x` (`0.4.3` → `1.0.0`): `!` after the scope (`feat(api)!:`, the spec form) or before it (`feat!(api):`), or a `BREAKING CHANGE:` / `BREAKING-CHANGE:` footer, which applies to the commit's own scope. `BREAKING-CHANGE(<scope>): …` on a line of its own breaks that scope.
+
 **step 4 — release**. the bump-version workflow pushes annotated tags like `@myorg/api@0.2.0` with a JSON annotation listing the deploy targets, then dispatches `publish-npm-on-tag.yml` (and every other installed tag workflow) for each new tag. the publish-npm workflow then:
 - for `npm`-tagged packages → publishes to npm at the new version
 - for non-npm-tagged packages (private, lib, etc.) → skips
