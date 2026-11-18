@@ -1,3 +1,4 @@
+import type { CommitItem } from "../git/conventional-commit-parser"
 import type { ParsedVersion } from "./parse-semver"
 import { formatSemver, parseSemver } from "./parse-semver"
 
@@ -21,7 +22,7 @@ export const PRERELEASE_CHANNELS = [
 ] as const
 
 // maps each conventional commit type to its default bump level.
-// breaking changes always produce a major bump.
+// breaking items go through commitItemSemver instead.
 
 export const CONVENTIONAL_TO_SEMVER: Record<string, SEMVER> = {
   fix: SEMVER.PATCH,
@@ -36,6 +37,12 @@ export const CONVENTIONAL_TO_SEMVER: Record<string, SEMVER> = {
   ci: SEMVER.PATCH,
   revert: SEMVER.PATCH,
   "BREAKING-CHANGE": SEMVER.MAJOR
+}
+
+// a breaking item ("!" or a BREAKING CHANGE footer) is major whatever its type,
+// on 0.x too, so 0.4.3 goes to 1.0.0. undefined for a type that bumps nothing.
+export function commitItemSemver(item: Pick<CommitItem, "type" | "breaking">): SEMVER | undefined {
+  return item.breaking ? SEMVER.MAJOR : CONVENTIONAL_TO_SEMVER[item.type]
 }
 
 // --- prerelease increment ---

@@ -99,4 +99,23 @@ describe("findManifestsByScope", () => {
     expect(findManifestsByScope(manifests, "docs")).toEqual([])
     expect(findManifestByName(manifests, "docs")).toBeUndefined()
   })
+
+  test("a breaking commit bumps major, in every spelling", () => {
+    const notch = manifest("just-notch", "0.4.3", ["island"])
+    for (const message of [
+      "feat!(island): new gesture model",
+      "feat(island)!: new gesture model",
+      "fix(island): new gesture model\n\nBREAKING CHANGE: swipes changed",
+      "fix(island): new gesture model\n\nBREAKING-CHANGE: swipes changed",
+      "chore(other): unrelated\n\nBREAKING-CHANGE(island): swipes changed"
+    ]) {
+      const { bumps } = collectPushBumps([message], [notch])
+      expect([...bumps]).toEqual([[notch, SEMVER.MAJOR]])
+    }
+  })
+
+  test("a scopeless breaking commit bumps nothing", () => {
+    const { bumps } = collectPushBumps(["feat!: new gesture model"], [app])
+    expect(bumps.size).toBe(0)
+  })
 })

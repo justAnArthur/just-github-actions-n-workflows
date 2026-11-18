@@ -1,5 +1,5 @@
 import { parseCommitMessage } from "@justanarthur/just-github-actions-n-workflows-lib/git/conventional-commit-parser"
-import { calculateNextSemver, CONVENTIONAL_TO_SEMVER, SEMVER } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
+import { calculateNextSemver, commitItemSemver, SEMVER } from "@justanarthur/just-github-actions-n-workflows-lib/version/calculate-semver"
 import type { Manifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
 import { findManifestsByScope, findManifests, getManifestSearchDir, updateManifest } from "@justanarthur/just-github-actions-n-workflows-lib/manifests"
 import { commitAndPush } from "@justanarthur/just-github-actions-n-workflows-lib/git/commit-n-push"
@@ -87,7 +87,7 @@ if (bumpToCalculatedStableEnv) {
 
       let semver = -1
       for (const item of scopedItems) {
-        const level = CONVENTIONAL_TO_SEMVER[item.type]
+        const level = commitItemSemver(item)
         if (level !== undefined && level > semver) semver = level
       }
 

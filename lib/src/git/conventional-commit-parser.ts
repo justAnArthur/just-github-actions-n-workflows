@@ -5,6 +5,7 @@ export type CommitItem = {
   subject: string;
   body: string;
   raw: string;
+  breaking: boolean;
 };
 
 export type ParsedCommit = {
@@ -15,8 +16,12 @@ export type ParsedCommit = {
   footer: string | null;
 };
 
+// "!" goes before the scope (feat!(x):) or, per the spec, after it (feat(x)!:)
 const CONVENTIONAL_RE =
-  /^(?<type>[a-zA-Z0-9+-]+)(?<breaking>!)?(?:\((?<scope>[^)]+)\))?:\s*(?<subject>.+)$/
+  /^(?<type>[a-zA-Z0-9+-]+)(?<bang>!)?(?:\((?<scope>[^)]+)\))?(?<bangAfterScope>!)?:\s*(?<subject>.+)$/
+
+// a scopeless footer, not an item; `BREAKING-CHANGE(<scope>): …` stays an item of its own
+const BREAKING_FOOTER_RE = /^BREAKING[ -]CHANGE:/
 
 const JIRA_RE = /([A-Z][A-Z0-9]+-\d+)/g
 
@@ -24,8 +29,11 @@ export function parseCommitMessage(raw: string): ParsedCommit {
   const lines = raw.replace(/\r\n/g, "\n").split("\n")
 
   const conventionalIndices: number[] = []
+  const breakingFooterIndices: number[] = []
   lines.forEach((line, i) => {
-    if (CONVENTIONAL_RE.test(line.trim())) conventionalIndices.push(i)
+    const trimmed = line.trim()
+    if (BREAKING_FOOTER_RE.test(trimmed)) breakingFooterIndices.push(i)
+    else if (CONVENTIONAL_RE.test(trimmed)) conventionalIndices.push(i)
   })
 
   const firstIdx = conventionalIndices.length ? conventionalIndices[0] : -1
@@ -74,8 +82,17 @@ export function parseCommitMessage(raw: string): ParsedCommit {
       scopes,
       subject: (groups.subject || "").trim(),
       body,
-      raw: line
+      raw: line,
+      breaking: Boolean(groups.bang || groups.bangAfterScope) || groups.type === "BREAKING-CHANGE"
     })
+  }
+
+  // a footer breaks the item it follows (the header line in a single-item commit)
+  for (const footerIdx of breakingFooterIndices) {
+    if (items.length === 0) break
+    let k = 0
+    while (k + 1 < conventionalIndices.length && conventionalIndices[k + 1] < footerIdx) k++
+    items[k].breaking = true
   }
 
   return {

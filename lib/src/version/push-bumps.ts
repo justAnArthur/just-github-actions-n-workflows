@@ -2,7 +2,7 @@ import { parseCommitMessage } from "../git/conventional-commit-parser"
 import { log } from "../github"
 import type { Manifest } from "../manifests"
 import { findManifestsByScope } from "../manifests"
-import { CONVENTIONAL_TO_SEMVER } from "./calculate-semver"
+import { commitItemSemver } from "./calculate-semver"
 
 // highest bump level per manifest named by a scope in the pushed commits.
 // a manifest without a version (docs deployed elsewhere, never released)
@@ -21,7 +21,7 @@ export function collectPushBumps<M extends Manifest>(
   const items = commitMessages.map(parseCommitMessage).flatMap((c) => c.items)
 
   for (const item of items) {
-    const level = CONVENTIONAL_TO_SEMVER[item.type]
+    const level = commitItemSemver(item)
     if (level === undefined) continue
 
     if (item.scopes.length === 0) {

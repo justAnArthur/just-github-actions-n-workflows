@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test"
 import { formatSemver, parseSemver } from "../src/version/parse-semver"
-import { calculateNextSemver, detectChannel } from "../src/version/calculate-semver"
+import { calculateNextSemver, commitItemSemver, detectChannel, SEMVER } from "../src/version/calculate-semver"
 import { compareSemver } from "../src/version/compare-semver"
 
 describe("parseSemver", () => {
@@ -144,3 +144,19 @@ describe("compareSemver", () => {
   })
 })
 
+describe("commitItemSemver", () => {
+  test("maps the type when not breaking", () => {
+    expect(commitItemSemver({ type: "feat", breaking: false })).toBe(SEMVER.MINOR)
+    expect(commitItemSemver({ type: "fix", breaking: false })).toBe(SEMVER.PATCH)
+    expect(commitItemSemver({ type: "wip", breaking: false })).toBeUndefined()
+  })
+
+  test("breaking is major whatever the type", () => {
+    expect(commitItemSemver({ type: "fix", breaking: true })).toBe(SEMVER.MAJOR)
+    expect(commitItemSemver({ type: "wip", breaking: true })).toBe(SEMVER.MAJOR)
+  })
+
+  test("a breaking change takes 0.x to 1.0.0", () => {
+    expect(calculateNextSemver("0.4.3", commitItemSemver({ type: "feat", breaking: true }))).toBe("1.0.0")
+  })
+})

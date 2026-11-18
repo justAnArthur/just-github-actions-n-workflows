@@ -124,7 +124,7 @@ async function generateReleaseNotes(
       const parsed = parseCommitMessage(commit)
       for (const item of parsed.items) {
         if (item.scope === scope || (scope === "general" && !item.scope)) {
-          const breaking = item.type.includes("!") ? " ⚠️ BREAKING" : ""
+          const breaking = item.breaking ? " ⚠️ BREAKING" : ""
           body += `- **${item.type}**: ${item.subject}${breaking}\n`
         }
       }
