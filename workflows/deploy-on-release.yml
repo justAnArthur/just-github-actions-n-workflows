@@ -98,6 +98,8 @@ permissions:
 
 jobs:
   resolve:
+    # on the shared runners even with JUSTACTIONS_RELEASE_RUNS_ON: this job waits for the images, and on a
+    # single release runner it would hold the very build it waits for. the deploy itself (deploy.yml) runs there
     runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 60
     outputs:
