@@ -113,7 +113,8 @@ permissions:
 
 jobs:
   bump-version:
-    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    # a dispatched run (e.g. promoting to stable) on the release runner, the bump on every push not
+    runs-on: ${{ fromJSON(github.event_name == 'workflow_dispatch' && (vars.JUSTACTIONS_RELEASE_RUNS_ON || vars.JUSTACTIONS_RUNS_ON) || vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 15
     # under workflow_call, event_name and head_commit are the caller's (e.g. push)
     if: >-

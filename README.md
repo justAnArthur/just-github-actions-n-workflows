@@ -546,11 +546,12 @@ modules:
 | `docker.builder.name`                 | string   | builder name, default `justactions`; a build with `network: host` uses `<name>-host` |
 | `docker.builder.cache_to`             | string   | registry cache export with the persistent builder on a self-hosted runner: `min` (default), `max` or `off`. github-hosted runs export `max` |
 
-one setting is a repository variable instead, because a job's runner is picked before any step can read `.justactions.yml`:
+the runners are repository variables instead, because a job's runner is picked before any step can read `.justactions.yml`:
 
-| variable              | description                                             |
-|-----------------------|---------------------------------------------------------|
-| `JUSTACTIONS_RUNS_ON` | JSON `runs-on` of every job of every workflow, e.g. `["self-hosted","ryde"]`; default `"ubuntu-latest"`. see [runners, caches and timeouts](#runners-caches-and-timeouts) |
+| variable                      | description                                             |
+|-------------------------------|---------------------------------------------------------|
+| `JUSTACTIONS_RUNS_ON`         | JSON `runs-on` of every job of every workflow, e.g. `["self-hosted","ryde"]`; default `"ubuntu-latest"`. see [runners, caches and timeouts](#runners-caches-and-timeouts) |
+| `JUSTACTIONS_RELEASE_RUNS_ON` | JSON `runs-on` of the release jobs (stable image builds, deploys, a dispatched `bump-version.yml`), e.g. `["self-hosted","release"]`; default `JUSTACTIONS_RUNS_ON`. see [release runner](#runners-caches-and-timeouts) |
 
 ### vercel fan-out
 
@@ -663,6 +664,22 @@ docker:
 ```bash
 gh variable set JUSTACTIONS_RUNS_ON --body '["self-hosted","ryde"]'
 ```
+
+**release runner.** GitHub has no job priority: on a few shared self-hosted runners, a stable release (say, a production hotfix) waits until previews and prerelease builds ahead of it finish. set `JUSTACTIONS_RELEASE_RUNS_ON` to the labels of a runner the other jobs don't match, and the release jobs get it to themselves:
+
+```bash
+# shared runners have the label `ryde`, the reserved one only `release`
+gh variable set JUSTACTIONS_RELEASE_RUNS_ON --body '["self-hosted","release"]'
+```
+
+| workflow                    | on the release runner                                   |
+|-----------------------------|---------------------------------------------------------|
+| `publish-docker-on-tag.yml` | `resolve-meta` (every tag, seconds) and the build of a stable version; prerelease builds stay on `JUSTACTIONS_RUNS_ON` |
+| `deploy.yml`, `deploy-docker-compose.yml` | every job                                 |
+| `bump-version.yml`          | a dispatched run (e.g. promoting to stable); the bump on push stays on `JUSTACTIONS_RUNS_ON` |
+| `deploy-on-release.yml`     | the deploy it calls (`deploy.yml`); its own job waits for the images and stays on `JUSTACTIONS_RUNS_ON` |
+
+previews, `preview-cleanup.yml` and the other workflows don't use it. with the variable set, stable builds of a package also queue apart from its prerelease builds (`-stable` concurrency group), so a release neither waits behind a prerelease build nor gets replaced by a newer one; the release runner then needs a Docker daemon of its own when a `docker.service` publishes a port. with only `JUSTACTIONS_RUNS_ON` set, nothing changes.
 
 a self-hosted runner needs `git` and `git-lfs`, `curl`, `unzip` (for `oven-sh/setup-bun`, which downloads Bun), `openssh-client` (ssh deploys and preview seeding), the `gh` CLI (`preview.yml` comments the url) and a Docker daemon with buildx — e.g. the `myoung34/github-runner` image with the host's Docker socket. no Maven, Java or Node is needed: the toolkit reads `pom.xml` itself, and builds happen inside the Dockerfiles. on a runner that keeps its home between jobs (not `EPHEMERAL`), the ssh key of `setup-ssh` and the `docker login` of the build jobs stay there. the `docker.service` of a build publishes its port on the Docker host, so builds of one package queue instead of running at once: `publish-docker-on-tag.yml` per package, `preview.yml` per package with a service (across pull requests). GitHub keeps only one waiting run per queue — a third run of the same package replaces the waiting one, which is then cancelled; dispatch it again with its tag.
 

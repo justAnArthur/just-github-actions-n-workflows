@@ -31,7 +31,8 @@
 #
 # the layer cache is the image's :buildcache tag on ghcr.io. jobs run on
 # the JSON `runs-on` in the JUSTACTIONS_RUNS_ON repo variable (default
-# "ubuntu-latest"). on persistent self-hosted runners, `docker.builder`
+# "ubuntu-latest"); resolve-meta and stable builds on the one in
+# JUSTACTIONS_RELEASE_RUNS_ON when it is set. on persistent self-hosted runners, `docker.builder`
 # in .justactions.yml keeps one buildx builder (and its local cache)
 # between jobs instead of a new one per job.
 #
@@ -74,7 +75,8 @@ permissions:
 
 jobs:
   resolve-meta:
-    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    # on the release runner for every tag: the runner of the build depends on its output
+    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RELEASE_RUNS_ON || vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 10
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
@@ -106,13 +108,16 @@ jobs:
     if: >-
       needs.resolve-meta.outputs.has_annotation != 'true' ||
       needs.resolve-meta.outputs.publish_docker == 'true'
-    runs-on: ${{ fromJSON(vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
+    # stable releases on the release runner (JUSTACTIONS_RELEASE_RUNS_ON), prereleases on the shared ones
+    runs-on: ${{ fromJSON(needs.resolve-meta.outputs.is_prerelease != 'true' && (vars.JUSTACTIONS_RELEASE_RUNS_ON || vars.JUSTACTIONS_RUNS_ON) || vars.JUSTACTIONS_RUNS_ON || '"ubuntu-latest"') }}
     timeout-minutes: 30
     # one build per package at a time: on runners sharing a docker host, two
     # builds of a package would start its service on the same host port.
-    # github keeps one waiting run per group, a newer one replaces it
+    # github keeps one waiting run per group, a newer one replaces it. with a
+    # release runner, stable builds queue apart from prereleases, so a hotfix
+    # never waits behind (or is replaced by) a canary build of its package
     concurrency:
-      group: publish-docker-${{ github.repository }}-${{ needs.resolve-meta.outputs.pkg_name || inputs.tag || github.ref_name }}
+      group: publish-docker-${{ github.repository }}-${{ needs.resolve-meta.outputs.pkg_name || inputs.tag || github.ref_name }}${{ vars.JUSTACTIONS_RELEASE_RUNS_ON && needs.resolve-meta.outputs.is_prerelease != 'true' && '-stable' || '' }}
       cancel-in-progress: false
 
     # modules.overrides[].docker.service in .justactions.yml; not started when its image is empty
